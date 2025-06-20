@@ -670,7 +670,7 @@ export function DataPreview({
     }
 
     toast({
-      title: "Data cleared",
+      icon: <Trash2 className="h-4 w-4" />,
       description: `${dataTypeToClear === "symbol" ? "Symbol map" : dataTypeToClear === "choropleth" ? "Choropleth" : "Custom map"} data has been cleared.${switchMessage}`,
       duration: 4000,
     })
