@@ -2223,10 +2223,24 @@ export function MapPreview({
             <CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">
                 Map preview
               </CardTitle>
-            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </div>
           {/* Right side: Download and Copy buttons (with stopPropagation) */}
           <div className="flex items-center gap-2">
+          <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                  "flex items-center gap-2 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700",
+                  "group",
+                )}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleCopySVG()
+              }}
+            >
+              <Copy className="h-3 w-3 transition-transform duration-300 group-hover:translate-x-1" />
+              Copy to Figma
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -2242,17 +2256,7 @@ export function MapPreview({
               <Download className="h-3 w-3 transition-transform duration-300 group-hover:translate-y-1" />
               Download SVG
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleCopySVG()
-              }}
-            >
-              <Copy className="h-4 w-4" />
-              <span>Copy to Figma</span>
-            </Button>
+            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </div>
         </div>
       </CardHeader>
