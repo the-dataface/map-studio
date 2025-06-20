@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dialog"
 import type { DataRow, GeocodedRow } from "@/app/page"
 import { cn } from "@/lib/utils"
+import { toast } from "@/components/ui/use-toast"
 
 interface GeocodingSectionProps {
   columns: string[]
@@ -283,6 +284,11 @@ export function GeocodingSection({
         processing: 0,
         total: 0,
       })
+      toast({
+        description: "Geocoding cache cleared.",
+        variant: "default",
+        icon: <Trash2 className="h-5 w-5" />,
+      })
     } catch (error) {
       console.warn("Error clearing cache:", error)
     }
@@ -477,7 +483,24 @@ export function GeocodingSection({
       }
     }
 
+    const finalCached = geocodedResults.filter((row) => row.geocoded && row.source !== "api").length
+    const finalSuccess = geocodedResults.filter((row) => row.geocoded && row.source === "api").length
+    const finalFailed = geocodedResults.filter((row) => row.geocoded === false).length
+
     setIsGeocoding(false)
+    if (finalFailed === 0) {
+      toast({
+        description: `${finalSuccess + finalCached} locations geocoded successfully.`,
+        variant: "success",
+        icon: <Check className="h-5 w-5" />,
+      })
+    } else {
+      toast({
+        description: `${finalSuccess + finalCached} locations geocoded, ${finalFailed} failed.`,
+        variant: "destructive",
+        icon: <AlertCircle className="h-5 w-5" />,
+      })
+    }
     setIsExpanded(false)
   }, [parsedData, fullAddressColumn, cityColumn, stateColumn, setIsGeocoding, setGeocodedData])
 
@@ -492,11 +515,20 @@ export function GeocodingSection({
         localStorage.setItem(PERMISSION_ASKED_KEY, "true")
         setShowConsentModal(false)
 
-        if (!consent) {
-          // If user declines, clear any existing cache
-          clearAllCache()
+        if (consent) {
+          updateCacheSize()
+          toast({
+            description: "Geocoding cache enabled. Future geocoding will be faster.",
+            variant: "success",
+            icon: <Database className="h-5 w-5" />,
+          })
         } else {
-          updateCacheSize() // Update cache size after consent
+          clearAllCache()
+          toast({
+            description: "Geocoding cache disabled. Performance may be slower.",
+            variant: "default",
+            icon: <AlertCircle className="h-5 w-5" />,
+          })
         }
 
         // If there was a pending geocode request, execute it now

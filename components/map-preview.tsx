@@ -2156,8 +2156,8 @@ export function MapPreview({
       URL.revokeObjectURL(url)
 
       toast({
-        title: "Download successful",
-        description: "SVG file has been downloaded",
+        icon: <Download className="h-4 w-4" />,
+        description: "SVG downloaded successfully.",
         duration: 3000,
       })
     } catch (error) {
@@ -2182,8 +2182,8 @@ export function MapPreview({
       await navigator.clipboard.writeText(svgString)
 
       toast({
-        title: "Copied to clipboard",
-        description: "SVG code has been copied to clipboard",
+        icon: <Copy className="h-4 w-4" />,
+        description: "SVG copied to clipboard.",
         duration: 3000,
       })
     } catch (error) {
@@ -2213,20 +2213,50 @@ export function MapPreview({
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-3">
+    <Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
+      <CardHeader
+        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-4 px-6 rounded-t-xl relative"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold">Map Preview</CardTitle>
+            <div className="flex items-center gap-2">
+            <CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">
+                Map preview
+              </CardTitle>
+          </div>
+          {/* Right side: Download and Copy buttons (with stopPropagation) */}
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleDownloadSVG} className="h-8 px-2">
-              <Download className="h-4 w-4" />
+          <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                  "flex items-center gap-2 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700",
+                  "group",
+                )}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleCopySVG()
+              }}
+            >
+              <Copy className="h-3 w-3 transition-transform duration-300 group-hover:translate-x-1" />
+              Copy to Figma
             </Button>
-            <Button variant="outline" size="sm" onClick={handleCopySVG} className="h-8 px-2">
-              <Copy className="h-4 w-4" />
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                  "flex items-center gap-2 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700",
+                  "group",
+                )}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleDownloadSVG()
+              }}
+            >
+              <Download className="h-3 w-3 transition-transform duration-300 group-hover:translate-y-1" />
+              Download SVG
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setIsExpanded(!isExpanded)} className="h-8 w-8 p-0">
-              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </Button>
+            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </div>
         </div>
       </CardHeader>
