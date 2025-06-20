@@ -2222,7 +2222,7 @@ export function MapPreview({
           {/* Left side: Title and Chevron (clickable as part of header) */}
           <div className="flex items-center gap-2">
             <CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">
-                Data preview
+                Map preview
               </CardTitle>
             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </div>
