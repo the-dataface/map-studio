@@ -2213,14 +2213,13 @@ export function MapPreview({
   }
 
   return (
-    <Card className="w-full">
+    <Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
       <CardHeader
-        className="pb-3 cursor-pointer hover:bg-accent/50 transition-colors duration-200"
+        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-5 px-6 rounded-t-xl relative"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center justify-between">
-          {/* Left side: Title and Chevron (clickable as part of header) */}
-          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
             <CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">
                 Map preview
               </CardTitle>
