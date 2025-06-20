@@ -483,16 +483,20 @@ export function GeocodingSection({
       }
     }
 
+    const finalCached = geocodedResults.filter((row) => row.geocoded && row.source !== "api").length
+    const finalSuccess = geocodedResults.filter((row) => row.geocoded && row.source === "api").length
+    const finalFailed = geocodedResults.filter((row) => row.geocoded === false).length
+
     setIsGeocoding(false)
-    if (geocodingStatus.failed === 0) {
+    if (finalFailed === 0) {
       toast({
-        description: `${geocodingStatus.success + geocodingStatus.cached} locations geocoded successfully.`,
+        description: `${finalSuccess + finalCached} locations geocoded successfully.`,
         variant: "success",
         icon: <Check className="h-5 w-5" />,
       })
     } else {
       toast({
-        description: `${geocodingStatus.success + geocodingStatus.cached} locations geocoded, ${geocodingStatus.failed} failed.`,
+        description: `${finalSuccess + finalCached} locations geocoded, ${finalFailed} failed.`,
         variant: "destructive",
         icon: <AlertCircle className="h-5 w-5" />,
       })
