@@ -2230,13 +2230,17 @@ export function MapPreview({
             <Button
               variant="outline"
               size="sm"
+              className={cn(
+                  "flex items-center gap-2 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700",
+                  "group",
+                )}
               onClick={(e) => {
                 e.stopPropagation()
                 handleDownloadSVG()
               }}
             >
-              <Download className="h-4 w-4" />
-              <span>Download SVG</span>
+              <Download className="h-3 w-3 transition-transform duration-300 group-hover:translate-y-1" />
+              Download SVG
             </Button>
             <Button
               variant="outline"

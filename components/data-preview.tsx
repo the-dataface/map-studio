@@ -906,7 +906,7 @@ export function DataPreview({
                 }}
               >
                 <Download className="h-3 w-3 transition-transform duration-300 group-hover:translate-y-1" />
-                Download
+                Download data
               </Button>
               <div className="transform transition-transform duration-200 ease-in-out">
                 {isExpanded ? (
