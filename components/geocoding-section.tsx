@@ -10,7 +10,7 @@ import {
   Search,
   Trash2,
   Database,
-  Check,
+  CheckCircle,
   X,
   Loader2,
   AlertCircle,
@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dialog"
 import type { DataRow, GeocodedRow } from "@/app/page"
 import { cn } from "@/lib/utils"
+import { toast } from "@/components/ui/use-toast"
 
 interface GeocodingSectionProps {
   columns: string[]
@@ -283,6 +284,11 @@ export function GeocodingSection({
         processing: 0,
         total: 0,
       })
+      toast({
+        description: "Geocoding cache cleared.",
+        variant: "default",
+        icon: <Trash2 className="h-5 w-5" />,
+      })
     } catch (error) {
       console.warn("Error clearing cache:", error)
     }
@@ -478,6 +484,19 @@ export function GeocodingSection({
     }
 
     setIsGeocoding(false)
+    if (geocodingStatus.failed === 0) {
+      toast({
+        description: `${geocodingStatus.success + geocodingStatus.cached} locations geocoded successfully.`,
+        variant: "success",
+        icon: <CheckCircle className="h-5 w-5" />,
+      })
+    } else {
+      toast({
+        description: `${geocodingStatus.success + geocodingStatus.cached} locations geocoded, ${geocodingStatus.failed} failed.`,
+        variant: "destructive",
+        icon: <AlertCircle className="h-5 w-5" />,
+      })
+    }
     setIsExpanded(false)
   }, [parsedData, fullAddressColumn, cityColumn, stateColumn, setIsGeocoding, setGeocodedData])
 
@@ -492,11 +511,20 @@ export function GeocodingSection({
         localStorage.setItem(PERMISSION_ASKED_KEY, "true")
         setShowConsentModal(false)
 
-        if (!consent) {
-          // If user declines, clear any existing cache
-          clearAllCache()
+        if (consent) {
+          updateCacheSize()
+          toast({
+            description: "Geocoding cache enabled. Future geocoding will be faster.",
+            variant: "success",
+            icon: <Database className="h-5 w-5" />,
+          })
         } else {
-          updateCacheSize() // Update cache size after consent
+          clearAllCache()
+          toast({
+            description: "Geocoding cache disabled. Performance may be slower.",
+            variant: "default",
+            icon: <AlertCircle className="h-5 w-5" />,
+          })
         }
 
         // If there was a pending geocode request, execute it now
@@ -587,7 +615,7 @@ export function GeocodingSection({
                   )}
                   {geocodingStatus.success > 0 && (
                     <div className="flex items-center gap-1">
-                      <Check className="h-3 w-3 text-green-500 transition-transform duration-200 hover:scale-110" />
+                      <CheckCircle className="h-3 w-3 text-green-500 transition-transform duration-200 hover:scale-110" />
                       <span className="text-green-700 dark:text-green-300 transition-colors duration-200">
                         {geocodingStatus.success}
                       </span>
@@ -775,7 +803,7 @@ export function GeocodingSection({
                   )}
                   {geocodingStatus.success > 0 && (
                     <div className="flex items-center gap-1 animate-in fade-in-50 slide-in-from-left-1 duration-300 delay-75">
-                      <Check className="h-3 w-3 text-green-500" />
+                      <CheckCircle className="h-3 w-3 text-green-500" />
                       <span className="text-green-700 dark:text-green-300 transition-colors duration-200">
                         {geocodingStatus.success}
                       </span>
