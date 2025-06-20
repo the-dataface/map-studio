@@ -10,7 +10,7 @@ import {
   Search,
   Trash2,
   Database,
-  CheckCircle,
+  Check,
   X,
   Loader2,
   AlertCircle,
@@ -488,7 +488,7 @@ export function GeocodingSection({
       toast({
         description: `${geocodingStatus.success + geocodingStatus.cached} locations geocoded successfully.`,
         variant: "success",
-        icon: <CheckCircle className="h-5 w-5" />,
+        icon: <Check className="h-5 w-5" />,
       })
     } else {
       toast({
@@ -615,7 +615,7 @@ export function GeocodingSection({
                   )}
                   {geocodingStatus.success > 0 && (
                     <div className="flex items-center gap-1">
-                      <CheckCircle className="h-3 w-3 text-green-500 transition-transform duration-200 hover:scale-110" />
+                      <Check className="h-3 w-3 text-green-500 transition-transform duration-200 hover:scale-110" />
                       <span className="text-green-700 dark:text-green-300 transition-colors duration-200">
                         {geocodingStatus.success}
                       </span>
@@ -803,7 +803,7 @@ export function GeocodingSection({
                   )}
                   {geocodingStatus.success > 0 && (
                     <div className="flex items-center gap-1 animate-in fade-in-50 slide-in-from-left-1 duration-300 delay-75">
-                      <CheckCircle className="h-3 w-3 text-green-500" />
+                      <Check className="h-3 w-3 text-green-500" />
                       <span className="text-green-700 dark:text-green-300 transition-colors duration-200">
                         {geocodingStatus.success}
                       </span>
