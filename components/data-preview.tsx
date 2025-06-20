@@ -554,8 +554,8 @@ export function DataPreview({
 
       await navigator.clipboard.writeText(tsvData)
       toast({
-        icon: <Copy className="h-4 w-4" />,
-        description: "Data copied to clipboard.",
+        title: "Data copied",
+        description: "Data has been copied to clipboard in TSV format",
         duration: 3000,
       })
     } catch (error) {
@@ -594,8 +594,8 @@ export function DataPreview({
       document.body.removeChild(link)
 
       toast({
-        icon: <Download className="h-4 w-4" />,
-        description: "Data downloaded successfully.",
+        title: "Download started",
+        description: "CSV file has been downloaded successfully",
         duration: 3000,
       })
     } catch (error) {
@@ -670,7 +670,7 @@ export function DataPreview({
     }
 
     toast({
-      icon: <Trash2 className="h-4 w-4" />,
+      title: "Data cleared",
       description: `${dataTypeToClear === "symbol" ? "Symbol map" : dataTypeToClear === "choropleth" ? "Choropleth" : "Custom map"} data has been cleared.${switchMessage}`,
       duration: 4000,
     })
@@ -844,7 +844,7 @@ export function DataPreview({
     <TooltipProvider>
       <Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
         <CardHeader
-          className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-4 px-6 rounded-t-xl relative"
+          className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-5 px-6 rounded-t-xl relative"
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <div className="flex items-center justify-between">
@@ -906,7 +906,7 @@ export function DataPreview({
                 }}
               >
                 <Download className="h-3 w-3 transition-transform duration-300 group-hover:translate-y-1" />
-                Download data
+                Download
               </Button>
               <div className="transform transition-transform duration-200 ease-in-out">
                 {isExpanded ? (

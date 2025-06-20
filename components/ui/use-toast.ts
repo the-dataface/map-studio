@@ -7,10 +7,9 @@ import { useState, useEffect } from "react"
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 5000
+const TOAST_REMOVE_DELAY = 1000000
 
 type ToasterToast = ToastProps & {
-  icon?: React.ReactNode
   id: string
   title?: React.ReactNode
   description?: React.ReactNode
@@ -127,7 +126,7 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
-function toast({ icon, ...props }: Toast) {
+function toast({ ...props }: Toast) {
   const id = genId()
 
   const update = (props: ToasterToast) =>
@@ -140,7 +139,6 @@ function toast({ icon, ...props }: Toast) {
   dispatch({
     type: "ADD_TOAST",
     toast: {
-      icon,
       ...props,
       id,
       open: true,

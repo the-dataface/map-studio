@@ -6,7 +6,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
-import { ChevronDown, ChevronUp, MapPin, BarChart3, MapIcon, HelpCircle, CheckCircle, AlertCircle } from "lucide-react"
+import { ChevronDown, ChevronUp, MapPin, BarChart3, MapIcon, HelpCircle } from "lucide-react"
 import type { DataRow } from "@/app/page"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "@/components/ui/use-toast" // Import toast
@@ -249,41 +249,26 @@ WY,6.0,65003,93.3,West`
       const { data, columns } = parseCSVData(symbolRawData)
       if (data.length > 0) {
         onDataLoad("symbol", data, columns, symbolRawData)
-        toast({
-          description: `${data.length} rows of symbol data loaded successfully.`,
-          variant: "success",
-          icon: <CheckCircle className="h-5 w-5" />,
-        })
       }
     } else if (activeTab === "choropleth") {
       const { data, columns } = parseCSVData(choroplethRawData)
       if (data.length > 0) {
         onDataLoad("choropleth", data, columns, choroplethRawData)
-        toast({
-          description: `${data.length} rows of choropleth data loaded successfully.`,
-          variant: "success",
-          icon: <CheckCircle className="h-5 w-5" />,
-        })
       }
     } else if (activeTab === "custom") {
       const validationResult = validateCustomSVG(customSVG)
       if (!validationResult.isValid) {
         toast({
+          title: "Invalid Custom SVG",
           description: validationResult.message,
           variant: "destructive",
           duration: 5000,
-          icon: <AlertCircle className="h-5 w-5" />,
         })
         return // Prevent loading invalid SVG
       }
 
       if (customSVG.trim()) {
         onDataLoad("custom", [], [], "", customSVG)
-        toast({
-          description: "Custom map loaded successfully.",
-          variant: "success",
-          icon: <CheckCircle className="h-5 w-5" />,
-        })
       }
     }
   }
