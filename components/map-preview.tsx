@@ -2214,18 +2214,39 @@ export function MapPreview({
 
   return (
     <Card className="w-full">
-      <CardHeader className="pb-3">
+      <CardHeader
+        className="pb-3 cursor-pointer hover:bg-accent/50 transition-colors duration-200"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold">Map Preview</CardTitle>
+          {/* Left side: Title and Chevron (clickable as part of header) */}
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleDownloadSVG} className="h-8 px-2">
+            <CardTitle className="text-base font-medium">Map preview</CardTitle>
+            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </div>
+          {/* Right side: Download and Copy buttons (with stopPropagation) */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleDownloadSVG()
+              }}
+            >
               <Download className="h-4 w-4" />
+              <span>Download SVG</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={handleCopySVG} className="h-8 px-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleCopySVG()
+              }}
+            >
               <Copy className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setIsExpanded(!isExpanded)} className="h-8 w-8 p-0">
-              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              <span>Copy to Figma</span>
             </Button>
           </div>
         </div>
