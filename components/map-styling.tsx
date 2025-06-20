@@ -42,6 +42,7 @@ import {
   Diamond,
   Triangle,
   Code,
+  CheckCircle,
 } from "lucide-react"
 import { ColorInput } from "@/components/color-input"
 import { v4 as uuidv4 } from "uuid" // For unique IDs for saved styles
@@ -231,9 +232,9 @@ export function MapStyling({
     })
     setNewStyleName("")
     toast({
-      title: "Style Saved",
-      description: `Style "${newStyle.name}" has been saved.`,
-      duration: 3000,
+      description: `Style "${newStyle.name}" saved.`,
+      variant: "success",
+      icon: <CheckCircle className="h-5 w-5" />,
     })
   }
 
@@ -245,11 +246,7 @@ export function MapStyling({
         savedStyles: stylingSettings.base.savedStyles.filter((style) => style.id !== id),
       },
     })
-    toast({
-      title: "Style Deleted",
-      description: "The style has been removed.",
-      duration: 3000,
-    })
+    toast({ description: "Style deleted.", variant: "default", icon: <Trash2 className="h-5 w-5" /> })
   }
 
   const handleApplyStyle = (styleSettings: StylingSettings["base"]["settings"], styleName: string) => {
@@ -260,11 +257,7 @@ export function MapStyling({
         ...styleSettings,
       },
     })
-    toast({
-      title: "Style Applied",
-      description: `Style "${styleName}" has been applied.`,
-      duration: 3000,
-    })
+    toast({ description: `Style "${styleName}" applied.`, variant: "default", icon: <Sparkles className="h-5 w-5" /> })
   }
 
   const renderSubPanel = (
@@ -745,7 +738,7 @@ export function MapStyling({
                             >
                               <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M12 2C8.13 2 5 5.13 5 9C5 14.25 12 22 12 22C12 22 19 14.25 19 9C19 5.13 15.87 2 12 2ZM7 9C7 6.24 9.24 4 12 4C14.76 4 17 6.24 17 9C17 11.88 14.12 16.19 12 18.88C9.92 16.21 7 11.85 7 9Z" />
-                                <path d="M12 11.5C13.3807 11.5 14.5 10.3807 14.5 9C14.5 7.61929 13.3807 6.5 12 6.5C10.6193 6.5 9.5 7.61929 9.5 9C9.5 10.3807 10.6193 11.5 12 11.5Z" />
+                                <path d="M12 11.5C13.3807 11.5 14.5 10.3807 14.5 9C14.5 7.61929 13.3807 6.5C12 6.5 10.6193 6.5 9.5 7.61929 9.5 9C9.5 10.3807 10.6193 11.5 12 11.5Z" />
                               </svg>
                             </ToggleGroupItem>
                             <ToggleGroupItem
