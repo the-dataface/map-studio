@@ -37,6 +37,7 @@ Map Studio is a tool for quickly visualizing geospatial data. It allows users to
 -   **Data Upload**: Add fields to upload a dataset instead of pasting.
 -   **Improved Label Positioning**: Make auto-positioning setting for symbol map layers more intelligent and add support for connected labels in choropleth layers.
 -   **Improved Error, Warning, and Success Notifications**
+-   **Data Checks and Verifications for Choropleth Data**
 
 ### Getting Started
 
