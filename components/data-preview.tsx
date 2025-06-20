@@ -554,8 +554,8 @@ export function DataPreview({
 
       await navigator.clipboard.writeText(tsvData)
       toast({
-        title: "Data copied",
-        description: "Data has been copied to clipboard in TSV format",
+        icon: <Copy className="h-4 w-4" />,
+        description: "Data copied to clipboard.",
         duration: 3000,
       })
     } catch (error) {
@@ -594,8 +594,8 @@ export function DataPreview({
       document.body.removeChild(link)
 
       toast({
-        title: "Download started",
-        description: "CSV file has been downloaded successfully",
+        icon: <Download className="h-4 w-4" />,
+        description: "Data downloaded successfully.",
         duration: 3000,
       })
     } catch (error) {

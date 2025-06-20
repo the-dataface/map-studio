@@ -2156,8 +2156,8 @@ export function MapPreview({
       URL.revokeObjectURL(url)
 
       toast({
-        title: "Download successful",
-        description: "SVG file has been downloaded",
+        icon: <Download className="h-4 w-4" />,
+        description: "SVG downloaded successfully.",
         duration: 3000,
       })
     } catch (error) {
@@ -2182,8 +2182,8 @@ export function MapPreview({
       await navigator.clipboard.writeText(svgString)
 
       toast({
-        title: "Copied to clipboard",
-        description: "SVG code has been copied to clipboard",
+        icon: <Copy className="h-4 w-4" />,
+        description: "SVG copied to clipboard.",
         duration: 3000,
       })
     } catch (error) {
