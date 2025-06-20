@@ -29,15 +29,15 @@ Map Studio is a tool for quickly visualizing geospatial data. It allows users to
 -   **Map Export**: Copy the rendered and well-structured SVG map to paste directly into Figma or save locally.
 
 ### On the roadmap
--   [ ]**Export Settings**: Save and share your settings (including data, dimensions,and styling) as a JSON file.
--   [ ]**Import Settings**: Load a saved settings JSON to continue editing.
--   [ ]**US Counties**: Add US county outlines as a layer option in the basemap.
--   [ ]**Canada and Other Countries**: Add options to render different countries or a world map.
--   [ ]**Alternative Projections**: Add options to change the rendered projection of the map.
--   [ ]**Data Upload**: Add fields to upload a dataset instead of pasting.
--   [ ]**Improved Label Positioning**: Make auto-positioning setting for symbol map layers more intelligent and add support for connected labels in choropleth layers.
--   [x]**Improved Error, Warning, and Success Notifications**
--   [ ]**Data Checks and Verifications for Choropleth Data**
+-   [ ] **Export Settings**: Save and share your settings (including data, dimensions,and styling) as a JSON file.
+-   [ ] **Import Settings**: Load a saved settings JSON to continue editing.
+-   [ ] **US Counties**: Add US county outlines as a layer option in the basemap.
+-   [ ] **Canada and Other Countries**: Add options to render different countries or a world map.
+-   [ ] **Alternative Projections**: Add options to change the rendered projection of the map.
+-   [ ] **Data Upload**: Add fields to upload a dataset instead of pasting.
+-   [ ] **Improved Label Positioning**: Make auto-positioning setting for symbol map layers more intelligent and add support for connected labels in choropleth layers.
+-   [x] **Improved Error, Warning, and Success Notifications**
+-   [ ] **Data Checks and Verifications for Choropleth Data**
 
 ### Getting Started
 
