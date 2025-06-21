@@ -637,7 +637,7 @@ const renderLabelPreview = (
     return "No data or template to preview."
   }
 
-  let previewHtml = template.replace(/\{([^}]+)\}/g, (match, columnName) => {
+  let previewHtml = template.replace(/{([^}]+)}/g, (match, columnName) => {
     const value = firstRow[columnName]
     if (value === undefined || value === null) {
       return "" // Or a placeholder like "[N/A]"
