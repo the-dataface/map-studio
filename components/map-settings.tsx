@@ -17,7 +17,6 @@ interface MapSettingsProps {
   selectedProjection: string
   setSelectedProjection: (v: string) => void
   columns: string[]
-  parsedData: Record<string, unknown>[]
 }
 
 /* ------------------------------------------------------------------ */
@@ -52,7 +51,6 @@ export function MapSettings({
   selectedProjection,
   setSelectedProjection,
   columns,
-  parsedData,
 }: MapSettingsProps) {
   /* ---------------------------------------------------------------- */
   /* Intelligent defaults                                              */
@@ -66,16 +64,7 @@ export function MapSettings({
       setSelectedProjection("geoAlbersUsa")
       return
     }
-
-    // Heuristic: look for two-letter uppercase codes in the first rows
-    const maybeState = parsedData
-      .slice(0, 100)
-      .some((row) => Object.values(row).some((v) => typeof v === "string" && /^[A-Z]{2}$/.test(v as string)))
-    if (maybeState) {
-      setSelectedCountry("united-states")
-      setSelectedProjection("geoAlbersUsa")
-    }
-  }, [columns, parsedData, setSelectedCountry, setSelectedProjection])
+  }, [columns, setSelectedCountry, setSelectedProjection])
 
   /* ---------------------------------------------------------------- */
   /* Search logic for region list                                      */
