@@ -1,17 +1,17 @@
-// components/map-preview.tsx
-
 import type React from "react"
 
 interface MapPreviewProps {
-  selectedGeography?: string
-  selectedProjection?: string
+  selectedGeography?: "world" | "usa"
+  selectedProjection?: "mercator" | "albersUsa" | "equalEarth"
 }
 
-const MapPreview: React.FC<MapPreviewProps> = () => {
+const MapPreview: React.FC<MapPreviewProps> = ({ selectedGeography, selectedProjection }) => {
   return (
     <div>
-      {/* Placeholder for map preview */}
+      {/* Map preview will be rendered here */}
       <p>Map Preview Component</p>
+      {selectedGeography && <p>Selected Geography: {selectedGeography}</p>}
+      {selectedProjection && <p>Selected Projection: {selectedProjection}</p>}
     </div>
   )
 }
