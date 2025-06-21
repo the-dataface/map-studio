@@ -17,7 +17,7 @@ interface MapSettingsProps {
   selectedProjection: string
   setSelectedProjection: (v: string) => void
   columns: string[]
-  parsedData: Record<string, unknown>[]
+  parsedData: Array<Record<string, any>>
 }
 
 type CountryOption = { id: string; label: string }
@@ -31,18 +31,19 @@ const COUNTRY_OPTIONS: CountryOption[] = [
   { id: "united-states", label: "United States" },
 ]
 
-const PROJECTION_OPTIONS: Record<string, { id: string; label: string }[]> = {
-  // Default/World
+// Projection choices keyed by country code.
+const PROJECTION_OPTIONS = {
+  // Default / world
   default: [
     { id: "geoMercator", label: "Mercator" },
     { id: "geoEqualEarth", label: "Equal-Earth" },
   ],
-  // United States specific
+  // United-States-specific
   "united-states": [
     { id: "geoAlbersUsa", label: "Albers USA" },
     { id: "geoMercator", label: "Mercator" },
   ],
-}
+} as const
 
 export function MapSettings({
   isExpanded,
