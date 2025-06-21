@@ -181,6 +181,7 @@ export default function MapStudio() {
   const [activeMapType, setActiveMapType] = useState<"symbol" | "choropleth" | "custom">("symbol")
   const [dataInputExpanded, setDataInputExpanded] = useState(true)
   const [showGeocoding, setShowGeocoding] = useState(false)
+  const [hasMadeInitialSuggestion, setHasMadeInitialSuggestion] = useState(false)
 
   // Map Projection and Geography states
   const [selectedGeography, setSelectedGeography] = useState<"usa" | "world">("usa")
@@ -522,6 +523,7 @@ export default function MapStudio() {
     }
 
     setDataInputExpanded(false) // Collapse data input after loading
+    setHasMadeInitialSuggestion(false) // Reset suggestion flag for new data
   }
 
   const handleClearData = (mapType: "symbol" | "choropleth" | "custom") => {
@@ -681,6 +683,8 @@ export default function MapStudio() {
           onProjectionChange={setSelectedProjection}
           columns={getCurrentColumns()}
           sampleRows={getCurrentSampleRows()}
+          hasMadeInitialSuggestion={hasMadeInitialSuggestion} // NEW PROP
+          setHasMadeInitialSuggestion={setHasMadeInitialSuggestion} // NEW PROP
         />
 
         {showGeocoding && (
