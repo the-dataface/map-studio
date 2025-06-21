@@ -17,33 +17,32 @@ interface MapSettingsProps {
   selectedProjection: string
   setSelectedProjection: (v: string) => void
   columns: string[]
-  parsedData: Array<Record<string, any>>
+  parsedData: Record<string, unknown>[]
 }
 
-type CountryOption = { id: string; label: string }
+/* ------------------------------------------------------------------ */
+/* Data                                                                */
+/* ------------------------------------------------------------------ */
 
-/**
- * A small searchable list of available regions.
- * Currently ships with just “World” and “United States” but can be expanded.
- */
-const COUNTRY_OPTIONS: CountryOption[] = [
+const COUNTRY_OPTIONS = [
   { id: "world", label: "World" },
   { id: "united-states", label: "United States" },
 ]
 
-// Projection choices keyed by country code.
-const PROJECTION_OPTIONS = {
-  // Default / world
-  default: [
+const PROJECTIONS_BY_COUNTRY: Record<string, { id: string; label: string }[]> = {
+  world: [
     { id: "geoMercator", label: "Mercator" },
     { id: "geoEqualEarth", label: "Equal-Earth" },
   ],
-  // United-States-specific
   "united-states": [
     { id: "geoAlbersUsa", label: "Albers USA" },
     { id: "geoMercator", label: "Mercator" },
   ],
-} as const
+}
+
+/* ------------------------------------------------------------------ */
+/* Component                                                           */
+/* ------------------------------------------------------------------ */
 
 export function MapSettings({
   isExpanded,
@@ -55,37 +54,32 @@ export function MapSettings({
   columns,
   parsedData,
 }: MapSettingsProps) {
-  /* ------------------------------------------------------------------ */
-  /* Intelligent default detection ­                                     */
-  /* ------------------------------------------------------------------ */
+  /* ---------------------------------------------------------------- */
+  /* Intelligent defaults                                              */
+  /* ---------------------------------------------------------------- */
   useEffect(() => {
-    // If the user hasn’t touched anything, try to infer a sensible default.
-    // 1.  If there’s a column literally called “state”, or the first few values
-    //     look like U.S. state abbreviations, switch to the U.S. map.
-    const userHasChosen = selectedCountry !== "united-states" && selectedCountry !== "world"
-    if (userHasChosen) return
-
     const lowerCols = columns.map((c) => c.toLowerCase())
+
+    // Infer USA if a "state" column exists
     if (lowerCols.includes("state")) {
       setSelectedCountry("united-states")
       setSelectedProjection("geoAlbersUsa")
       return
     }
 
-    // Simple heuristic: two-letter uppercase strings seen in first 100 rows
-    const firstRows = parsedData.slice(0, 100)
-    const maybeState = firstRows.some((row) =>
-      Object.values(row).some((val) => typeof val === "string" && /^[A-Z]{2}$/.test(val as string)),
-    )
+    // Heuristic: look for two-letter uppercase codes in the first rows
+    const maybeState = parsedData
+      .slice(0, 100)
+      .some((row) => Object.values(row).some((v) => typeof v === "string" && /^[A-Z]{2}$/.test(v as string)))
     if (maybeState) {
       setSelectedCountry("united-states")
       setSelectedProjection("geoAlbersUsa")
     }
-  }, [columns, parsedData, selectedCountry, setSelectedCountry, setSelectedProjection])
+  }, [columns, parsedData, setSelectedCountry, setSelectedProjection])
 
-  /* ------------------------------------------------------------------ */
-  /* Search / filtering for the country list                             */
-  /* ------------------------------------------------------------------ */
+  /* ---------------------------------------------------------------- */
+  /* Search logic for region list                                      */
+  /* ---------------------------------------------------------------- */
   const [search, setSearch] = useState("")
   const visibleCountries = useMemo(() => {
     if (!search.trim()) return COUNTRY_OPTIONS
@@ -93,27 +87,27 @@ export function MapSettings({
     return COUNTRY_OPTIONS.filter((c) => c.label.toLowerCase().includes(s))
   }, [search])
 
-  /* ------------------------------------------------------------------ */
-  /* UI                                                                  */
-  /* ------------------------------------------------------------------ */
+  /* ---------------------------------------------------------------- */
+  /* UI                                                                */
+  /* ---------------------------------------------------------------- */
   return (
     <Card className={cn({ "border-muted-foreground/30": !isExpanded })}>
       <CardHeader
         onClick={() => setIsExpanded(!isExpanded)}
-        className="cursor-pointer flex flex-row items-center justify-between space-y-0"
+        className="cursor-pointer flex items-center justify-between space-y-0"
       >
         <CardTitle className="text-lg font-medium">Map settings</CardTitle>
-        <ChevronDown className={cn("transition-transform", isExpanded ? "rotate-180" : "rotate-0")} size={18} />
+        <ChevronDown size={18} className={cn("transition-transform", isExpanded ? "rotate-180" : "rotate-0")} />
       </CardHeader>
 
       {isExpanded && (
         <CardContent className="space-y-4">
-          {/* Country / region picker */}
+          {/* Region picker */}
           <div>
             <p className="mb-1 text-sm font-medium">Region</p>
             <Input
               type="search"
-              placeholder="Search region…"
+              placeholder="Search region …"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="mb-2"
@@ -143,7 +137,7 @@ export function MapSettings({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(PROJECTION_OPTIONS[selectedCountry] || PROJECTION_OPTIONS.default).map((p) => (
+                {(PROJECTIONS_BY_COUNTRY[selectedCountry] ?? PROJECTIONS_BY_COUNTRY.world).map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     {p.label}
                   </SelectItem>

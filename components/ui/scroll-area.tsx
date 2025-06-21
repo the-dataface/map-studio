@@ -1,21 +1,19 @@
 "use client"
 
-import * as React from "react"
+import type React from "react"
+
+import { forwardRef } from "react"
 import { cn } from "@/lib/utils"
 
 /**
- * Lightweight vertical ScrollArea.
- * Keeps the API surface tiny to avoid type-annotation issues in the playground.
+ * A tiny wrapper that simply adds vertical scrolling.
  */
-export const ScrollArea = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(function ScrollArea(
-  { className, children, ...props },
-  ref,
-) {
-  return (
+export const ScrollArea = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, children, ...props }, ref) => (
     <div ref={ref} {...props} className={cn("relative w-full h-full overflow-y-auto", className)}>
       {children}
     </div>
-  )
-})
+  ),
+)
 
 ScrollArea.displayName = "ScrollArea"
