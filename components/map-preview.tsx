@@ -17,3 +17,5 @@ const MapPreview: React.FC<MapPreviewProps> = ({ selectedGeography, selectedProj
 }
 
 export default MapPreview
+
+export { MapPreview }
