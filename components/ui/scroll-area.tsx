@@ -1,26 +1,21 @@
 "use client"
 
 import * as React from "react"
-import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
 import { cn } from "@/lib/utils"
 
 /**
- * Shadcn-style ScrollArea component.
- * Wrap any overflowing content and it becomes scrollable with a custom thumb.
+ * Lightweight vertical ScrollArea.
+ * Keeps the API surface tiny to avoid type-annotation issues in the playground.
  */
-export const ScrollArea = React.forwardRef<
-  React.ElementRef<typeof ScrollAreaPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root>
->(({ className, children, ...props }, ref) => (
-  <ScrollAreaPrimitive.Root ref={ref} className={cn("relative overflow-hidden", className)} {...props}>
-    <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">{children}</ScrollAreaPrimitive.Viewport>
+export const ScrollArea = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(function ScrollArea(
+  { className, children, ...props },
+  ref,
+) {
+  return (
+    <div ref={ref} {...props} className={cn("relative w-full h-full overflow-y-auto", className)}>
+      {children}
+    </div>
+  )
+})
 
-    <ScrollAreaPrimitive.Scrollbar
-      orientation="vertical"
-      className="flex select-none touch-none p-0.5 transition-colors"
-    >
-      <ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-muted-foreground/50" />
-    </ScrollAreaPrimitive.Scrollbar>
-  </ScrollAreaPrimitive.Root>
-))
 ScrollArea.displayName = "ScrollArea"
