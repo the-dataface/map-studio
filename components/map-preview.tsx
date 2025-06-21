@@ -465,7 +465,7 @@ const formatNumber = (value: any, format: string): string => {
     num = compactNum
   } else {
     const cleanedValue = strValue.replace(/[,$%]/g, "")
-    num = Number.parseFloat(cleanedValue)
+    const parsedNum = Number.parseFloat(cleanedValue)
   }
 
   if (isNaN(num)) {
@@ -924,6 +924,7 @@ export function MapPreview({
         .geoAlbersUsa()
         .scale(1300)
         .translate([width / 2, mapHeight / 2])
+      console.log(`Using Albers USA projection with scale: 1300, translate: [${width / 2}, ${mapHeight / 2}]`)
     } else if (selectedProjection === "mercator") {
       // Adjust scale for Mercator to fit the world
       projection = d3
@@ -1674,6 +1675,7 @@ export function MapPreview({
           } else if (selectedGeography === "world") {
             // For world maps, try to match by country name (d.properties.name or d.id)
             const countryName = d.properties?.name || d.id
+            const stateDataMap = new Map()
             if (countryName && stateDataMap.has(countryName)) {
               dataRow = stateDataMap.get(countryName)
               console.log(`✅ Found data for country: ${countryName}`)
