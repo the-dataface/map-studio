@@ -6,7 +6,7 @@ import * as topojson from "topojson-client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Download, Copy } from "lucide-react"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 
 // Define interfaces for props and data structures
 interface DataRow {
@@ -247,12 +247,50 @@ export function MapPreview({
       let geoFeatures: any[] = []
       let nationFeature: any = null
 
+      // Ensure expected TopoJSON objects exist before processing
+      const { objects } = geoAtlasData as Record<string, any>
+
+      if (!objects) {
+        console.error("TopoJSON file has no 'objects' property:", geoAtlasData)
+        toast({
+          title: "Invalid TopoJSON",
+          description: "The downloaded map file is missing required data.",
+          variant: "destructive",
+        })
+        return
+      }
+
       if (selectedGeography === "usa") {
-        geoFeatures = topojson.feature(geoAtlasData, geoAtlasData.objects.states).features
-        nationFeature = topojson.mesh(geoAtlasData, geoAtlasData.objects.nation)
+        if (!objects.states || !objects.nation) {
+          console.error("US atlas missing 'states' or 'nation' objects:", objects)
+          toast({
+            title: "Atlas format error",
+            description: "Could not find states/nation layers in US-atlas file.",
+            variant: "destructive",
+          })
+          return
+        }
+        geoFeatures = topojson.feature(geoAtlasData, objects.states).features
+        nationFeature = topojson.mesh(geoAtlasData, objects.nation)
       } else if (selectedGeography === "world") {
-        geoFeatures = topojson.feature(geoAtlasData, geoAtlasData.objects.countries).features
-        nationFeature = topojson.mesh(geoAtlasData, geoAtlasData.objects.countries, (a: any, b: any) => a !== b)
+        if (!objects.countries) {
+          console.error("World atlas missing 'countries' object:", objects)
+          toast({
+            title: "Atlas format error",
+            description: "Could not find country layer in World-atlas file.",
+            variant: "destructive",
+          })
+          return
+        }
+        geoFeatures = topojson.feature(geoAtlasData, objects.countries).features
+        nationFeature = topojson.mesh(geoAtlasData, objects.countries, (a: any, b: any) => a !== b)
+      } else {
+        // Unknown geography – bail out gracefully
+        toast({
+          title: "Unsupported geography",
+          description: `No renderer for “${selectedGeography}”.`,
+        })
+        return
       }
 
       // Choropleth logic
