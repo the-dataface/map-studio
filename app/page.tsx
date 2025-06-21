@@ -181,7 +181,6 @@ export default function MapStudio() {
   const [activeMapType, setActiveMapType] = useState<"symbol" | "choropleth" | "custom">("symbol")
   const [dataInputExpanded, setDataInputExpanded] = useState(true)
   const [showGeocoding, setShowGeocoding] = useState(false)
-  const [hasMadeInitialSuggestion, setHasMadeInitialSuggestion] = useState(false)
 
   // Map Projection and Geography states
   const [selectedGeography, setSelectedGeography] = useState<"usa" | "world">("usa")
@@ -487,9 +486,6 @@ export default function MapStudio() {
         break
     }
 
-    // NEW: Removed redundant setColumnTypes({}) and setColumnFormats({}) calls here.
-    // DataPreview's useEffect will handle inference based on updated data.
-
     // NEW: Enhanced logic for determining active map type
     const hasCustomMap =
       (mapType === "custom" && customMapDataParam && customMapDataParam.length > 0) ||
@@ -523,7 +519,48 @@ export default function MapStudio() {
     }
 
     setDataInputExpanded(false) // Collapse data input after loading
-    setHasMadeInitialSuggestion(false) // Reset suggestion flag for new data
+
+    // NEW: Infer geography and projection directly here
+    let inferredGeo: "usa" | "world" = "usa"
+    let inferredProj: "albersUsa" | "mercator" | "equalEarth" = "albersUsa"
+
+    const lowerCaseColumns = columns.map((col) => col.toLowerCase())
+    const hasCountryColumn = lowerCaseColumns.some((col) => col.includes("country") || col.includes("nation"))
+    const hasStateColumn = lowerCaseColumns.some((col) => col.includes("state") || col.includes("province"))
+    const hasLatLon =
+      lowerCaseColumns.some((col) => col.includes("lat")) && lowerCaseColumns.some((col) => col.includes("lon"))
+
+    const sampleDataString = JSON.stringify(parsedData.slice(0, 10)).toLowerCase() // Use parsedData for inference
+    const containsUsStates =
+      sampleDataString.includes("california") ||
+      sampleDataString.includes("texas") ||
+      sampleDataString.includes("new york") ||
+      sampleDataString.includes("florida")
+    const containsWorldCountries =
+      sampleDataString.includes("canada") ||
+      sampleDataString.includes("china") ||
+      sampleDataString.includes("india") ||
+      sampleDataString.includes("brazil")
+
+    if (hasCountryColumn || containsWorldCountries) {
+      inferredGeo = "world"
+      inferredProj = "equalEarth" // Equal Earth is good for world maps
+    } else if (hasStateColumn || containsUsStates) {
+      inferredGeo = "usa"
+      inferredProj = "albersUsa" // Albers USA is standard for US
+    } else if (hasLatLon) {
+      inferredGeo = "world"
+      inferredProj = "mercator"
+    }
+
+    // Apply inferred settings if they are different from current defaults
+    // This ensures user's previous manual selection isn't overridden if they re-load similar data
+    if (inferredGeo !== selectedGeography) {
+      setSelectedGeography(inferredGeo)
+    }
+    if (inferredProj !== selectedProjection) {
+      setSelectedProjection(inferredProj)
+    }
   }
 
   const handleClearData = (mapType: "symbol" | "choropleth" | "custom") => {
@@ -683,8 +720,6 @@ export default function MapStudio() {
           onProjectionChange={setSelectedProjection}
           columns={getCurrentColumns()}
           sampleRows={getCurrentSampleRows()}
-          hasMadeInitialSuggestion={hasMadeInitialSuggestion} // NEW PROP
-          setHasMadeInitialSuggestion={setHasMadeInitialSuggestion} // NEW PROP
         />
 
         {showGeocoding && (

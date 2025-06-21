@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { useToast } from "@/components/ui/use-toast"
+// Removed useToast import as it's no longer needed here
 
 interface MapProjectionSelectionProps {
   geography: "usa" | "world"
@@ -16,8 +16,7 @@ interface MapProjectionSelectionProps {
   onProjectionChange: (projection: "albersUsa" | "mercator" | "equalEarth") => void
   columns: string[]
   sampleRows: (string | number)[][]
-  hasMadeInitialSuggestion: boolean
-  setHasMadeInitialSuggestion: (value: boolean) => void
+  // Removed hasMadeInitialSuggestion and setHasMadeInitialSuggestion props
 }
 
 const geographies = [
@@ -39,133 +38,16 @@ export function MapProjectionSelection({
   projection,
   onGeographyChange,
   onProjectionChange,
-  columns,
-  sampleRows,
-  hasMadeInitialSuggestion,
-  setHasMadeInitialSuggestion,
+  columns, // Still passed, but not used for inference in this component
+  sampleRows, // Still passed, but not used for inference in this component
 }: MapProjectionSelectionProps) {
   const [searchQuery, setSearchQuery] = useState("")
-  const { toast } = useToast()
+  // Removed useToast hook
 
   const filteredGeographies = geographies.filter((g) => g.label.toLowerCase().includes(searchQuery.toLowerCase()))
 
-  const inferGeographyAndProjection = useCallback(() => {
-    let inferredGeo: "usa" | "world" = "usa"
-    let inferredProj: "albersUsa" | "mercator" | "equalEarth" = "albersUsa"
-    let suggestionMade = false
-
-    // Check columns for country/state names
-    const lowerCaseColumns = columns.map((col) => col.toLowerCase())
-    const hasCountryColumn = lowerCaseColumns.some((col) => col.includes("country") || col.includes("nation"))
-    const hasStateColumn = lowerCaseColumns.some((col) => col.includes("state") || col.includes("province"))
-    const hasLatLon =
-      lowerCaseColumns.some((col) => col.includes("lat")) && lowerCaseColumns.some((col) => col.includes("lon"))
-
-    // Check sample data for common country/state names
-    const sampleDataString = JSON.stringify(sampleRows).toLowerCase()
-    const containsUsStates =
-      sampleDataString.includes("california") ||
-      sampleDataString.includes("texas") ||
-      sampleDataString.includes("new york") ||
-      sampleDataString.includes("florida")
-    const containsWorldCountries =
-      sampleDataString.includes("canada") ||
-      sampleDataString.includes("china") ||
-      sampleDataString.includes("india") ||
-      sampleDataString.includes("brazil")
-
-    if (hasCountryColumn || containsWorldCountries) {
-      inferredGeo = "world"
-      inferredProj = "equalEarth" // Equal Earth is good for world maps
-      suggestionMade = true
-    } else if (hasStateColumn || containsUsStates) {
-      inferredGeo = "usa"
-      inferredProj = "albersUsa" // Albers USA is standard for US
-      suggestionMade = true
-    } else if (hasLatLon) {
-      // If only lat/lon, world map with Mercator is a reasonable default
-      inferredGeo = "world"
-      inferredProj = "mercator"
-      suggestionMade = true
-    }
-
-    if (suggestionMade && (inferredGeo !== geography || inferredProj !== projection)) {
-      onGeographyChange(inferredGeo)
-      onProjectionChange(inferredProj)
-      toast({
-        title: "Map Settings Suggested",
-        description: `Based on your data, we've suggested "${geographies.find((g) => g.value === inferredGeo)?.label}" geography and "${projections.find((p) => p.value === inferredProj)?.label}" projection.`,
-        duration: 3000,
-      })
-    }
-  }, [columns, sampleRows, geography, projection, onGeographyChange, onProjectionChange, toast])
-
-  useEffect(() => {
-    // Only run inference and suggestion if an initial suggestion hasn't been made yet
-    // and there's actual data to infer from.
-    if (!hasMadeInitialSuggestion && (columns.length > 0 || sampleRows.length > 0)) {
-      let inferredGeo: "usa" | "world" = "usa"
-      let inferredProj: "albersUsa" | "mercator" | "equalEarth" = "albersUsa"
-      let suggestionMade = false
-
-      // Check columns for country/state names
-      const lowerCaseColumns = columns.map((col) => col.toLowerCase())
-      const hasCountryColumn = lowerCaseColumns.some((col) => col.includes("country") || col.includes("nation"))
-      const hasStateColumn = lowerCaseColumns.some((col) => col.includes("state") || col.includes("province"))
-      const hasLatLon =
-        lowerCaseColumns.some((col) => col.includes("lat")) && lowerCaseColumns.some((col) => col.includes("lon"))
-
-      // Check sample data for common country/state names
-      const sampleDataString = JSON.stringify(sampleRows).toLowerCase()
-      const containsUsStates =
-        sampleDataString.includes("california") ||
-        sampleDataString.includes("texas") ||
-        sampleDataString.includes("new york") ||
-        sampleDataString.includes("florida")
-      const containsWorldCountries =
-        sampleDataString.includes("canada") ||
-        sampleDataString.includes("china") ||
-        sampleDataString.includes("india") ||
-        sampleDataString.includes("brazil")
-
-      if (hasCountryColumn || containsWorldCountries) {
-        inferredGeo = "world"
-        inferredProj = "equalEarth" // Equal Earth is good for world maps
-        suggestionMade = true
-      } else if (hasStateColumn || containsUsStates) {
-        inferredGeo = "usa"
-        inferredProj = "albersUsa" // Albers USA is standard for US
-        suggestionMade = true
-      } else if (hasLatLon) {
-        // If only lat/lon, world map with Mercator is a reasonable default
-        inferredGeo = "world"
-        inferredProj = "mercator"
-        suggestionMade = true
-      }
-
-      // Only suggest if the inferred values are different from the current ones
-      if (suggestionMade && (inferredGeo !== geography || inferredProj !== projection)) {
-        onGeographyChange(inferredGeo)
-        onProjectionChange(inferredProj)
-        toast({
-          title: "Map Settings Suggested",
-          description: `Based on your data, we've suggested "${geographies.find((g) => g.value === inferredGeo)?.label}" geography and "${projections.find((p) => p.value === inferredProj)?.label}" projection.`,
-          duration: 3000,
-        })
-        setHasMadeInitialSuggestion(true) // Mark that a suggestion has been made
-      }
-    }
-  }, [
-    columns,
-    sampleRows,
-    geography,
-    projection,
-    onGeographyChange,
-    onProjectionChange,
-    toast,
-    hasMadeInitialSuggestion,
-    setHasMadeInitialSuggestion,
-  ])
+  // Removed inferGeographyAndProjection useCallback and its useEffect
+  // The inference logic is now handled in app/page.tsx
 
   return (
     <Card className="w-full">
