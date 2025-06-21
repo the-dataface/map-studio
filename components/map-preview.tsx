@@ -465,7 +465,7 @@ const formatNumber = (value: any, format: string): string => {
     num = compactNum
   } else {
     const cleanedValue = strValue.replace(/[,$%]/g, "")
-    const parsedNum = Number.parseFloat(cleanedValue)
+    num = Number.parseFloat(cleanedValue)
   }
 
   if (isNaN(num)) {
@@ -831,7 +831,8 @@ export function MapPreview({
         setIsLoading(true)
         let dataUrl = ""
         if (selectedGeography === "usa") {
-          dataUrl = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-albers-10m.json"
+          // Use the unprojected states-10m.json for USA
+          dataUrl = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json"
         } else if (selectedGeography === "world") {
           dataUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"
         }
@@ -1928,8 +1929,8 @@ export function MapPreview({
 
         const domain = [dimensionSettings.symbol.colorMinValue, dimensionSettings.symbol.colorMaxValue]
         const rangeColors = [
-          dimensionSettings.symbol.colorMinColor || stylingSettings.symbol.symbolFillColor,
-          dimensionSettings.symbol.colorMaxColor || stylingSettings.symbol.symbolFillColor,
+          stylingSettings.symbol.colorMinColor || stylingSettings.symbol.symbolFillColor,
+          stylingSettings.symbol.colorMaxColor || stylingSettings.symbol.symbolFillColor,
         ]
 
         if (dimensionSettings.symbol.colorMidColor) {
