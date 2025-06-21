@@ -1042,6 +1042,22 @@ export function MapPreview({
 
       // Ensure expected TopoJSON objects exist before processing
       const { objects } = geoAtlasData as TopoJSONData
+      if (!objects) {
+        console.error("TopoJSON file has no 'objects' property:", geoAtlasData)
+        toast({
+          title: "Invalid TopoJSON",
+          description: "The downloaded map file is missing required data.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      /**
+       * The file might not match the UI's `selectedGeography`.
+       *  • If it has `objects.countries` we treat it as a WORLD file.
+       *  • Otherwise, if it has `objects.states`, we treat it as a USA file.
+       */
+      const topoType: "usa" | "world" = objects.countries ? "world" : "usa"
 
       if (!objects) {
         console.error("TopoJSON file has no 'objects' property:", geoAtlasData)
@@ -1053,7 +1069,7 @@ export function MapPreview({
         return
       }
 
-      if (selectedGeography === "usa") {
+      if (topoType === "usa") {
         if (!objects.states || !objects.nation) {
           console.error("US atlas missing 'states' or 'nation' objects:", objects)
           toast({
@@ -1065,7 +1081,7 @@ export function MapPreview({
         }
         geoFeatures = topojson.feature(geoAtlasData, objects.states).features
         nationMesh = topojson.mesh(geoAtlasData, objects.nation)
-      } else if (selectedGeography === "world") {
+      } else if (topoType === "world") {
         if (!objects.countries) {
           console.error("World atlas missing 'countries' object:", objects)
           toast({
@@ -1088,7 +1104,7 @@ export function MapPreview({
 
       nationsGroup
         .append("path")
-        .attr("id", selectedGeography === "usa" ? "Country-US" : "World-Outline")
+        .attr("id", topoType === "usa" ? "Country-US" : "World-Outline")
         .attr("fill", stylingSettings.base.nationFillColor)
         .attr("stroke", stylingSettings.base.nationStrokeColor)
         .attr("stroke-width", stylingSettings.base.nationStrokeWidth)
@@ -1115,14 +1131,14 @@ export function MapPreview({
           let identifier = d.properties?.postal // Try postal code first (e.g., "TX") for US states
           if (!identifier && d.id) {
             // If postal is not available, try FIPS ID for US states and convert to abbr
-            if (selectedGeography === "usa") {
+            if (topoType === "usa") {
               identifier = fipsToStateAbbrMap[String(d.id).padStart(2, "0")]
-            } else if (selectedGeography === "world") {
+            } else if (topoType === "world") {
               // For world countries, use name or ID directly
               identifier = d.properties?.name || d.id
             }
           }
-          const featureId = `${selectedGeography === "usa" ? "State" : "Country"}-${identifier || ""}` // Fallback to empty string if no identifier found
+          const featureId = `${topoType === "usa" ? "State" : "Country"}-${identifier || ""}` // Fallback to empty string if no identifier found
           console.log(`Creating feature path with ID: ${featureId}`)
           return featureId
         })
@@ -1155,7 +1171,7 @@ export function MapPreview({
 
         // Normalize state/country value based on selected geography
         let normalizedKey: string
-        if (selectedGeography === "usa") {
+        if (topoType === "usa") {
           normalizedKey = normalizeStateValue(rawStateValue)
         } else {
           // For world map, use the raw value as the key (assuming it's country name)
@@ -1218,9 +1234,9 @@ export function MapPreview({
           let featureKey: string | null = null
 
           if (id) {
-            if (selectedGeography === "usa") {
+            if (topoType === "usa") {
               featureKey = extractStateFromSVGId(id) // Use existing state extraction for US
-            } else if (selectedGeography === "world") {
+            } else if (topoType === "world") {
               // For world map, try to get country name from ID or properties
               const d = pathElement.datum() as any
               featureKey = d?.properties?.name || id // Prefer name from data, fallback to ID
@@ -1567,9 +1583,9 @@ export function MapPreview({
       // Get state/country features from geoAtlasData or custom map paths
       let featuresForLabels: any[] = []
       if (geoAtlasData && mapType !== "custom") {
-        if (selectedGeography === "usa" && geoAtlasData.objects.states) {
+        if (topoType === "usa" && geoAtlasData.objects.states) {
           featuresForLabels = topojson.feature(geoAtlasData, geoAtlasData.objects.states).features
-        } else if (selectedGeography === "world" && geoAtlasData.objects.countries) {
+        } else if (topoType === "world" && geoAtlasData.objects.countries) {
           featuresForLabels = topojson.feature(geoAtlasData, geoAtlasData.objects.countries).features
         }
         console.log("Using geoAtlasData for labels, features count:", featuresForLabels.length)
@@ -1584,7 +1600,7 @@ export function MapPreview({
             const id = pathElement.attr("id")
             let featureId = null
             if (id) {
-              featureId = selectedGeography === "usa" ? extractStateFromSVGId(id) : id // Use ID directly for world custom maps
+              featureId = topoType === "usa" ? extractStateFromSVGId(id) : id
             }
             if (featureId) {
               featuresForLabels.push({
@@ -1602,7 +1618,7 @@ export function MapPreview({
             const id = groupElement.attr("id")
             let featureId = null
             if (id) {
-              featureId = selectedGeography === "usa" ? extractStateFromSVGId(id) : id
+              featureId = topoType === "usa" ? extractStateFromSVGId(id) : id
             }
             if (featureId) {
               featuresForLabels.push({
@@ -1641,7 +1657,7 @@ export function MapPreview({
           // Try to find data for this state/country using multiple identifiers
           let dataRow: DataRow | GeocodedRow | undefined
 
-          if (selectedGeography === "usa") {
+          if (topoType === "usa") {
             // If it looks like a FIPS code, try FIPS lookup first
             if (isNumericId && stateFips) {
               console.log(`Trying FIPS lookup for: ${stateFips}`)
@@ -1673,7 +1689,7 @@ export function MapPreview({
                 console.log(`✅ Found data via state name: ${featureId} -> ${stateName}`)
               }
             }
-          } else if (selectedGeography === "world") {
+          } else if (topoType === "world") {
             // For world maps, try to match by country name (d.properties.name or d.id)
             const countryName = d.properties?.name || d.id
             const stateDataMap = new Map()
