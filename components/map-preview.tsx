@@ -342,11 +342,11 @@ const parseCompactNumber = (value: string): number | null => {
 
 const getNumericValue = (row: DataRow | GeocodedRow, column: string): number | null => {
   const rawValue = String(row[column] || "").trim()
-  let parsedNum: number | null = parseCompactNumber(rawValue)
+  const parsedNum: number | null = parseCompactNumber(rawValue)
 
   if (parsedNum === null) {
     const cleanedValue = rawValue.replace(/[,$%]/g, "")
-    parsedNum = Number.parseFloat(cleanedValue)
+    const parsedNum = Number.parseFloat(cleanedValue)
   }
   return isNaN(parsedNum) ? null : parsedNum
 }
@@ -465,7 +465,7 @@ const formatNumber = (value: any, format: string): string => {
     num = compactNum
   } else {
     const cleanedValue = strValue.replace(/[,$%]/g, "")
-    num = Number.parseFloat(cleanedValue)
+    const parsedNum = Number.parseFloat(cleanedValue)
   }
 
   if (isNaN(num)) {
@@ -874,6 +874,9 @@ export function MapPreview({
     const svg = d3.select(svgRef.current)
     svg.selectAll("*").remove()
 
+    // Determine whether we’re drawing a USA map or a World map.
+    const topoType: "usa" | "world" = "usa"
+
     const width = 975
 
     // Create scales that will be used by both symbols and legends
@@ -1057,7 +1060,7 @@ export function MapPreview({
        *  • If it has `objects.countries` we treat it as a WORLD file.
        *  • Otherwise, if it has `objects.states`, we treat it as a USA file.
        */
-      const topoType: "usa" | "world" = objects.countries ? "world" : "usa"
+      const topoType = objects.countries ? "world" : "usa"
 
       if (!objects) {
         console.error("TopoJSON file has no 'objects' property:", geoAtlasData)
@@ -1322,7 +1325,7 @@ export function MapPreview({
 
             // Ensure min/max colors are set, fallback to default symbol fill
             rangeColors[0] = dimensionSettings.symbol.colorMinColor || stylingSettings.symbol.symbolFillColor
-            rangeColors[1] = dimensionSettings.symbol.colorMaxColor || stylingSettings.symbol.symbolFillColor
+            rangeColors[1] = stylingSettings.symbol.colorMaxColor || stylingSettings.symbol.symbolFillColor
 
             if (dimensionSettings.symbol.colorMidColor) {
               domain.splice(1, 0, dimensionSettings.symbol.colorMidValue)
