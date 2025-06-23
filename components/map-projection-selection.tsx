@@ -4,10 +4,7 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-// Removed useToast import as it's no longer needed here
 
 interface MapProjectionSelectionProps {
   geography: "usa" | "world"
@@ -16,7 +13,6 @@ interface MapProjectionSelectionProps {
   onProjectionChange: (projection: "albersUsa" | "mercator" | "equalEarth") => void
   columns: string[]
   sampleRows: (string | number)[][]
-  // Removed hasMadeInitialSuggestion and setHasMadeInitialSuggestion props
 }
 
 const geographies = [
@@ -38,16 +34,12 @@ export function MapProjectionSelection({
   projection,
   onGeographyChange,
   onProjectionChange,
-  columns, // Still passed, but not used for inference in this component
-  sampleRows, // Still passed, but not used for inference in this component
+  columns,
+  sampleRows,
 }: MapProjectionSelectionProps) {
   const [searchQuery, setSearchQuery] = useState("")
-  // Removed useToast hook
 
   const filteredGeographies = geographies.filter((g) => g.label.toLowerCase().includes(searchQuery.toLowerCase()))
-
-  // Removed inferGeographyAndProjection useCallback and its useEffect
-  // The inference logic is now handled in app/page.tsx
 
   return (
     <Card className="w-full">
@@ -60,13 +52,14 @@ export function MapProjectionSelection({
           <Label htmlFor="geography-search" className="mb-2 block">
             Select Geography
           </Label>
-          <Input
+          {/* Hidden for now */}
+          {/* <Input
             id="geography-search"
             placeholder="Search geographies..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="mb-3"
-          />
+          /> */}
           <ScrollArea className="h-[200px] w-full rounded-md border p-4">
             <ToggleGroup
               type="single"
@@ -88,6 +81,9 @@ export function MapProjectionSelection({
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
+            <p className="text-sm text-muted-foreground mt-2">
+              Note: Only US and World maps are fully supported with data.
+            </p>
           </ScrollArea>
         </div>
 
@@ -96,23 +92,28 @@ export function MapProjectionSelection({
           <Label htmlFor="projection-select" className="mb-2 block">
             Select Projection
           </Label>
-          <Select
-            value={projection}
-            onValueChange={(value: "albersUsa" | "mercator" | "equalEarth") => {
-              if (value) onProjectionChange(value)
-            }}
-          >
-            <SelectTrigger id="projection-select">
-              <SelectValue placeholder="Select a projection" />
-            </SelectTrigger>
-            <SelectContent>
+          <ScrollArea className="h-[200px] w-full rounded-md border p-4">
+            <ToggleGroup
+              type="single"
+              value={projection}
+              onValueChange={(value: "albersUsa" | "mercator" | "equalEarth") => {
+                if (value) onProjectionChange(value)
+              }}
+              orientation="vertical"
+              className="flex flex-col items-start"
+            >
               {projections.map((p) => (
-                <SelectItem key={p.value} value={p.value}>
+                <ToggleGroupItem
+                  key={p.value}
+                  value={p.value}
+                  aria-label={`Select ${p.label}`}
+                  className="w-full justify-start"
+                >
                   {p.label}
-                </SelectItem>
+                </ToggleGroupItem>
               ))}
-            </SelectContent>
-          </Select>
+            </ToggleGroup>
+          </ScrollArea>
         </div>
       </CardContent>
     </Card>
