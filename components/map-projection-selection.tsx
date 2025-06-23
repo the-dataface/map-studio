@@ -1,12 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent } from "@/components/ui/card" // Removed CardTitle import
+import { Card, CardContent } from "@/components/ui/card"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { ChevronDownIcon } from "lucide-react" // Import Chevron icon
+import { ChevronDownIcon } from "lucide-react"
 
 interface MapProjectionSelectionProps {
   geography: "usa" | "world"
@@ -42,16 +42,21 @@ export function MapProjectionSelection({
   const filteredGeographies = geographies.filter((g) => g.label.toLowerCase().includes(searchQuery.toLowerCase()))
 
   return (
-    <Card className="w-full">
+    <Card className="w-full rounded-xl">
+      {" "}
+      {/* Added rounded-xl to the Card */}
       <Collapsible open={!isCollapsed} onOpenChange={setIsCollapsed}>
         <CollapsibleTrigger className="w-full flex justify-between items-center px-6 py-5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out rounded-t-xl">
-          <div className="font-medium text-gray-900 dark:text-white">Map and projection</div>
+          <div className="text-2xl font-semibold text-gray-900 dark:text-white">Map and projection</div>{" "}
+          {/* Reverted text size and weight */}
           <ChevronDownIcon
             className={`h-4 w-4 text-gray-600 dark:text-gray-400 transition-transform duration-200 ${isCollapsed ? "" : "rotate-180"}`}
           />
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 px-6 pb-6 pt-2">
+          <CardContent className="p-6 pt-0">
+            {" "}
+            {/* Reverted CardContent padding to standard */}
             {/* Geography Selection */}
             <div>
               <Label htmlFor="geography-search" className="mb-2 block">
@@ -80,7 +85,6 @@ export function MapProjectionSelection({
                 </ToggleGroup>
               </ScrollArea>
             </div>
-
             {/* Projection Selection */}
             <div>
               <Label htmlFor="projection-select" className="mb-2 block">
