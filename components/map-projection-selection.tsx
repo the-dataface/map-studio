@@ -43,26 +43,25 @@ export function MapProjectionSelection({
 
   return (
     <Card className="w-full rounded-xl">
-      {" "}
-      {/* Added rounded-xl to the Card */}
       <Collapsible open={!isCollapsed} onOpenChange={setIsCollapsed}>
         <CollapsibleTrigger className="w-full flex justify-between items-center px-6 py-5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out rounded-t-xl">
-          <div className="text-2xl font-semibold text-gray-900 dark:text-white">Map and projection</div>{" "}
-          {/* Reverted text size and weight */}
+          <div className="text-2xl font-semibold text-gray-900 dark:text-white">Map and projection</div>
           <ChevronDownIcon
             className={`h-4 w-4 text-gray-600 dark:text-gray-400 transition-transform duration-200 ${isCollapsed ? "" : "rotate-180"}`}
           />
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <CardContent className="p-6 pt-0">
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 pt-6">
             {" "}
-            {/* Reverted CardContent padding to standard */}
+            {/* Adjusted padding to pt-6 */}
             {/* Geography Selection */}
             <div>
               <Label htmlFor="geography-search" className="mb-2 block">
                 Select geography
               </Label>
-              <ScrollArea className="h-[200px] w-full rounded-md border p-4">
+              <ScrollArea className={`w-full rounded-md border p-4 ${!isCollapsed ? "h-[200px]" : "h-0"}`}>
+                {" "}
+                {/* Conditional height for collapse */}
                 <ToggleGroup
                   type="single"
                   value={geography}
@@ -90,7 +89,9 @@ export function MapProjectionSelection({
               <Label htmlFor="projection-select" className="mb-2 block">
                 Select projection
               </Label>
-              <ScrollArea className="h-[200px] w-full rounded-md border p-4">
+              <ScrollArea className={`w-full rounded-md border p-4 ${!isCollapsed ? "h-[200px]" : "h-0"}`}>
+                {" "}
+                {/* Conditional height for collapse */}
                 <ToggleGroup
                   type="single"
                   value={projection}
