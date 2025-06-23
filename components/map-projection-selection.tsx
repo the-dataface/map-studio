@@ -1,12 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card" // Removed CardTitle import
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible" // Import Collapsible components
-import { ChevronDownIcon } from "lucide-react" // Import Chevron icon
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { ChevronDownIcon } from "lucide-react"
 
 interface MapProjectionSelectionProps {
   geography: "usa" | "world"
@@ -20,9 +20,6 @@ interface MapProjectionSelectionProps {
 const geographies = [
   { value: "usa", label: "United States" },
   { value: "world", label: "World" },
-  // Add more countries/regions here as TopoJSON data becomes available
-  // { value: "canada", label: "Canada" },
-  // { value: "mexico", label: "Mexico" },
 ]
 
 const projections = [
@@ -40,15 +37,15 @@ export function MapProjectionSelection({
   sampleRows,
 }: MapProjectionSelectionProps) {
   const [searchQuery, setSearchQuery] = useState("")
-  const [isCollapsed, setIsCollapsed] = useState(false) // State for collapsible panel
+  const [isCollapsed, setIsCollapsed] = useState(false)
 
   const filteredGeographies = geographies.filter((g) => g.label.toLowerCase().includes(searchQuery.toLowerCase()))
 
   return (
     <Card className="w-full">
       <Collapsible open={!isCollapsed} onOpenChange={setIsCollapsed}>
-        <CollapsibleTrigger className="w-full flex justify-between items-center px-6 py-4 hover:bg-accent rounded-t-xl">
-          <div className="text-2xl font-semibold">Map and projection</div>
+        <CollapsibleTrigger className="w-full flex justify-between items-center px-6 py-4 hover:bg-accent rounded-t-xl text-2xl font-semibold">
+          Map and projection
           <ChevronDownIcon className={`h-5 w-5 transition-transform ${isCollapsed ? "" : "rotate-180"}`} />
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -57,16 +54,7 @@ export function MapProjectionSelection({
             <div>
               <Label htmlFor="geography-search" className="mb-2 block">
                 Select geography
-              </Label>{" "}
-              {/* Sentence case label */}
-              {/* Hidden for now */}
-              {/* <Input
-              id="geography-search"
-              placeholder="Search geographies..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="mb-3"
-            /> */}
+              </Label>
               <ScrollArea className="h-[200px] w-full rounded-md border p-4">
                 <ToggleGroup
                   type="single"
@@ -88,7 +76,6 @@ export function MapProjectionSelection({
                     </ToggleGroupItem>
                   ))}
                 </ToggleGroup>
-                {/* Removed the note */}
               </ScrollArea>
             </div>
 
@@ -96,8 +83,7 @@ export function MapProjectionSelection({
             <div>
               <Label htmlFor="projection-select" className="mb-2 block">
                 Select projection
-              </Label>{" "}
-              {/* Sentence case label */}
+              </Label>
               <ScrollArea className="h-[200px] w-full rounded-md border p-4">
                 <ToggleGroup
                   type="single"
