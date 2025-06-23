@@ -457,18 +457,19 @@ const getDefaultFormat = (type: "number" | "date" | "state" | "coordinate"): str
 const formatNumber = (value: any, format: string): string => {
   if (value === null || value === undefined || value === "") return ""
 
+  let num: number
   const strValue = String(value).trim()
 
-  // Try compact notation first (e.g. 1.2M)
-  const compact = parseCompactNumber(strValue)
-  let num: number
-
-  if (compact !== null) {
-    num = compact
+  const compactNum = parseCompactNumber(strValue)
+  if (compactNum !== null) {
+    num = compactNum
   } else {
-    const cleaned = strValue.replace(/[,$%]/g, "")
-    num = Number.parseFloat(cleaned)
-    if (isNaN(num)) return strValue
+    const cleanedValue = strValue.replace(/[,$%]/g, "")
+    num = Number.parseFloat(cleanedValue)
+  }
+
+  if (isNaN(num)) {
+    return strValue
   }
 
   switch (format) {
@@ -865,9 +866,6 @@ export function MapPreview({
     console.log("Custom map data length:", customMapData?.length || 0)
     console.log("Geo atlas data loaded:", !!geoAtlasData)
 
-    // Ensure topoType is always defined even if we render a custom SVG first
-    let topoType: "usa" | "world" = selectedGeography
-
     if (!svgRef.current || !mapContainerRef.current) {
       console.log("SVG ref or container ref not ready")
       return
@@ -1032,9 +1030,6 @@ export function MapPreview({
         })
       }
     } else if (geoAtlasData) {
-      // Determine atlas type
-      topoType = geoAtlasData.objects.countries ? "world" : "usa"
-
       // Render standard US or World map
       console.log("=== STANDARD MAP RENDERING START ===")
 
@@ -1062,7 +1057,7 @@ export function MapPreview({
        *  • If it has `objects.countries` we treat it as a WORLD file.
        *  • Otherwise, if it has `objects.states`, we treat it as a USA file.
        */
-      // const topoType: "usa" | "world" = objects.countries ? "world" : "usa"
+      const topoType: "usa" | "world" = objects.countries ? "world" : "usa"
 
       if (!objects) {
         console.error("TopoJSON file has no 'objects' property:", geoAtlasData)
@@ -1954,6 +1949,11 @@ export function MapPreview({
           stylingSettings.symbol.colorMaxColor || stylingSettings.symbol.symbolFillColor,
         ]
 
+        if (dimensionSettings.symbol.colorMidColor) {
+          domain.splice(1, 0, dimensionSettings.symbol.colorMidValue)
+          rangeColors.splice(1, 0, dimensionSettings.symbol.colorMidColor)
+        }
+
         rangeColors.forEach((color, index) => {
           gradient
             .append("stop")
@@ -2120,6 +2120,15 @@ export function MapPreview({
           stylingSettings.base.defaultStateFillColor, // Use default if not set
           stylingSettings.base.defaultStateFillColor, // Use default if not set
         ]
+
+        // Ensure min/max colors are set, fallback to default state fill
+        rangeColors[0] = dimensionSettings.choropleth.colorMinColor || stylingSettings.base.defaultStateFillColor
+        rangeColors[1] = dimensionSettings.choropleth.colorMaxColor || stylingSettings.base.defaultStateFillColor
+
+        if (dimensionSettings.choropleth.colorMidColor) {
+          domain.splice(1, 0, dimensionSettings.choropleth.colorMidValue)
+          rangeColors.splice(1, 0, dimensionSettings.choropleth.colorMidColor)
+        }
 
         rangeColors.forEach((color, index) => {
           gradient
@@ -2416,16 +2425,6 @@ export function MapPreview({
         >
           <svg ref={svgRef} className="w-full h-full" />
         </div>
-      </CardContent>
-    </Card>
-  )
-}
-</ ref=
-{
-  svgRef
-}
-className="w-full h-full" />
-</div>
       </CardContent>
     </Card>
   )
