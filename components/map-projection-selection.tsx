@@ -6,7 +6,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { ChevronDownIcon } from "lucide-react"
+import { ChevronDownIcon } from "lucide-react" // Import Chevron icon
 
 interface MapProjectionSelectionProps {
   geography: "usa" | "world"
@@ -44,12 +44,14 @@ export function MapProjectionSelection({
   return (
     <Card className="w-full">
       <Collapsible open={!isCollapsed} onOpenChange={setIsCollapsed}>
-        <CollapsibleTrigger className="w-full flex justify-between items-center px-6 py-4 hover:bg-accent rounded-t-xl text-2xl font-semibold">
-          Map and projection
-          <ChevronDownIcon className={`h-5 w-5 transition-transform ${isCollapsed ? "" : "rotate-180"}`} />
+        <CollapsibleTrigger className="w-full flex justify-between items-center px-6 py-5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out rounded-t-xl">
+          <div className="font-medium text-gray-900 dark:text-white">Map and projection</div>
+          <ChevronDownIcon
+            className={`h-4 w-4 text-gray-600 dark:text-gray-400 transition-transform duration-200 ${isCollapsed ? "" : "rotate-180"}`}
+          />
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 px-6 pb-6 pt-2">
             {/* Geography Selection */}
             <div>
               <Label htmlFor="geography-search" className="mb-2 block">
