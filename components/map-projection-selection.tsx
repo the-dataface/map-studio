@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible" // Import Collapsible components
 import { ChevronDownIcon } from "lucide-react" // Import Chevron icon
+import { Button } from "@/components/ui/button"
 
 interface MapProjectionSelectionProps {
   geography: "usa" | "world"
@@ -47,9 +48,11 @@ export function MapProjectionSelection({
   return (
     <Card className="w-full">
       <Collapsible open={!isCollapsed} onOpenChange={setIsCollapsed}>
-        <CollapsibleTrigger className="flex w-full items-center justify-between space-x-4 px-6 py-4">
-          <CardTitle className="text-lg font-semibold">Map and projection</CardTitle> {/* Sentence case title */}
-          <ChevronDownIcon className={`h-5 w-5 transition-transform ${isCollapsed ? "" : "rotate-180"}`} />
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" className="w-full justify-between px-6 py-4 hover:bg-accent">
+            <CardTitle className="text-xl font-semibold">Map and projection</CardTitle>
+            <ChevronDownIcon className={`h-5 w-5 transition-transform ${isCollapsed ? "" : "rotate-180"}`} />
+          </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
