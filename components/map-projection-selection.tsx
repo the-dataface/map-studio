@@ -88,9 +88,6 @@ export function MapProjectionSelection({
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
-            <p className="text-sm text-muted-foreground mt-2">
-              Note: Only US and World maps are fully supported with data.
-            </p>
           </ScrollArea>
         </div>
 
