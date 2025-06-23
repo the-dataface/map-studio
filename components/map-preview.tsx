@@ -457,20 +457,18 @@ const getDefaultFormat = (type: "number" | "date" | "state" | "coordinate"): str
 const formatNumber = (value: any, format: string): string => {
   if (value === null || value === undefined || value === "") return ""
 
-  let num: number
   const strValue = String(value).trim()
-  let parsedNum: number | null = null
 
-  const compactNum = parseCompactNumber(strValue)
-  if (compactNum !== null) {
-    num = compactNum
+  // Try compact notation first (e.g. 1.2M)
+  const compact = parseCompactNumber(strValue)
+  let num: number
+
+  if (compact !== null) {
+    num = compact
   } else {
-    const cleanedValue = strValue.replace(/[,$%]/g, "")
-    parsedNum = Number.parseFloat(cleanedValue)
-  }
-
-  if (isNaN(num)) {
-    return strValue
+    const cleaned = strValue.replace(/[,$%]/g, "")
+    num = Number.parseFloat(cleaned)
+    if (isNaN(num)) return strValue
   }
 
   switch (format) {
@@ -2420,10 +2418,9 @@ export function MapPreview({
         </div>
       </CardContent>
     </Card>
+  )
 }
-}
-        >\
-          <svg ref=
+</ ref=
 {
   svgRef
 }
@@ -2431,3 +2428,5 @@ className="w-full h-full" />
 </div>
       </CardContent>
     </Card>
+  )
+}
