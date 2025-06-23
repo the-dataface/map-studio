@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -48,7 +48,7 @@ export function MapProjectionSelection({
     <Card className="w-full">
       <Collapsible open={!isCollapsed} onOpenChange={setIsCollapsed}>
         <CollapsibleTrigger className="w-full flex justify-between items-center px-6 py-4 hover:bg-accent rounded-t-xl">
-          <CardTitle className="text-xl font-semibold">Map and projection</CardTitle>
+          <div className="text-2xl font-semibold">Map and projection</div>
           <ChevronDownIcon className={`h-5 w-5 transition-transform ${isCollapsed ? "" : "rotate-180"}`} />
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -61,12 +61,12 @@ export function MapProjectionSelection({
               {/* Sentence case label */}
               {/* Hidden for now */}
               {/* <Input
-                id="geography-search"
-                placeholder="Search geographies..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="mb-3"
-              /> */}
+              id="geography-search"
+              placeholder="Search geographies..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="mb-3"
+            /> */}
               <ScrollArea className="h-[200px] w-full rounded-md border p-4">
                 <ToggleGroup
                   type="single"
