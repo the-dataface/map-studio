@@ -1003,7 +1003,7 @@ export function MapPreview({
                 "https://cdn.jsdelivr.net/npm/us-atlas@3/dist/states-10m.json",
                 "https://unpkg.com/us-atlas@3/states-10m.json",
               ],
-              selectedGeography === "usa-states" ? ["nation", "states"] : ["nation", "counties"],
+              ["nation", selectedGeography === "usa-states" ? "states" : "counties"],
             )
             if (!data) {
               toast({
@@ -1026,7 +1026,7 @@ export function MapPreview({
                 "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json",
                 "https://unpkg.com/world-atlas@2/countries-110m.json",
               ],
-              ["countries"],
+              ["countries"], // Always expect 'countries' for world-atlas
             )
             if (!data) {
               toast({
@@ -1302,36 +1302,48 @@ export function MapPreview({
 
       // Determine nation mesh and countryFeatureForClipping based on selectedGeography
       if (selectedGeography === "usa-nation") {
-        // Use whichever atlas we have; prefer the nation object, otherwise fall back to the world-atlas countries list
-        if (objects.nation) {
-          nationMesh = topojson.mesh(geoAtlasData, objects.nation)
-          countryFeatureForClipping = topojson.feature(geoAtlasData, objects.nation)
-        } else if (objects.countries) {
-          const us = topojson
-            .feature(geoAtlasData, objects.countries)
-            .features.find((f: any) => f.properties.name === "United States")
-          if (us) {
-            nationMesh = topojson.mesh(geoAtlasData, us)
-            countryFeatureForClipping = us
-          }
+        if (!objects.countries) {
+          console.error(
+            "World atlas missing 'countries' object for usa-nation (expected after loading world-atlas).",
+            objects,
+          )
+          return
         }
-        geoFeatures = [] // no sub-features for the nation view
+        const allCountries = topojson.feature(geoAtlasData, objects.countries).features
+        countryFeatureForClipping = allCountries.find((f: any) => f.properties.name === "United States")
+        if (!countryFeatureForClipping) {
+          console.error("Could not find United States feature in world-atlas for usa-nation.")
+          return
+        }
+        nationMesh = topojson.mesh(geoAtlasData, countryFeatureForClipping)
+        geoFeatures = [] // No sub-features for nation view
       } else if (selectedGeography === "canada-nation") {
-        if (objects.nation) {
-          nationMesh = topojson.mesh(geoAtlasData, objects.nation)
-          countryFeatureForClipping = topojson.feature(geoAtlasData, objects.nation)
-        } else if (objects.countries) {
-          const ca = topojson
-            .feature(geoAtlasData, objects.countries)
-            .features.find((f: any) => f.properties.name === "Canada")
-          if (ca) {
-            nationMesh = topojson.mesh(geoAtlasData, ca)
-            countryFeatureForClipping = ca
-          }
+        if (!objects.countries) {
+          console.error(
+            "World atlas missing 'countries' object for canada-nation (expected after loading world-atlas).",
+            objects,
+          )
+          return
         }
-        geoFeatures = [] // single-nation view; no sub-features
+        const allCountries = topojson.feature(geoAtlasData, objects.countries).features
+        countryFeatureForClipping = allCountries.find((f: any) => f.properties.name === "Canada")
+        if (!countryFeatureForClipping) {
+          console.error("Could not find Canada feature in world-atlas for canada-nation.")
+          return
+        }
+        nationMesh = topojson.mesh(geoAtlasData, countryFeatureForClipping)
+        geoFeatures = [] // No sub-features for nation view
       } else if (selectedGeography === "world") {
-        // For world, use the entire countries object
+        if (!objects.countries) {
+          console.error("World atlas missing 'countries' object for world:", objects)
+          toast({
+            title: "Map data error",
+            description: "The world map data is incomplete (missing 'countries' object).",
+            variant: "destructive",
+            duration: 4000,
+          })
+          return
+        }
         nationMesh = topojson.mesh(geoAtlasData, objects.countries, (a: any, b: any) => a !== b)
         countryFeatureForClipping = topojson.feature(geoAtlasData, objects.countries)
         geoFeatures = topojson.feature(geoAtlasData, objects.countries).features // Render individual countries as features
