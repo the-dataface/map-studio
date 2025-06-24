@@ -6,7 +6,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { ChevronDownIcon } from "lucide-react"
+import { ChevronDown, ChevronUp } from "lucide-react"
 
 interface MapProjectionSelectionProps {
   geography: "usa" | "world"
