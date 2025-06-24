@@ -56,7 +56,7 @@ export function MapProjectionSelection({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">
-              Map and projection
+              Geography and projection
             </CardTitle>
           </div>
           <div className="flex items-center gap-2">
