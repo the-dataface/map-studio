@@ -1227,7 +1227,7 @@ export function MapPreview({
         console.log("Created categorical color scale with map:", Array.from(colorMap.entries()))
       }
 
-      // Apply colors to state/country paths and groups
+      // Apply colors to state/country paths
       const mapGroup = svg.select("#Map")
       if (!mapGroup.empty()) {
         console.log("Found map group, applying choropleth colors...")
@@ -1243,8 +1243,10 @@ export function MapPreview({
               featureKey = extractStateFromSVGId(id) // Use existing state extraction for US
             } else if (topoType === "world") {
               // For world map, try to get country name from ID or properties
+              // For custom maps, ID is often the primary identifier.
+              // For TopoJSON features, d.properties.name or d.id
               const d = element.datum() as any
-              featureKey = d?.properties?.name || id // Prefer name from data, fallback to ID
+              featureKey = d?.properties?.name || id
             }
           }
 
@@ -1595,46 +1597,54 @@ export function MapPreview({
         }
         console.log("Using geoAtlasData for labels, features count:", featuresForLabels.length)
       } else if (customMapData) {
-        // For custom maps, iterate through both paths and groups in the #States group
+        // For custom maps, iterate through all relevant elements (paths and groups) in the #States group
         const statesGroup = svg.select("#States")
+        const nationsGroup = svg.select("#Nations") || svg.select("#Countries") // Also check for countries in custom map
+
         console.log("Custom map - States group found:", !statesGroup.empty())
+        console.log("Custom map - Nations/Countries group found:", !nationsGroup.empty())
+
+        // Collect elements from the States group
         if (!statesGroup.empty()) {
-          // First, handle individual path elements
-          statesGroup.selectAll("path").each(function (this: SVGPathElement) {
-            const pathElement = d3.select(this)
-            const id = pathElement.attr("id")
+          statesGroup.selectAll("path, g").each(function (this: SVGElement) {
+            const element = d3.select(this)
+            const id = element.attr("id")
             let featureId = null
             if (id) {
-              featureId = topoType === "usa" ? extractStateFromSVGId(id) : id
+              featureId = topoType === "usa" ? extractStateFromSVGId(id) : id // Use state extraction for USA type
+              if (!featureId && topoType === "world") {
+                // For world type custom maps, assume ID is country name or code
+                featureId = id
+              }
             }
             if (featureId) {
               featuresForLabels.push({
                 id: featureId,
                 properties: { postal: featureId, name: featureId }, // Mock properties for consistency
-                pathNode: this,
-                isGroup: false,
-              })
-            }
-          })
-
-          // Then, handle group elements (for multi-path states)
-          statesGroup.selectAll("g").each(function (this: SVGGElement) {
-            const groupElement = d3.select(this)
-            const id = groupElement.attr("id")
-            let featureId = null
-            if (id) {
-              featureId = topoType === "usa" ? extractStateFromSVGId(id) : id
-            }
-            if (featureId) {
-              featuresForLabels.push({
-                id: featureId,
-                properties: { postal: featureId, name: featureId },
-                pathNode: this,
-                isGroup: true,
+                pathNode: this, // Store reference to the actual DOM node
               })
             }
           })
         }
+
+        // Collect elements from the Nations/Countries group if it exists and we're not dealing with US states
+        if (!nationsGroup.empty() && topoType === "world") {
+          // Only consider nations for world maps
+          nationsGroup.selectAll("path, g").each(function (this: SVGElement) {
+            const element = d3.select(this)
+            const id = element.attr("id")
+            const featureId = id // Assume ID is the country identifier for custom world maps
+            if (featureId && !featuresForLabels.some((f) => f.id === featureId)) {
+              // Avoid duplicates
+              featuresForLabels.push({
+                id: featureId,
+                properties: { name: featureId },
+                pathNode: this,
+              })
+            }
+          })
+        }
+
         console.log("Custom map features for labels count:", featuresForLabels.length)
       }
 
