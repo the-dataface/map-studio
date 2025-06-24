@@ -1214,9 +1214,13 @@ export function MapPreview({
       if (dimensionSettings?.choropleth?.colorScale === "linear") {
         const domain = [dimensionSettings.choropleth.colorMinValue, dimensionSettings.choropleth.colorMaxValue]
         const rangeColors = [
-          dimensionSettings.choropleth.colorMinColor || stylingSettings.base.defaultStateFillColor,
-          dimensionSettings.choropleth.colorMaxColor || stylingSettings.base.defaultStateFillColor,
+          stylingSettings.base.defaultStateFillColor, // Use default if not set
+          stylingSettings.base.defaultStateFillColor, // Use default if not set
         ]
+
+        // Ensure min/max colors are set, fallback to default state fill
+        rangeColors[0] = dimensionSettings.choropleth.colorMinColor || stylingSettings.base.defaultStateFillColor
+        rangeColors[1] = dimensionSettings.choropleth.colorMaxColor || stylingSettings.base.defaultStateFillColor
 
         if (dimensionSettings.choropleth.colorMidColor) {
           domain.splice(1, 0, dimensionSettings.choropleth.colorMidValue)
@@ -1248,56 +1252,48 @@ export function MapPreview({
           const id = element.attr("id")
           let featureKey: string | null = null
 
-          if (id) {
+          // Determine the effective ID: prioritize element's own ID, then parent's ID if it's a path without ID
+          let effectiveId = id
+          if (this.tagName === "path" && !effectiveId && this.parentElement && this.parentElement.tagName === "g") {
+            effectiveId = d3.select(this.parentElement).attr("id")
+          }
+
+          if (effectiveId) {
             if (customMapData) {
-              // For custom maps, always try to extract state/province first
-              const extractedId = extractStateFromSVGId(id)
-              featureKey = extractedId || id // Fallback to raw ID if not a recognized state/province format
+              // For custom maps, always try to extract state/province first from the effective ID
+              featureKey = extractStateFromSVGId(effectiveId)
+              if (!featureKey) {
+                featureKey = effectiveId // Fallback to raw effective ID if not a recognized state/province format
+              }
             } else {
-              // For standard TopoJSON maps
+              // For standard TopoJSON maps (which use d.id on paths)
+              const d = element.datum() as any // Here, d.properties.name or d.id is valid for TopoJSON
               if (topoType === "usa") {
-                featureKey = extractStateFromSVGId(id)
+                featureKey = d?.id ? extractStateFromSVGId(String(d.id)) : null // Use d.id for TopoJSON US states
+                if (!featureKey && effectiveId) {
+                  // Fallback to effectiveId if d.id wasn't useful
+                  featureKey = extractStateFromSVGId(effectiveId)
+                }
               } else {
-                // topoType === "world" for standard maps
-                const d = element.datum() as any // Here, d.properties.name is valid for TopoJSON
-                featureKey = d?.properties?.name || id
+                featureKey = d?.properties?.name || String(d?.id) || effectiveId // For world maps, use name or ID directly
               }
             }
           }
 
           if (!featureKey) {
-            // If no featureKey can be determined, apply default fill to the element itself
-            // This handles cases where a path/group might not represent a state/country
-            if (this.tagName.toLowerCase() === "g") {
-              element.selectAll("path").attr("fill", stylingSettings.base.defaultStateFillColor)
-            } else if (this.tagName.toLowerCase() === "path") {
-              element.attr("fill", stylingSettings.base.defaultStateFillColor)
-            }
+            element.attr("fill", stylingSettings.base.defaultStateFillColor)
             return
           }
 
           const value = stateDataMap.get(featureKey)
           if (value !== undefined) {
             const color = choroplethColorScale(value)
-            if (this.tagName.toLowerCase() === "g") {
-              // If it's a group, apply color to all its direct path children
-              element.selectAll("path").attr("fill", color)
-              console.log(`✅ Applied color ${color} to paths within group ${featureKey} (value: ${value})`)
-            } else if (this.tagName.toLowerCase() === "path") {
-              // If it's a path, apply color directly
-              element.attr("fill", color)
-              console.log(`✅ Applied color ${color} to path ${featureKey} (value: ${value})`)
-            }
+            element.attr("fill", color)
             featuresColored++
+            console.log(`✅ Applied color ${color} to feature ${featureKey} (value: ${value})`)
           } else {
-            // If no data, apply default fill
-            if (this.tagName.toLowerCase() === "g") {
-              element.selectAll("path").attr("fill", stylingSettings.base.defaultStateFillColor)
-              console.log(`No data found for group: ${featureKey}, applying default fill to its paths.`)
-            } else if (this.tagName.toLowerCase() === "path") {
-              element.attr("fill", stylingSettings.base.defaultStateFillColor)
-              console.log(`No data found for path: ${featureKey}, applying default fill.`)
-            }
+            element.attr("fill", stylingSettings.base.defaultStateFillColor)
+            console.log(`No data found for feature: ${featureKey}, applying default fill.`)
           }
         })
         console.log("Features actually colored:", featuresColored)
@@ -1488,8 +1484,6 @@ export function MapPreview({
                 .attr("fill", stylingSettings.symbol.labelColor)
                 .attr("stroke", stylingSettings.symbol.labelOutlineColor)
                 .attr("stroke-width", stylingSettings.symbol.labelOutlineThickness)
-                .attr("stroke-linejoin", "round")
-                .attr("stroke-linecap", "round")
                 .style("paint-order", "stroke fill")
                 .style("pointer-events", "none")
 
@@ -1637,51 +1631,47 @@ export function MapPreview({
         }
         console.log("Using geoAtlasData for labels, features count:", featuresForLabels.length)
       } else if (customMapData) {
-        // For custom maps, iterate through all relevant elements (paths and groups) in the #States group
-        const statesGroup = svg.select("#States")
-        const nationsGroup = svg.select("#Nations") || svg.select("#Countries") // Also check for countries in custom map
-
-        console.log("Custom map - States group found:", !statesGroup.empty())
-        console.log("Custom map - Nations/Countries group found:", !nationsGroup.empty())
-
-        // Collect elements from the States group
-        if (!statesGroup.empty()) {
-          statesGroup.selectAll("path, g").each(function (this: SVGElement) {
-            const element = d3.select(this)
-            const id = element.attr("id")
-            let featureId = null
-            if (id) {
-              // For custom maps, always try to extract state/province first
-              const extractedId = extractStateFromSVGId(id)
-              featureId = extractedId || id // Fallback to raw ID if not a recognized state/province format
-            }
-            if (featureId) {
-              featuresForLabels.push({
-                id: featureId,
-                properties: { postal: featureId, name: featureId }, // Mock properties for consistency
-                pathNode: this, // Store reference to the actual DOM node
-              })
-            }
+        // For custom maps, iterate through all relevant elements (paths and groups) in the #States and #Nations groups
+        const elementsToProcess: SVGElement[] = []
+        svg
+          .select("#States")
+          .selectAll("path, g")
+          .each(function (this: SVGElement) {
+            elementsToProcess.push(this)
+          })
+        const nationsOrCountriesGroup = svg.select("#Nations") || svg.select("#Countries")
+        if (!nationsOrCountriesGroup.empty() && topoType === "world") {
+          // Only process nations for world maps in custom SVG
+          nationsOrCountriesGroup.selectAll("path, g").each(function (this: SVGElement) {
+            elementsToProcess.push(this)
           })
         }
 
-        // Collect elements from the Nations/Countries group if it exists and we're not dealing with US states
-        if (!nationsGroup.empty() && topoType === "world") {
-          // Only consider nations for world maps
-          nationsGroup.selectAll("path, g").each(function (this: SVGElement) {
-            const element = d3.select(this)
-            const id = element.attr("id")
-            const featureId = id // Assume ID is the country identifier for custom world maps
-            if (featureId && !featuresForLabels.some((f) => f.id === featureId)) {
-              // Avoid duplicates
-              featuresForLabels.push({
-                id: featureId,
-                properties: { name: featureId },
-                pathNode: this,
-              })
-            }
-          })
-        }
+        elementsToProcess.forEach((el) => {
+          const element = d3.select(el)
+          const id = element.attr("id")
+          let effectiveId = id
+
+          // If it's a path without an ID, check parent G's ID
+          if (el.tagName === "path" && !effectiveId && el.parentElement && el.parentElement.tagName === "g") {
+            effectiveId = d3.select(el.parentElement).attr("id")
+          }
+
+          let featureId = null
+          if (effectiveId) {
+            const extractedId = extractStateFromSVGId(effectiveId)
+            featureId = extractedId || effectiveId // Fallback to raw effective ID
+          }
+
+          if (featureId && !featuresForLabels.some((f) => f.id === featureId)) {
+            // Avoid duplicates and add only if we have data for it later
+            featuresForLabels.push({
+              id: featureId,
+              properties: { postal: featureId, name: featureId }, // Mock properties for consistency
+              pathNode: el, // Store reference to the actual DOM node
+            })
+          }
+        })
 
         console.log("Custom map features for labels count:", featuresForLabels.length)
       }
