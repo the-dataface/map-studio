@@ -2415,7 +2415,7 @@ export function MapPreview({
           </div>
         </div>
       </CardHeader>
-      <CardContent className={cn("transition-all duration-200", isExpanded ? "pb-6" : "pb-0 h-0 overflow-hidden")}>
+      <CardContent className={cn("transition-all duration-200", isExpanded ? "pb-6 pt-2" : "pb-0 h-0 overflow-hidden")}>
         <div
           ref={mapContainerRef}
           className="w-full border rounded-lg overflow-hidden"
