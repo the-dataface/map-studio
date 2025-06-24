@@ -192,6 +192,7 @@ WY,6.0,65003,93.3,West`
     setChoroplethRawData(sampleData)
   }
 
+  // Add a validation function
   const validateCustomSVG = (svgString: string): { isValid: boolean; message: string } => {
     if (!svgString.trim()) {
       return { isValid: false, message: "SVG code cannot be empty." }
