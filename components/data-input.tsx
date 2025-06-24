@@ -29,9 +29,10 @@ interface DataInputProps {
   ) => void
   isExpanded: boolean
   setIsExpanded: (expanded: boolean) => void
+  onClearData: (mapType: "symbol" | "choropleth" | "custom") => void // New prop
 }
 
-export function DataInput({ onDataLoad, isExpanded, setIsExpanded }: DataInputProps) {
+export function DataInput({ onDataLoad, isExpanded, setIsExpanded, onClearData }: DataInputProps) {
   const [activeTab, setActiveTab] = useState<"symbol" | "choropleth" | "custom">("symbol")
   const [symbolRawData, setSymbolRawData] = useState("")
   const [choroplethRawData, setChoroplethRawData] = useState("")
@@ -466,7 +467,10 @@ Supports both comma-separated (CSV) and tab-separated (TSV) formats."
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCustomSVG("")}
+                      onClick={() => {
+                        setCustomSVG("")
+                        onClearData("custom") // Call onClearData for custom map
+                      }}
                       disabled={!customSVG.trim()}
                       className="transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                     >

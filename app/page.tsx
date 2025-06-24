@@ -711,7 +711,12 @@ export default function MapStudio() {
       <Header />
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-        <DataInput onDataLoad={handleDataLoad} isExpanded={dataInputExpanded} setIsExpanded={setDataInputExpanded} />
+        <DataInput
+          onDataLoad={handleDataLoad}
+          isExpanded={dataInputExpanded}
+          setIsExpanded={setDataInputExpanded}
+          onClearData={handleClearData} // Pass handleClearData to DataInput
+        />
 
         {hasAnyData() &&
           !hasDataForType("custom") && ( // Conditional rendering for MapProjectionSelection
