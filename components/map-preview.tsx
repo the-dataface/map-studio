@@ -1227,15 +1227,15 @@ export function MapPreview({
         console.log("Created categorical color scale with map:", Array.from(colorMap.entries()))
       }
 
-      // Apply colors to state/country paths
+      // Apply colors to state/country paths and groups
       const mapGroup = svg.select("#Map")
       if (!mapGroup.empty()) {
         console.log("Found map group, applying choropleth colors...")
         let featuresColored = 0
 
         mapGroup.selectAll("path, g").each(function (this: SVGElement) {
-          const pathElement = d3.select(this)
-          const id = pathElement.attr("id")
+          const element = d3.select(this)
+          const id = element.attr("id")
           let featureKey: string | null = null
 
           if (id) {
@@ -1243,24 +1243,24 @@ export function MapPreview({
               featureKey = extractStateFromSVGId(id) // Use existing state extraction for US
             } else if (topoType === "world") {
               // For world map, try to get country name from ID or properties
-              const d = pathElement.datum() as any
+              const d = element.datum() as any
               featureKey = d?.properties?.name || id // Prefer name from data, fallback to ID
             }
           }
 
           if (!featureKey) {
-            pathElement.attr("fill", stylingSettings.base.defaultStateFillColor)
+            element.attr("fill", stylingSettings.base.defaultStateFillColor)
             return
           }
 
           const value = stateDataMap.get(featureKey)
           if (value !== undefined) {
             const color = choroplethColorScale(value)
-            pathElement.attr("fill", color)
+            element.attr("fill", color)
             featuresColored++
             console.log(`✅ Applied color ${color} to feature ${featureKey} (value: ${value})`)
           } else {
-            pathElement.attr("fill", stylingSettings.base.defaultStateFillColor)
+            element.attr("fill", stylingSettings.base.defaultStateFillColor)
             console.log(`No data found for feature: ${featureKey}, applying default fill.`)
           }
         })
