@@ -874,6 +874,10 @@ export function MapPreview({
     const svg = d3.select(svgRef.current)
     svg.selectAll("*").remove()
 
+    // Determine whether we’re drawing a USA map or a World map.
+    // Always have a valid value; will be refined later if we load TopoJSON.
+    let topoType: "usa" | "world" = selectedGeography === "world" ? "world" : "usa"
+
     const width = 975
 
     // Create scales that will be used by both symbols and legends
@@ -1057,7 +1061,7 @@ export function MapPreview({
        *  • If it has `objects.countries` we treat it as a WORLD file.
        *  • Otherwise, if it has `objects.states`, we treat it as a USA file.
        */
-      const topoType: "usa" | "world" = objects.countries ? "world" : "usa"
+      topoType = objects.countries ? "world" : "usa"
 
       if (!objects) {
         console.error("TopoJSON file has no 'objects' property:", geoAtlasData)
