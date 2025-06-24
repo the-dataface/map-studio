@@ -905,6 +905,33 @@ const createFormattedText = (
 }
 
 /**
+ * Canada topo files come with wildly different object names.
+ * This inspects the object keys and aliases them so that
+ *   data.objects.provinces   ⟶ provincial geometries (adm-1 level)
+ *   data.objects.nation      ⟶ Canada outline
+ */
+function normaliseCanadaObjects(data: TopoJSONData) {
+  const objects = data.objects ?? {}
+
+  // Detect a candidate for provinces (adm1)
+  const provincesKey = Object.keys(objects).find((k) => /prov|adm1|can_adm1|canada_provinces/i.test(k)) ?? null
+
+  // Detect a candidate for the national outline
+  const nationKey = Object.keys(objects).find((k) => /nation|country|canada|can/i.test(k)) ?? null
+
+  // Only alias when we actually find something
+  if (provincesKey && !objects.provinces) {
+    objects.provinces = objects[provincesKey]
+  }
+  if (nationKey && !objects.nation) {
+    objects.nation = objects[nationKey]
+  }
+
+  data.objects = objects
+  return data
+}
+
+/**
  * Try a list of candidate URLs until we find one that contains the
  * expected TopoJSON object(s).  Returns null if all attempts fail.
  */
@@ -998,11 +1025,47 @@ export function MapPreview({
             expectedObjects = ["countries"]
             break
           case "canada-provinces":
-          case "canada-nation": // Both use the same Canada topojson
-            dataUrl =
-              "https://gist.githubusercontent.com/Brideau/2391df60938462571ca9/raw/f5a1f3b47ff671eaf2fb7e7b798bacfc6962606a/canadaprovtopo.json"
-            expectedObjects = ["nation", "provinces"] // Assuming 'provinces' object exists
-            break
+          case "canada-nation": {
+            const candidates = [
+              // Gist (original)
+              "https://gist.githubusercontent.com/Brideau/2391df60938462571ca9/raw/f5a1f3b47ff671eaf2fb7e7b798bacfc6962606a/canadaprovtopo.json",
+              // GitHub raw backup
+              "https://raw.githubusercontent.com/deldersveld/topojson/master/countries/canada/canada-provinces.json",
+              // jsDelivr mirror
+              "https://cdn.jsdelivr.net/gh/deldersveld/topojson@master/countries/canada/canada-provinces.json",
+            ]
+
+            const data = await fetchTopoJSON(candidates, []) // accept any objects, we'll normalise below
+            if (!data) {
+              toast({
+                title: "Map data error",
+                description: "Couldn’t load Canadian province boundaries.",
+                variant: "destructive",
+                duration: 4000,
+              })
+              setGeoAtlasData(null)
+              return
+            }
+
+            // Coerce keys to the canonical names we use elsewhere
+            const fixed = normaliseCanadaObjects(data)
+
+            // Double-check we now have provinces (adm1) data
+            if (!fixed.objects?.provinces) {
+              console.error("No provincial geometries recognised in topo:", Object.keys(fixed.objects ?? {}))
+              toast({
+                title: "Map data error",
+                description: "The downloaded Canada topojson has no provincial shapes.",
+                variant: "destructive",
+                duration: 4000,
+              })
+              setGeoAtlasData(null)
+              return
+            }
+
+            setGeoAtlasData(fixed)
+            return
+          }
           default:
             setGeoAtlasData(null)
             setIsLoading(false)
@@ -1532,7 +1595,7 @@ export function MapPreview({
 
             // Ensure min/max colors are set, fallback to default symbol fill
             rangeColors[0] = dimensionSettings.symbol.colorMinColor || stylingSettings.symbol.symbolFillColor
-            rangeColors[1] = dimensionSettings.symbol.colorMaxColor || stylingSettings.symbol.symbolFillColor
+            rangeColors[1] = dimensionSettings.symbol.colorMaxColor ||
 
             if (dimensionSettings.symbol.colorMidColor) {
               domain.splice(1, 0, dimensionSettings.symbol.colorMidValue)
