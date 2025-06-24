@@ -1315,16 +1315,39 @@ export function MapPreview({
         const primaryFeatureSource = objects.countries || objects.nation
         if (primaryFeatureSource) {
           const allFeatures = topojson.feature(geoAtlasData, primaryFeatureSource).features
+
+          // 1) regular fuzzy search
           countryFeatureForClipping = findCountryFeature(allFeatures, [
             "United States of America",
             "United States",
             "USA",
             840,
           ])
+
+          // 2) iso_a3 fallback
+          if (!countryFeatureForClipping) {
+            countryFeatureForClipping = allFeatures.find(
+              (f: any) => (f.properties?.iso_a3 ?? "").toUpperCase() === "USA",
+            )
+          }
+
+          // 3) numeric id fallback
+          if (!countryFeatureForClipping) {
+            countryFeatureForClipping = allFeatures.find((f: any) => String(f.id) === "840")
+          }
+
+          // 4) last-ditch: use objects.nation if it exists
+          if (!countryFeatureForClipping && objects.nation) {
+            countryFeatureForClipping = topojson.feature(geoAtlasData, objects.nation)
+          }
+
           if (countryFeatureForClipping) {
             nationMesh = topojson.mesh(geoAtlasData, countryFeatureForClipping)
           } else {
-            console.error("Could not locate United States feature in provided data.")
+            console.warn(
+              "[map-studio] Still couldn’t find a USA outline – rendering entire landmass as a single feature.",
+            )
+            nationMesh = topojson.mesh(geoAtlasData, primaryFeatureSource)
           }
         } else {
           console.error("No suitable USA outline found in topojson (missing 'countries' or 'nation').")
@@ -1334,11 +1357,34 @@ export function MapPreview({
         const primaryFeatureSource = objects.countries || objects.nation
         if (primaryFeatureSource) {
           const allFeatures = topojson.feature(geoAtlasData, primaryFeatureSource).features
+
+          // 1) regular fuzzy search
           countryFeatureForClipping = findCountryFeature(allFeatures, ["Canada", "CAN", 124])
+
+          // 2) iso_a3 fallback
+          if (!countryFeatureForClipping) {
+            countryFeatureForClipping = allFeatures.find(
+              (f: any) => (f.properties?.iso_a3 ?? "").toUpperCase() === "CAN",
+            )
+          }
+
+          // 3) numeric id fallback
+          if (!countryFeatureForClipping) {
+            countryFeatureForClipping = allFeatures.find((f: any) => String(f.id) === "124")
+          }
+
+          // 4) last-ditch: use objects.nation if it exists
+          if (!countryFeatureForClipping && objects.nation) {
+            countryFeatureForClipping = topojson.feature(geoAtlasData, objects.nation)
+          }
+
           if (countryFeatureForClipping) {
             nationMesh = topojson.mesh(geoAtlasData, countryFeatureForClipping)
           } else {
-            console.error("Could not locate Canada feature in provided data.")
+            console.warn(
+              "[map-studio] Still couldn’t find a USA outline – rendering entire landmass as a single feature.",
+            )
+            nationMesh = topojson.mesh(geoAtlasData, primaryFeatureSource)
           }
         } else {
           console.error("No suitable Canada outline found in topojson (missing 'countries' or 'nation').")
