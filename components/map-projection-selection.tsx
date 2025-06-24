@@ -9,16 +9,22 @@ import { ChevronDown, ChevronUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface MapProjectionSelectionProps {
-  geography: "usa" | "world"
+  geography: "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world"
   projection: "albersUsa" | "mercator" | "equalEarth"
-  onGeographyChange: (geography: "usa" | "world") => void
+  onGeographyChange: (
+    geography: "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world",
+  ) => void
   onProjectionChange: (projection: "albersUsa" | "mercator" | "equalEarth") => void
   columns: string[]
   sampleRows: (string | number)[][]
 }
 
 const geographies = [
-  { value: "usa", label: "United States" },
+  { value: "usa-states", label: "United States (states)" },
+  { value: "usa-counties", label: "United States (counties)" },
+  { value: "usa-nation", label: "United States (no outlines)" },
+  { value: "canada-provinces", label: "Canada (provinces)" },
+  { value: "canada-nation", label: "Canada (no outlines)" },
   { value: "world", label: "World" },
 ]
 
@@ -49,9 +55,11 @@ export function MapProjectionSelection({
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">Map and projection</CardTitle>
+            <CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">
+              Map and projection
+            </CardTitle>
           </div>
-          <div className="flex items-center gap-2">            
+          <div className="flex items-center gap-2">
             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </div>
         </div>
@@ -59,60 +67,62 @@ export function MapProjectionSelection({
       <CardContent className={cn("transition-all duration-200", isExpanded ? "pb-6 pt-2" : "pb-0 h-0 overflow-hidden")}>
         <div className="flex items-center gap-2">
           <div className="flex-grow">
-              <Label htmlFor="geography-search" className="mb-2 block">
-                Select geography
-              </Label>
-              <ScrollArea className="h-[200px] w-full rounded-md border p-4">
-                <ToggleGroup
-                  type="single"
-                  value={geography}
-                  onValueChange={(value: "usa" | "world") => {
-                    if (value) onGeographyChange(value)
-                  }}
-                  orientation="vertical"
-                  className="flex flex-col items-start"
-                >
-                  {filteredGeographies.map((g) => (
-                    <ToggleGroupItem
-                      key={g.value}
-                      value={g.value}
-                      aria-label={`Select ${g.label}`}
-                      className="w-full justify-start"
-                    >
-                      {g.label}
-                    </ToggleGroupItem>
-                  ))}
-                </ToggleGroup>
-              </ScrollArea>
-            </div>
-            {/* Projection Selection */}
+            <Label htmlFor="geography-search" className="mb-2 block">
+              Select geography
+            </Label>
+            <ScrollArea className="h-[200px] w-full rounded-md border p-4">
+              <ToggleGroup
+                type="single"
+                value={geography}
+                onValueChange={(
+                  value: "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world",
+                ) => {
+                  if (value) onGeographyChange(value)
+                }}
+                orientation="vertical"
+                className="flex flex-col items-start"
+              >
+                {filteredGeographies.map((g) => (
+                  <ToggleGroupItem
+                    key={g.value}
+                    value={g.value}
+                    aria-label={`Select ${g.label}`}
+                    className="w-full justify-start"
+                  >
+                    {g.label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </ScrollArea>
+          </div>
+          {/* Projection Selection */}
           <div className="flex-grow">
-              <Label htmlFor="projection-select" className="mb-2 block">
-                Select projection
-              </Label>
-              <ScrollArea className="h-[200px] w-full rounded-md border p-4">
-                <ToggleGroup
-                  type="single"
-                  value={projection}
-                  onValueChange={(value: "albersUsa" | "mercator" | "equalEarth") => {
-                    if (value) onProjectionChange(value)
-                  }}
-                  orientation="vertical"
-                  className="flex flex-col items-start"
-                >
-                  {projections.map((p) => (
-                    <ToggleGroupItem
-                      key={p.value}
-                      value={p.value}
-                      aria-label={`Select ${p.label}`}
-                      className="w-full justify-start"
-                    >
-                      {p.label}
-                    </ToggleGroupItem>
-                  ))}
-                </ToggleGroup>
-              </ScrollArea>
-            </div>
+            <Label htmlFor="projection-select" className="mb-2 block">
+              Select projection
+            </Label>
+            <ScrollArea className="h-[200px] w-full rounded-md border p-4">
+              <ToggleGroup
+                type="single"
+                value={projection}
+                onValueChange={(value: "albersUsa" | "mercator" | "equalEarth") => {
+                  if (value) onProjectionChange(value)
+                }}
+                orientation="vertical"
+                className="flex flex-col items-start"
+              >
+                {projections.map((p) => (
+                  <ToggleGroupItem
+                    key={p.value}
+                    value={p.value}
+                    aria-label={`Select ${p.label}`}
+                    className="w-full justify-start"
+                  >
+                    {p.label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </ScrollArea>
+          </div>
         </div>
       </CardContent>
     </Card>

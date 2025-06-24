@@ -183,7 +183,9 @@ export default function MapStudio() {
   const [showGeocoding, setShowGeocoding] = useState(false)
 
   // Map Projection and Geography states
-  const [selectedGeography, setSelectedGeography] = useState<"usa" | "world">("usa")
+  const [selectedGeography, setSelectedGeography] = useState<
+    "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world"
+  >("usa-states")
   const [selectedProjection, setSelectedProjection] = useState<"albersUsa" | "mercator" | "equalEarth">("albersUsa")
 
   // Update the state management to connect dimension settings between components
@@ -521,7 +523,8 @@ export default function MapStudio() {
     setDataInputExpanded(false) // Collapse data input after loading
 
     // NEW: Infer geography and projection directly here
-    let inferredGeo: "usa" | "world" = "usa"
+    let inferredGeo: "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world" =
+      "usa-states"
     let inferredProj: "albersUsa" | "mercator" | "equalEarth" = "albersUsa"
 
     const lowerCaseColumns = columns.map((col) => col.toLowerCase())
@@ -542,14 +545,33 @@ export default function MapStudio() {
       sampleDataString.includes("india") ||
       sampleDataString.includes("brazil")
 
+    // Check for Canadian provinces
+    const hasCanadaProvinceColumn = lowerCaseColumns.some(
+      (col) => col.includes("province") || col.includes("territory"),
+    )
+    const containsCanadaProvinces =
+      sampleDataString.includes("ontario") ||
+      sampleDataString.includes("quebec") ||
+      sampleDataString.includes("alberta")
+
+    // Check for US counties
+    const hasCountyColumn = lowerCaseColumns.some((col) => col.includes("county") || col.includes("fips"))
+    const containsUsCounties = sampleDataString.match(/\b\d{5}\b/) // Simple check for 5-digit FIPS
+
     if (hasCountryColumn || containsWorldCountries) {
       inferredGeo = "world"
-      inferredProj = "equalEarth" // Equal Earth is good for world maps
+      inferredProj = "equalEarth"
+    } else if (hasCanadaProvinceColumn || containsCanadaProvinces) {
+      inferredGeo = "canada-provinces"
+      inferredProj = "mercator" // Mercator is often used for Canada
+    } else if (hasCountyColumn || containsUsCounties) {
+      inferredGeo = "usa-counties"
+      inferredProj = "albersUsa"
     } else if (hasStateColumn || containsUsStates) {
-      inferredGeo = "usa"
-      inferredProj = "albersUsa" // Albers USA is standard for US
+      inferredGeo = "usa-states"
+      inferredProj = "albersUsa"
     } else if (hasLatLon) {
-      inferredGeo = "world"
+      inferredGeo = "world" // Default to world for lat/lon if no other geo hint
       inferredProj = "mercator"
     }
 

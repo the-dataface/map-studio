@@ -23,16 +23,18 @@ interface MapPreviewProps {
   columnTypes: ColumnType
   columnFormats: ColumnFormat
   customMapData: string
-  selectedGeography: "usa" | "world" // New prop
+  selectedGeography: "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world" // New prop
   selectedProjection: "albersUsa" | "mercator" | "equalEarth" // New prop
 }
 
 interface TopoJSONData {
   type: string
   objects: {
-    nation: any
+    nation?: any
     states?: any // states is optional for world map
     countries?: any // countries is optional for US map
+    counties?: any // Add this
+    provinces?: any // Add this
   }
   arcs: any[]
 }
@@ -178,6 +180,26 @@ const reverseStateMap: Record<string, string> = Object.fromEntries(
   Object.entries(stateMap).map(([abbr, full]) => [full.toLowerCase(), abbr]),
 )
 
+// Canadian Province Map
+const canadaProvinceMap: Record<string, string> = {
+  AB: "Alberta",
+  BC: "British Columbia",
+  MB: "Manitoba",
+  NB: "New Brunswick",
+  NL: "Newfoundland and Labrador",
+  NS: "Nova Scotia",
+  ON: "Ontario",
+  PE: "Prince Edward Island",
+  QC: "Quebec",
+  SK: "Saskatchewan",
+  NT: "Northwest Territories",
+  NU: "Nunavut",
+  YT: "Yukon",
+}
+const reverseCanadaProvinceMap: Record<string, string> = Object.fromEntries(
+  Object.entries(canadaProvinceMap).map(([abbr, full]) => [full.toLowerCase(), abbr]),
+)
+
 // FIPS to State Abbreviation Map
 const fipsToStateAbbrMap: Record<string, string> = {
   "01": "AL",
@@ -238,94 +260,141 @@ const fipsToStateAbbrMap: Record<string, string> = {
   "78": "VI",
 }
 
-// Enhanced state matching function
-const normalizeStateValue = (value: string): string => {
+// Enhanced geographic identifier normalization function
+const normalizeGeoIdentifier = (
+  value: string,
+  geoType: "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world",
+): string => {
   if (!value) return ""
 
-  const trimmed = value.trim()
+  const trimmed = String(value).trim()
 
-  // If it's already a 2-letter abbreviation, return uppercase
-  if (trimmed.length === 2 && stateMap[trimmed.toUpperCase()]) {
-    return trimmed.toUpperCase()
-  }
-
-  // If it's a full state name, convert to abbreviation
-  const lowerValue = trimmed.toLowerCase()
-  const abbreviation = reverseStateMap[lowerValue]
-  if (abbreviation) {
-    return abbreviation
-  }
-
-  // Try partial matching for state names
-  for (const [abbr, fullName] of Object.entries(stateMap)) {
-    if (fullName.toLowerCase() === lowerValue) {
-      return abbr
+  if (geoType.startsWith("usa-states")) {
+    // US state logic
+    if (trimmed.length === 2 && stateMap[trimmed.toUpperCase()]) {
+      return trimmed.toUpperCase()
     }
+    const lowerValue = trimmed.toLowerCase()
+    const abbreviation = reverseStateMap[lowerValue]
+    if (abbreviation) return abbreviation
+    for (const [abbr, fullName] of Object.entries(stateMap)) {
+      if (fullName.toLowerCase() === lowerValue) return abbr
+    }
+    return trimmed.toUpperCase() // Fallback
+  } else if (geoType.startsWith("usa-counties")) {
+    // For US counties, assume data provides FIPS code directly (e.g., "01001")
+    // us-atlas county IDs are 5-digit FIPS codes
+    return trimmed
+  } else if (geoType.startsWith("canada-provinces")) {
+    // For Canadian provinces
+    if (trimmed.length === 2 && canadaProvinceMap[trimmed.toUpperCase()]) {
+      return trimmed.toUpperCase()
+    }
+    const lowerValue = trimmed.toLowerCase()
+    const abbreviation = reverseCanadaProvinceMap[lowerValue]
+    if (abbreviation) return abbreviation
+    for (const [abbr, fullName] of Object.entries(canadaProvinceMap)) {
+      if (fullName.toLowerCase() === lowerValue) return abbr
+    }
+    return trimmed.toUpperCase() // Fallback
+  } else if (geoType === "world") {
+    // For world countries, use the value as is (expecting country name or ISO code)
+    return trimmed
   }
-
-  // Return original value if no match found
-  return trimmed.toUpperCase()
+  return trimmed // Default fallback
 }
 
-// Enhanced function to extract state from SVG ID
-const extractStateFromSVGId = (id: string): string | null => {
+// Enhanced function to extract state/county/province from SVG ID
+const extractStateFromSVGId = (id: string, geoType: string): string | null => {
   if (!id) return null
 
-  console.log(`Extracting state from SVG ID: "${id}"`)
+  console.log(`Extracting geo ID from SVG ID: "${id}" for geoType: "${geoType}"`)
 
-  // Try different patterns for state extraction
-  const patterns = [
+  // Patterns for US States
+  const usStatePatterns = [
     /^State-(\d{2})$/i, // State-01 (FIPS code)
     /^State-([A-Z]{2})$/i, // State-CA
     /^State-([a-zA-Z\s]+)$/i, // State-California
-    /^Province-(\d{2})$/i, // Province-01 (FIPS code)
-    /^Province-([A-Z]{2})$/i, // Province-CA
-    /^Province-([a-zA-Z\s]+)$/i, // Province-California
-    /^Region-(\d{2})$/i, // Region-01 (FIPS code)
-    /^Region-([A-Z]{2})$/i, // Region-CA
-    /^Region-([a-zA-Z\s]+)$/i, // Region-California
-    /^(\d{2})$/i, // 01 (FIPS code directly)
-    /^([A-Z]{2})$/i, // CA
-    /^([a-zA-Z\s]+)$/i, // California
     /State.*?([A-Z]{2})$/i, // Any State prefix with 2-letter code at end
     /State.*?([a-zA-Z\s]{4,})$/i, // Any State prefix with longer name
-    /Province.*?([A-Z]{2})$/i,
-    /Province.*?([a-zA-Z\s]{4,})$/i,
-    /Region.*?([A-Z]{2})$/i,
-    /Region.*?([a-zA-Z\s]{4,})$/i,
   ]
 
-  for (const pattern of patterns) {
+  // Patterns for US Counties (expecting 5-digit FIPS)
+  const usCountyPatterns = [
+    /^County-(\d{5})$/i, // County-01001 (FIPS code)
+    /^(\d{5})$/i, // 01001 (FIPS code directly)
+  ]
+
+  // Patterns for Canadian Provinces
+  const canadaProvincePatterns = [
+    /^Province-(\d{2})$/i, // Province-01 (numeric, if any)
+    /^Province-([A-Z]{2})$/i, // Province-AB
+    /^Province-([a-zA-Z\s]+)$/i, // Province-Alberta
+    /Province.*?([A-Z]{2})$/i,
+    /Province.*?([a-zA-Z\s]{4,})$/i,
+  ]
+
+  // General patterns (e.g., for world countries or direct IDs)
+  const generalPatterns = [
+    /^(\d{2})$/i, // 01 (FIPS code directly, for states)
+    /^([A-Z]{2})$/i, // CA (state abbr directly)
+    /^([a-zA-Z\s]+)$/i, // California (state name directly)
+  ]
+
+  let patternsToUse: RegExp[] = []
+  if (geoType.startsWith("usa-states")) {
+    patternsToUse = [...usStatePatterns, ...generalPatterns]
+  } else if (geoType.startsWith("usa-counties")) {
+    patternsToUse = [...usCountyPatterns]
+  } else if (geoType.startsWith("canada-provinces")) {
+    patternsToUse = [...canadaProvincePatterns, ...generalPatterns] // General for direct abbr/name
+  } else {
+    patternsToUse = [...generalPatterns] // For world or other custom
+  }
+
+  for (const pattern of patternsToUse) {
     const match = id.match(pattern)
     if (match && match[1]) {
       const extracted = match[1].trim()
       let normalized: string
 
-      // Check if the extracted value is a FIPS code
-      if (pattern.source.includes("\\d{2}")) {
-        const fipsAbbr = fipsToStateAbbrMap[extracted]
-        if (fipsAbbr) {
-          normalized = fipsAbbr
-          console.log(
-            `Pattern matched FIPS: ${pattern} -> extracted: "${extracted}" -> converted to abbr: "${normalized}"`,
-          )
+      // Handle FIPS codes for US states/counties
+      if (pattern.source.includes("\\d{2}") || pattern.source.includes("\\d{5}")) {
+        if (geoType.startsWith("usa-states")) {
+          const fipsAbbr = fipsToStateAbbrMap[extracted]
+          if (fipsAbbr) {
+            normalized = fipsAbbr
+            console.log(
+              `Pattern matched FIPS: ${pattern} -> extracted: "${extracted}" -> converted to abbr: "${normalized}"`,
+            )
+          } else {
+            console.log(`Pattern matched FIPS: ${pattern} -> extracted: "${extracted}" but no FIPS mapping found.`)
+            continue
+          }
+        } else if (geoType.startsWith("usa-counties")) {
+          normalized = extracted // For counties, FIPS is the identifier
+          console.log(`Pattern matched FIPS (county): ${pattern} -> extracted: "${extracted}"`)
         } else {
-          console.log(`Pattern matched FIPS: ${pattern} -> extracted: "${extracted}" but no FIPS mapping found.`)
-          continue
+          normalized = normalizeGeoIdentifier(extracted, geoType)
         }
       } else {
-        normalized = normalizeStateValue(extracted)
+        normalized = normalizeGeoIdentifier(extracted, geoType)
         console.log(`Pattern matched: ${pattern} -> extracted: "${extracted}" -> normalized: "${normalized}"`)
       }
 
-      // Verify the normalized value is a valid state abbreviation
-      if (stateMap[normalized]) {
+      // Verify the normalized value is a valid identifier for the current geoType
+      if (
+        (geoType.startsWith("usa-states") && stateMap[normalized]) ||
+        (geoType.startsWith("canada-provinces") && canadaProvinceMap[normalized]) ||
+        (geoType.startsWith("usa-counties") && normalized.length === 5 && /^\d{5}$/.test(normalized)) || // Simple FIPS check
+        (geoType === "world" && normalized.length > 0) // For world, any non-empty string is fine
+      ) {
         return normalized
       }
     }
   }
 
-  console.log(`No valid state extracted from ID: "${id}"`)
+  console.log(`No valid geo identifier extracted from ID: "${id}" for geoType: "${geoType}"`)
   return null
 }
 
@@ -547,31 +616,60 @@ const formatDate = (value: any, format: string): string => {
 }
 
 // Format a state value based on the selected format
-const formatState = (value: any, format: string): string => {
+const formatState = (value: any, format: string, geoType: string): string => {
   if (value === null || value === undefined || value === "") return ""
 
   const str = String(value).trim()
 
-  switch (format) {
-    case "abbreviated":
-      if (str.length === 2 && stateMap[str.toUpperCase()]) {
-        return str.toUpperCase()
-      }
-      const abbr = reverseStateMap[str.toLowerCase()]
-      return abbr || str
-    case "full":
-      if (str.length === 2) {
-        return stateMap[str.toUpperCase()] || str
-      }
-      const fullName = Object.values(stateMap).find((state) => state.toLowerCase() === str.toLowerCase())
-      return fullName || str
-    default:
-      return str
+  if (geoType.startsWith("usa-states")) {
+    switch (format) {
+      case "abbreviated":
+        if (str.length === 2 && stateMap[str.toUpperCase()]) {
+          return str.toUpperCase()
+        }
+        const abbr = reverseStateMap[str.toLowerCase()]
+        return abbr || str
+      case "full":
+        if (str.length === 2) {
+          return stateMap[str.toUpperCase()] || str
+        }
+        const fullName = Object.values(stateMap).find((state) => state.toLowerCase() === str.toLowerCase())
+        return fullName || str
+      default:
+        return str
+    }
+  } else if (geoType.startsWith("canada-provinces")) {
+    switch (format) {
+      case "abbreviated":
+        if (str.length === 2 && canadaProvinceMap[str.toUpperCase()]) {
+          return str.toUpperCase()
+        }
+        const abbr = reverseCanadaProvinceMap[str.toLowerCase()]
+        return abbr || str
+      case "full":
+        if (str.length === 2) {
+          return canadaProvinceMap[str.toUpperCase()] || str
+        }
+        const fullName = Object.values(canadaProvinceMap).find(
+          (province) => province.toLowerCase() === str.toLowerCase(),
+        )
+        return fullName || str
+      default:
+        return str
+    }
   }
+  // For counties or world, just return raw for now
+  return str
 }
 
 // Helper function to format legend values based on column type and format
-const formatLegendValue = (value: any, column: string, columnTypes: any, columnFormats: any): string => {
+const formatLegendValue = (
+  value: any,
+  column: string,
+  columnTypes: any,
+  columnFormats: any,
+  geoType: string,
+): string => {
   const type = columnTypes[column] || "text"
   const format = columnFormats[column]
 
@@ -582,7 +680,7 @@ const formatLegendValue = (value: any, column: string, columnTypes: any, columnF
     return formatDate(value, format)
   }
   if (type === "state" && format) {
-    return formatState(value, format)
+    return formatState(value, format, geoType)
   }
   return String(value)
 }
@@ -593,6 +691,7 @@ const renderLabelPreview = (
   dataRow: DataRow | GeocodedRow,
   columnTypes: { [key: string]: "text" | "number" | "date" | "coordinate" | "state" },
   columnFormats: { [key: string]: string },
+  geoType: string,
 ): string => {
   if (!template || !dataRow) {
     return ""
@@ -605,7 +704,7 @@ const renderLabelPreview = (
     }
     const type = columnTypes[columnName] || "text"
     const format = columnFormats[columnName] || getDefaultFormat(type as "number" | "date" | "state" | "coordinate")
-    return formatLegendValue(value, columnName, columnTypes, columnFormats)
+    return formatLegendValue(value, columnName, columnTypes, columnFormats, geoType)
   })
 
   return previewText
@@ -841,16 +940,56 @@ export function MapPreview({
       try {
         setIsLoading(true)
         let dataUrl = ""
-        if (selectedGeography === "usa") {
-          // Use the unprojected states-10m.json for USA
-          dataUrl = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json"
-        } else if (selectedGeography === "world") {
-          dataUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"
+        let expectedObjects: string[] = [] // To check if the loaded TopoJSON has the expected objects
+
+        switch (selectedGeography) {
+          case "usa-states":
+          case "usa-nation": // Both use the same US atlas, but render differently
+            dataUrl = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json"
+            expectedObjects = ["nation", "states"]
+            break
+          case "usa-counties":
+            dataUrl = "https://cdn.jsdelivr.net/npm/us-atlas@3/count-10m.json" // Corrected URL for counties
+            expectedObjects = ["nation", "counties"]
+            break
+          case "world":
+            dataUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"
+            expectedObjects = ["countries"]
+            break
+          case "canada-provinces":
+          case "canada-nation": // Both use the same Canada topojson
+            dataUrl =
+              "https://gist.githubusercontent.com/Brideau/2391df60938462571ca9/raw/f5a1f3b47ff671eaf2fb7e7b798bacfc6962606a/canadaprovtopo.json"
+            expectedObjects = ["nation", "provinces"] // Assuming 'provinces' object exists
+            break
+          default:
+            setGeoAtlasData(null)
+            setIsLoading(false)
+            return
         }
 
         if (dataUrl) {
           const response = await fetch(dataUrl)
           const data = await response.json()
+
+          // Basic validation for expected objects
+          const hasAllExpectedObjects = expectedObjects.every((obj) => data.objects && data.objects[obj])
+          if (!hasAllExpectedObjects) {
+            console.error(
+              `Loaded TopoJSON for ${selectedGeography} is missing expected objects:`,
+              expectedObjects,
+              data.objects,
+            )
+            toast({
+              title: "Map data error",
+              description: `The map data for ${selectedGeography} is incomplete.`,
+              variant: "destructive",
+              duration: 3000,
+            })
+            setGeoAtlasData(null)
+            return
+          }
+
           setGeoAtlasData(data)
         } else {
           setGeoAtlasData(null)
@@ -884,10 +1023,6 @@ export function MapPreview({
 
     const svg = d3.select(svgRef.current)
     svg.selectAll("*").remove()
-
-    // Determine whether we’re drawing a USA map or a World map.
-    // Always have a valid value; will be refined later if we load TopoJSON.
-    let topoType: "usa" | "world" = selectedGeography === "world" ? "world" : "usa"
 
     const width = 975
 
@@ -1003,19 +1138,24 @@ export function MapPreview({
           console.log("✅ Imported", customMapElement.children.length, "elements into new Map group")
         }
 
-        // Look for Nations and States groups
+        // Look for Nations and States/Counties/Provinces groups
         let nationsGroup = svg.select("#Nations")
-        let statesGroup = svg.select("#States")
+        let statesOrCountiesGroup = svg.select("#States")
 
         if (nationsGroup.empty()) {
           nationsGroup = svg.select("#Countries")
         }
-        if (statesGroup.empty()) {
-          statesGroup = svg.select("#Provinces, #Regions")
+        if (statesOrCountiesGroup.empty()) {
+          statesOrCountiesGroup = svg.select("#Counties, #Provinces, #Regions")
         }
 
         console.log("Nations group found:", !nationsGroup.empty(), "Paths:", nationsGroup.selectAll("path").size())
-        console.log("States group found:", !statesGroup.empty(), "Paths:", statesGroup.selectAll("path").size())
+        console.log(
+          "States/Counties/Provinces group found:",
+          !statesOrCountiesGroup.empty(),
+          "Paths:",
+          statesOrCountiesGroup.selectAll("path").size(),
+        )
 
         // Apply styling
         if (!nationsGroup.empty()) {
@@ -1026,8 +1166,8 @@ export function MapPreview({
             .attr("stroke-width", stylingSettings.base.nationStrokeWidth)
         }
 
-        if (!statesGroup.empty()) {
-          statesGroup
+        if (!statesOrCountiesGroup.empty()) {
+          statesOrCountiesGroup
             .selectAll("path")
             .attr("fill", stylingSettings.base.defaultStateFillColor)
             .attr("stroke", stylingSettings.base.defaultStateStrokeColor)
@@ -1050,12 +1190,11 @@ export function MapPreview({
 
       const mapGroup = svg.append("g").attr("id", "Map")
       const nationsGroup = mapGroup.append("g").attr("id", "Nations")
-      const statesGroup = mapGroup.append("g").attr("id", "States") // This group will hold states or countries
+      const statesOrCountiesGroup = mapGroup.append("g").attr("id", "StatesOrCounties") // New group name
 
       let geoFeatures: any[] = []
       let nationMesh: any = null
 
-      // Ensure expected TopoJSON objects exist before processing
       const { objects } = geoAtlasData as TopoJSONData
       if (!objects) {
         console.error("TopoJSON file has no 'objects' property:", geoAtlasData)
@@ -1067,67 +1206,69 @@ export function MapPreview({
         return
       }
 
-      /**
-       * The file might not match the UI's `selectedGeography`.
-       *  • If it has `objects.countries` we treat it as a WORLD file.
-       *  • Otherwise, if it has `objects.states`, we treat it as a USA file.
-       */
-      topoType = objects.countries ? "world" : "usa"
-
-      if (!objects) {
-        console.error("TopoJSON file has no 'objects' property:", geoAtlasData)
-        toast({
-          title: "Invalid TopoJSON",
-          description: "The downloaded map file is missing required data.",
-          variant: "destructive",
-        })
-        return
+      // Determine nation mesh based on selectedGeography
+      if (selectedGeography.startsWith("usa")) {
+        if (!objects.nation) {
+          console.error("US atlas missing 'nation' object:", objects)
+          return
+        }
+        nationMesh = topojson.mesh(geoAtlasData, objects.nation)
+      } else if (selectedGeography.startsWith("canada")) {
+        if (!objects.nation) {
+          console.error("Canada topojson missing 'nation' object:", objects)
+          return
+        }
+        nationMesh = topojson.mesh(geoAtlasData, objects.nation)
+      } else if (selectedGeography === "world") {
+        if (!objects.countries) {
+          console.error("World atlas missing 'countries' object:", objects)
+          return
+        }
+        nationMesh = topojson.mesh(geoAtlasData, objects.countries, (a: any, b: any) => a !== b)
       }
 
-      if (topoType === "usa") {
-        if (!objects.states || !objects.nation) {
-          console.error("US atlas missing 'states' or 'nation' objects:", objects)
-          toast({
-            title: "Atlas format error",
-            description: "Could not find states/nation layers in US-atlas file.",
-            variant: "destructive",
-          })
+      if (nationMesh) {
+        nationsGroup
+          .append("path")
+          .attr(
+            "id",
+            selectedGeography.includes("usa")
+              ? "Country-US"
+              : selectedGeography.includes("canada")
+                ? "Country-CA"
+                : "World-Outline",
+          )
+          .attr("fill", stylingSettings.base.nationFillColor)
+          .attr("stroke", stylingSettings.base.nationStrokeColor)
+          .attr("stroke-width", stylingSettings.base.nationStrokeWidth)
+          .attr("stroke-linejoin", "round")
+          .attr("stroke-linecap", "round")
+          .attr("d", path(nationMesh))
+      }
+
+      // Conditionally render states/counties/provinces
+      if (selectedGeography === "usa-states") {
+        if (!objects.states) {
+          console.error("US atlas missing 'states' object:", objects)
           return
         }
         geoFeatures = topojson.feature(geoAtlasData, objects.states).features
-        nationMesh = topojson.mesh(geoAtlasData, objects.nation)
-      } else if (topoType === "world") {
-        if (!objects.countries) {
-          console.error("World atlas missing 'countries' object:", objects)
-          toast({
-            title: "Atlas format error",
-            description: "Could not find country layer in World-atlas file.",
-            variant: "destructive",
-          })
+      } else if (selectedGeography === "usa-counties") {
+        if (!objects.counties) {
+          console.error("US atlas missing 'counties' object:", objects)
           return
         }
-        geoFeatures = topojson.feature(geoAtlasData, objects.countries).features
-        nationMesh = topojson.mesh(geoAtlasData, objects.countries, (a: any, b: any) => a !== b)
-      } else {
-        // Unknown geography – bail out gracefully
-        toast({
-          title: "Unsupported geography",
-          description: `No renderer for “${selectedGeography}”.`,
-        })
-        return
+        geoFeatures = topojson.feature(geoAtlasData, objects.counties).features
+      } else if (selectedGeography === "canada-provinces") {
+        if (!objects.provinces) {
+          console.error("Canada topojson missing 'provinces' object:", objects)
+          return
+        }
+        geoFeatures = topojson.feature(geoAtlasData, objects.provinces).features
       }
+      // For "usa-nation", "canada-nation", "world", geoFeatures remains empty, so no sub-features are rendered.
 
-      nationsGroup
-        .append("path")
-        .attr("id", topoType === "usa" ? "Country-US" : "World-Outline")
-        .attr("fill", stylingSettings.base.nationFillColor)
-        .attr("stroke", stylingSettings.base.nationStrokeColor)
-        .attr("stroke-width", stylingSettings.base.nationStrokeWidth)
-        .attr("stroke-linejoin", "round")
-        .attr("stroke-linecap", "round")
-        .attr("d", path(nationMesh))
-
-      console.log("=== STATE/COUNTRY FEATURES DEBUG ===")
+      console.log("=== SUB-FEATURE FEATURES DEBUG ===")
       console.log("Number of features:", geoFeatures.length)
       geoFeatures.slice(0, 5).forEach((feature, index) => {
         console.log(`Feature ${index}:`, {
@@ -1138,22 +1279,18 @@ export function MapPreview({
         })
       })
 
-      statesGroup
+      statesOrCountiesGroup
         .selectAll("path")
         .data(geoFeatures)
         .join("path")
         .attr("id", (d) => {
-          let identifier = d.properties?.postal // Try postal code first (e.g., "TX") for US states
-          if (!identifier && d.id) {
-            // If postal is not available, try FIPS ID for US states and convert to abbr
-            if (topoType === "usa") {
-              identifier = fipsToStateAbbrMap[String(d.id).padStart(2, "0")]
-            } else if (topoType === "world") {
-              // For world countries, use name or ID directly
-              identifier = d.properties?.name || d.id
-            }
-          }
-          const featureId = `${topoType === "usa" ? "State" : "Country"}-${identifier || ""}` // Fallback to empty string if no identifier found
+          const identifier = d.properties?.postal || d.properties?.name || d.id // Prioritize postal, then name, then id
+          let prefix = ""
+          if (selectedGeography === "usa-states") prefix = "State"
+          else if (selectedGeography === "usa-counties") prefix = "County"
+          else if (selectedGeography === "canada-provinces") prefix = "Province"
+
+          const featureId = `${prefix}-${identifier || ""}`
           console.log(`Creating feature path with ID: ${featureId}`)
           return featureId
         })
@@ -1177,21 +1314,15 @@ export function MapPreview({
 
     if (shouldRenderChoropleth) {
       // Build state data map
-      const stateDataMap = new Map()
+      const geoDataMap = new Map()
 
-      console.log("=== Building state data map for choropleth ===")
+      console.log("=== Building geo data map for choropleth ===")
       choroplethData.forEach((d, index) => {
-        const rawStateValue = String(d[dimensionSettings.choropleth.stateColumn] || "")
-        if (!rawStateValue.trim()) return
+        const rawGeoValue = String(d[dimensionSettings.choropleth.stateColumn] || "")
+        if (!rawGeoValue.trim()) return
 
-        // Normalize state/country value based on selected geography
-        let normalizedKey: string
-        if (topoType === "usa") {
-          normalizedKey = normalizeStateValue(rawStateValue)
-        } else {
-          // For world map, use the raw value as the key (assuming it's country name)
-          normalizedKey = rawStateValue.trim()
-        }
+        // Normalize geo value based on selected geography
+        const normalizedKey = normalizeGeoIdentifier(rawGeoValue, selectedGeography)
 
         const value =
           dimensionSettings.choropleth.colorScale === "linear"
@@ -1202,13 +1333,13 @@ export function MapPreview({
           value !== null &&
           (dimensionSettings.choropleth.colorScale === "linear" ? !isNaN(value as number) : value)
         ) {
-          stateDataMap.set(normalizedKey, value)
-          console.log(`✓ Mapped ${rawStateValue} → ${normalizedKey} = ${value}`)
+          geoDataMap.set(normalizedKey, value)
+          console.log(`✓ Mapped ${rawGeoValue} → ${normalizedKey} = ${value}`)
         }
       })
 
-      console.log("Total mapped states/countries:", stateDataMap.size)
-      console.log("State/Country data map:", Array.from(stateDataMap.entries()))
+      console.log("Total mapped geos:", geoDataMap.size)
+      console.log("Geo data map:", Array.from(geoDataMap.entries()))
 
       // Create color scale
       if (dimensionSettings?.choropleth?.colorScale === "linear") {
@@ -1237,11 +1368,12 @@ export function MapPreview({
             colorMap.set(String(dataCategory), item.color)
           }
         })
-        choroplethColorScale = (value: any) => colorMap.get(String(value)) || stylingSettings.base.defaultStateFillColor
+        choroplethColorScale = (value: any) =>
+          geoDataMap.get(String(value)) || stylingSettings.base.defaultStateFillColor
         console.log("Created categorical color scale with map:", Array.from(colorMap.entries()))
       }
 
-      // Apply colors to state/country paths and groups
+      // Apply colors to state/country/county/province paths and groups
       const mapGroup = svg.select("#Map")
       if (!mapGroup.empty()) {
         console.log("Found map group, applying choropleth colors...")
@@ -1260,21 +1392,21 @@ export function MapPreview({
 
           if (effectiveId) {
             if (customMapData) {
-              // For custom maps, always try to extract state/province first from the effective ID
-              featureKey = extractStateFromSVGId(effectiveId)
+              // For custom maps, always try to extract state/province/county first from the effective ID
+              featureKey = extractStateFromSVGId(effectiveId, selectedGeography)
               if (!featureKey) {
-                featureKey = effectiveId // Fallback to raw effective ID if not a recognized state/province format
+                featureKey = effectiveId // Fallback to raw effective ID if not a recognized format
               }
             } else {
               // For standard TopoJSON maps (which use d.id on paths)
               const d = element.datum() as any // Here, d.properties.name or d.id is valid for TopoJSON
-              if (topoType === "usa") {
-                featureKey = d?.id ? extractStateFromSVGId(String(d.id)) : null // Use d.id for TopoJSON US states
-                if (!featureKey && effectiveId) {
-                  // Fallback to effectiveId if d.id wasn't useful
-                  featureKey = extractStateFromSVGId(effectiveId)
-                }
-              } else {
+              if (selectedGeography.startsWith("usa-states")) {
+                featureKey = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null // Use d.id for TopoJSON US states
+              } else if (selectedGeography.startsWith("usa-counties")) {
+                featureKey = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null // Use d.id (FIPS) for US counties
+              } else if (selectedGeography.startsWith("canada-provinces")) {
+                featureKey = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null // Use d.id (abbr) for Canadian provinces
+              } else if (selectedGeography === "world") {
                 featureKey = d?.properties?.name || String(d?.id) || effectiveId // For world maps, use name or ID directly
               }
             }
@@ -1285,7 +1417,7 @@ export function MapPreview({
             return
           }
 
-          const value = stateDataMap.get(featureKey)
+          const value = geoDataMap.get(featureKey)
           if (value !== undefined) {
             const color = choroplethColorScale(value)
             element.attr("fill", color)
@@ -1457,6 +1589,7 @@ export function MapPreview({
                 d,
                 columnTypes,
                 columnFormats,
+                selectedGeography,
               )
 
               if (!labelText) return
@@ -1581,52 +1714,31 @@ export function MapPreview({
       console.log("=== Rendering choropleth labels ===")
       const choroplethLabelGroup = svg.append("g").attr("id", "ChoroplethLabels")
 
-      // Create multiple maps for different state identifier formats
-      const stateDataMapByAbbr = new Map<string, DataRow | GeocodedRow>()
-      const stateDataMapByFips = new Map<string, DataRow | GeocodedRow>()
-      const stateDataMapByName = new Map<string, DataRow | GeocodedRow>()
+      // Create a single map for geo data, using normalized identifiers
+      const geoDataMap = new Map<string, DataRow | GeocodedRow>()
 
-      // Log some sample data to see what we're working with
       console.log("Sample choropleth data:", choroplethData.slice(0, 3))
 
       choroplethData.forEach((d) => {
-        const rawStateValue = String(d[dimensionSettings.choropleth.stateColumn] || "")
-        if (!rawStateValue.trim()) return
+        const rawGeoValue = String(d[dimensionSettings.choropleth.stateColumn] || "")
+        if (!rawGeoValue.trim()) return
 
-        // Store by state abbreviation (normalized)
-        let normalizedKey: string
-        if (topoType === "usa") {
-          normalizedKey = normalizeStateValue(rawStateValue)
-        } else {
-          // For world map, use the raw value as the key (assuming it's country name)
-          normalizedKey = rawStateValue.trim()
-        }
-        stateDataMapByAbbr.set(normalizedKey, d)
-
-        // Also store by state name (lowercase for case-insensitive lookup)
-        if (stateMap[normalizedKey]) {
-          const stateName = stateMap[normalizedKey].toLowerCase()
-          stateDataMapByName.set(stateName, d)
-        }
-
-        // Try to find FIPS code for this state and store by FIPS
-        for (const [fips, abbr] of Object.entries(fipsToStateAbbrMap)) {
-          if (abbr === normalizedKey) {
-            stateDataMapByFips.set(fips, d)
-          }
-        }
+        const normalizedKey = normalizeGeoIdentifier(rawGeoValue, selectedGeography)
+        geoDataMap.set(normalizedKey, d)
       })
 
-      console.log("State data map by abbreviation size:", stateDataMapByAbbr.size)
-      console.log("State data map by FIPS size:", stateDataMapByFips.size)
-      console.log("State data map by name size:", stateDataMapByName.size)
+      console.log("Geo data map size:", geoDataMap.size)
 
-      // Get state/country features from geoAtlasData or custom map paths
+      // Get state/country/county/province features from geoAtlasData or custom map paths
       let featuresForLabels: any[] = []
       if (geoAtlasData && mapType !== "custom") {
-        if (topoType === "usa" && geoAtlasData.objects.states) {
+        if (selectedGeography === "usa-states" && geoAtlasData.objects.states) {
           featuresForLabels = topojson.feature(geoAtlasData, geoAtlasData.objects.states).features
-        } else if (topoType === "world" && geoAtlasData.objects.countries) {
+        } else if (selectedGeography === "usa-counties" && geoAtlasData.objects.counties) {
+          featuresForLabels = topojson.feature(geoAtlasData, geoAtlasData.objects.counties).features
+        } else if (selectedGeography === "canada-provinces" && geoAtlasData.objects.provinces) {
+          featuresForLabels = topojson.feature(geoAtlasData, geoAtlasData.objects.provinces).features
+        } else if (selectedGeography === "world" && geoAtlasData.objects.countries) {
           featuresForLabels = topojson.feature(geoAtlasData, geoAtlasData.objects.countries).features
         }
         console.log("Using geoAtlasData for labels, features count:", featuresForLabels.length)
@@ -1634,13 +1746,13 @@ export function MapPreview({
         // For custom maps, iterate through all relevant elements (paths and groups) in the #States and #Nations groups
         const elementsToProcess: SVGElement[] = []
         svg
-          .select("#States")
+          .select("#StatesOrCounties")
           .selectAll("path, g")
           .each(function (this: SVGElement) {
             elementsToProcess.push(this)
           })
         const nationsOrCountriesGroup = svg.select("#Nations") || svg.select("#Countries")
-        if (!nationsOrCountriesGroup.empty() && topoType === "world") {
+        if (!nationsOrCountriesGroup.empty() && selectedGeography === "world") {
           // Only process nations for world maps in custom SVG
           nationsOrCountriesGroup.selectAll("path, g").each(function (this: SVGElement) {
             elementsToProcess.push(this)
@@ -1659,7 +1771,7 @@ export function MapPreview({
 
           let featureId = null
           if (effectiveId) {
-            const extractedId = extractStateFromSVGId(effectiveId)
+            const extractedId = extractStateFromSVGId(effectiveId, selectedGeography)
             featureId = extractedId || effectiveId // Fallback to raw effective ID
           }
 
@@ -1681,73 +1793,35 @@ export function MapPreview({
         .data(featuresForLabels)
         .join("text")
         .each(function (d) {
-          // Try multiple ways to identify the state/country
-          const featureId = d.id || d.properties?.postal || d.properties?.name
-
-          // Determine if this looks like a FIPS code (numeric string or number)
-          let stateFips = null
-          let isNumericId = false
-
-          if (typeof featureId === "number") {
-            stateFips = String(featureId).padStart(2, "0")
-            isNumericId = true
-          } else if (typeof featureId === "string" && /^\d{1,2}$/.test(featureId)) {
-            // String that contains only 1-2 digits (FIPS code)
-            stateFips = featureId.padStart(2, "0")
-            isNumericId = true
-          }
-
-          // Try to find data for this state/country using multiple identifiers
-          let dataRow: DataRow | GeocodedRow | undefined
-
-          if (topoType === "usa") {
-            // If it looks like a FIPS code, try FIPS lookup first
-            if (isNumericId && stateFips) {
-              console.log(`Trying FIPS lookup for: ${stateFips}`)
-
-              // Try direct FIPS lookup
-              if (stateDataMapByFips.has(stateFips)) {
-                dataRow = stateDataMapByFips.get(stateFips)
-                console.log(`✅ Found data via FIPS: ${stateFips}`)
-              }
-              // Try converting FIPS to abbreviation and look up
-              else if (fipsToStateAbbrMap[stateFips]) {
-                const stateAbbr = fipsToStateAbbrMap[stateFips]
-                if (stateDataMapByAbbr.has(stateAbbr)) {
-                  dataRow = stateDataMapByAbbr.get(stateAbbr)
-                  console.log(`✅ Found data via FIPS->Abbr: ${stateFips} -> ${stateAbbr}`)
-                }
-              }
-            }
-            // Otherwise try state abbreviation lookup
-            else if (featureId && stateDataMapByAbbr.has(featureId)) {
-              dataRow = stateDataMapByAbbr.get(featureId)
-              console.log(`✅ Found data via abbreviation: ${featureId}`)
-            }
-            // Try state name lookup
-            else if (featureId && stateMap[featureId]) {
-              const stateName = stateMap[featureId].toLowerCase()
-              if (stateDataMapByName.has(stateName)) {
-                dataRow = stateDataMapByName.get(stateName)
-                console.log(`✅ Found data via state name: ${featureId} -> ${stateName}`)
-              }
-            }
-          } else if (topoType === "world") {
-            // For world maps, try to match by country name (d.properties.name or d.id)
-            const countryName = d.properties?.name || d.id
-            const stateDataMap = new Map()
-            if (countryName && stateDataMap.has(countryName)) {
-              dataRow = stateDataMap.get(countryName)
-              console.log(`✅ Found data for country: ${countryName}`)
+          // Determine the identifier for lookup in geoDataMap
+          let featureIdentifier: string | null = null
+          if (customMapData) {
+            featureIdentifier = d.id // For custom maps, the stored ID is already normalized
+          } else {
+            // For TopoJSON data, normalize based on selectedGeography
+            if (selectedGeography.startsWith("usa-states")) {
+              featureIdentifier = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null
+            } else if (selectedGeography.startsWith("usa-counties")) {
+              featureIdentifier = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null
+            } else if (selectedGeography.startsWith("canada-provinces")) {
+              featureIdentifier = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null
+            } else if (selectedGeography === "world") {
+              featureIdentifier = d?.properties?.name || String(d?.id) || null
             }
           }
 
-          console.log(
-            `Processing label for feature ID: ${featureId}, FIPS: ${stateFips}, isNumeric: ${isNumericId}, has data: ${!!dataRow}`,
-          )
+          const dataRow = featureIdentifier ? geoDataMap.get(featureIdentifier) : undefined
+
+          console.log(`Processing label for feature ID: ${featureIdentifier}, has data: ${!!dataRow}`)
 
           const labelText = dataRow
-            ? renderLabelPreview(dimensionSettings.choropleth.labelTemplate, dataRow, columnTypes, columnFormats)
+            ? renderLabelPreview(
+                dimensionSettings.choropleth.labelTemplate,
+                dataRow,
+                columnTypes,
+                columnFormats,
+                selectedGeography,
+              )
             : ""
 
           if (labelText) {
@@ -1800,13 +1874,13 @@ export function MapPreview({
                 }
               })
 
-              console.log(`✅ Rendered label for feature ID: ${featureId} at position:`, centroid)
+              console.log(`✅ Rendered label for feature ID: ${featureIdentifier} at position:`, centroid)
             } else {
-              console.log(`❌ Invalid centroid for feature ID: ${featureId}:`, centroid)
+              console.log(`❌ Invalid centroid for feature ID: ${featureIdentifier}:`, centroid)
               d3.select(this).remove()
             }
           } else {
-            console.log(`❌ No label text for feature ID: ${featureId}`)
+            console.log(`❌ No label text for feature ID: ${featureIdentifier}`)
             d3.select(this).remove()
           }
         })
@@ -1881,6 +1955,7 @@ export function MapPreview({
             dimensionSettings.symbol.sizeBy,
             columnTypes,
             columnFormats,
+            selectedGeography,
           ),
         )
 
@@ -1940,6 +2015,7 @@ export function MapPreview({
             dimensionSettings.symbol.sizeBy,
             columnTypes,
             columnFormats,
+            selectedGeography,
           ),
         )
 
@@ -1988,8 +2064,8 @@ export function MapPreview({
 
         const domain = [dimensionSettings.symbol.colorMinValue, dimensionSettings.symbol.colorMaxValue]
         const rangeColors = [
-          stylingSettings.symbol.colorMinColor || stylingSettings.symbol.symbolFillColor,
-          stylingSettings.symbol.colorMaxColor || stylingSettings.symbol.symbolFillColor,
+          stylingSettings.symbol.symbolFillColor, // Use default if not set
+          stylingSettings.symbol.symbolFillColor, // Use default if not set
         ]
 
         if (dimensionSettings.symbol.colorMidColor) {
@@ -2028,7 +2104,15 @@ export function MapPreview({
           .attr("font-size", "11px")
           .attr("fill", "#666")
           .attr("text-anchor", "end")
-          .text(formatLegendValue(domain[0], dimensionSettings.symbol.colorBy, columnTypes, columnFormats))
+          .text(
+            formatLegendValue(
+              domain[0],
+              dimensionSettings.symbol.colorBy,
+              columnTypes,
+              columnFormats,
+              selectedGeography,
+            ),
+          )
 
         // Max label (right)
         colorLegendGroup
@@ -2040,7 +2124,13 @@ export function MapPreview({
           .attr("fill", "#666")
           .attr("text-anchor", "start")
           .text(
-            formatLegendValue(domain[domain.length - 1], dimensionSettings.symbol.colorBy, columnTypes, columnFormats),
+            formatLegendValue(
+              domain[domain.length - 1],
+              dimensionSettings.symbol.colorBy,
+              columnTypes,
+              columnFormats,
+              selectedGeography,
+            ),
           )
       } else {
         // Categorical color legend with horizontal swatches
@@ -2079,7 +2169,13 @@ export function MapPreview({
 
         uniqueValues.slice(0, maxItems).forEach((value, index) => {
           const color = symbolColorScale(value)
-          const labelText = formatLegendValue(value, dimensionSettings.symbol.colorBy, columnTypes, columnFormats)
+          const labelText = formatLegendValue(
+            value,
+            dimensionSettings.symbol.colorBy,
+            columnTypes,
+            columnFormats,
+            selectedGeography,
+          )
 
           // Create smaller fixed-size symbol swatch for categorical legend
           const fixedLegendSize = 12 // Smaller size for better proportion
@@ -2204,7 +2300,15 @@ export function MapPreview({
           .attr("font-size", "11px")
           .attr("fill", "#666")
           .attr("text-anchor", "end")
-          .text(formatLegendValue(domain[0], dimensionSettings.choropleth.colorBy, columnTypes, columnFormats))
+          .text(
+            formatLegendValue(
+              domain[0],
+              dimensionSettings.choropleth.colorBy,
+              columnTypes,
+              columnFormats,
+              selectedGeography,
+            ),
+          )
 
         // Max label (right)
         choroplethColorLegendGroup
@@ -2221,6 +2325,7 @@ export function MapPreview({
               dimensionSettings.choropleth.colorBy,
               columnTypes,
               columnFormats,
+              selectedGeography,
             ),
           )
       } else {
@@ -2260,7 +2365,13 @@ export function MapPreview({
 
         uniqueValues.slice(0, maxItems).forEach((value, index) => {
           const color = choroplethColorScale(value)
-          const labelText = formatLegendValue(value, dimensionSettings.choropleth.colorBy, columnTypes, columnFormats)
+          const labelText = formatLegendValue(
+            value,
+            dimensionSettings.choropleth.colorBy,
+            columnTypes,
+            columnFormats,
+            selectedGeography,
+          )
 
           // Smaller square swatch for choropleth categorical
           choroplethColorLegendGroup
