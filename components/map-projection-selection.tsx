@@ -57,7 +57,7 @@ export function MapProjectionSelection({
         </div>
       </CardHeader>
       <CardContent className={cn("transition-all duration-200", isExpanded ? "pb-6 pt-2" : "pb-0 h-0 overflow-hidden")}>
-        <div>
+        <div className="flex items-center gap-2">
               <Label htmlFor="geography-search" className="mb-2 block">
                 Select geography
               </Label>
