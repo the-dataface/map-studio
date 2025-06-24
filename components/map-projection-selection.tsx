@@ -100,7 +100,7 @@ export function MapProjectionSelection({
             <Label htmlFor="projection-select" className="mb-2 block">
               Select projection
             </Label>
-            <ScrollArea className="h-[200px] w-full rounded-md border p-4">
+            <ScrollArea className="h-[200px] w-full rounded-md border p-2">
               <ToggleGroup
                 type="single"
                 value={projection}
