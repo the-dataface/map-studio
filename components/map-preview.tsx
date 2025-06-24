@@ -968,12 +968,18 @@ export function MapPreview({
             expectedObjects = ["nation", "states"]
             break
           case "usa-counties": {
-            // Two equivalent county files shipped by us-atlas.
             const candidates = [
+              // primary jsDelivr mirror
               "https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json",
+              // fallback jsDelivr path that sometimes bypasses cache issues
+              "https://cdn.jsdelivr.net/npm/us-atlas@3/dist/counties-10m.json",
+              // unpkg mirror
+              "https://unpkg.com/us-atlas@3/counties-10m.json",
+              // last-ditch albers-projected version
               "https://cdn.jsdelivr.net/npm/us-atlas@3/counties-albers-10m.json",
             ]
-            const data = await fetchTopoJSON(candidates, ["counties"])
+            // Require both 'nation' and 'counties' objects to be present
+            const data = await fetchTopoJSON(candidates, ["nation", "counties"])
             if (!data) {
               toast({
                 title: "Map data error",
