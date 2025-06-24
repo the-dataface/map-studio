@@ -1598,9 +1598,6 @@ export function MapPreview({
                 featureKey = selectedGeography === "usa-nation" ? "United States" : "Canada"
               }
 
-                featureKey = selectedGeography === "usa-nation" ? "United States" : "Canada"
-              }
-
           if (!featureKey) {
             element.attr("fill", stylingSettings.base.defaultStateFillColor)
             return
@@ -1618,21 +1615,21 @@ export function MapPreview({
           }
         })
         console.log(\"Features actually colored:", featuresColored)
-      } else {\
-        console.log(\"❌ No map group found for choropleth rendering")
+      } else {
+        console.log("❌ No map group found for choropleth rendering")
       }
     }
-    \
+
     // Render symbol data if available, and only if not using a custom map
 
-    console.log("=== SYMBOL RENDERING DEBUG ===")
-    console.log("Should render symbols:", shouldRenderSymbols)
-    console.log("Symbol data exists:", symbolDataExists)
-    console.log("Latitude column:", dimensionSettings?.symbol?.latitude)
-    console.log("Longitude column:", dimensionSettings?.symbol?.longitude)
-    console.log("Symbol data length:", symbolData.length)
-    console.log("Custom map data present (for symbol check):", !!customMapData)
-
+    console.log(\"=== SYMBOL RENDERING DEBUG ===")
+    console.log(\"Should render symbols:\", shouldRenderSymbols)
+    console.log(\"Symbol data exists:\", symbolDataExists)
+    console.log(\"Latitude column:\", dimensionSettings?.symbol?.latitude)
+    console.log(\"Longitude column:\", dimensionSettings?.symbol?.longitude)
+    console.log(\"Symbol data length:\", symbolData.length)
+    console.log(\"Custom map data present (for symbol check):", !!customMapData)
+\
     if (shouldRenderSymbols) {
       console.log("=== Rendering symbol data ===")
       console.log("Symbol data before filter:", symbolData.length)
@@ -2422,7 +2419,7 @@ export function MapPreview({
 
     console.log("=== MAP PREVIEW RENDER COMPLETE ===")
   }, [
-    geoAtlasData,
+    geoAtlasData,\
     symbolData,
     choroplethData,
     mapType,
@@ -2600,4 +2597,3 @@ export function MapPreview({
     </Card>
   )
 }
-</merged_code>
