@@ -36,6 +36,7 @@ interface TopoJSONData {
     countries?: any // countries is optional for US map
     counties?: any // Add this
     provinces?: any // Add this
+    land?: any // Added for world map fallback
   }
   arcs: any[]
 }
@@ -1060,16 +1061,14 @@ export function MapPreview({
               return
             }
             data = normaliseCanadaObjects(data) // Normalise after fetching
-            console.log("Normalized Canada data objects:", data.objects) // Debugging
 
+            // No longer return here if provinces are missing, allow fallback to nation outline
             if (!data.objects?.provinces) {
               console.warn(
                 "[map-studio] Canada topojson has no provincial shapes – falling back to nation view.",
                 Object.keys(data.objects ?? {}),
               )
-              // we’ll draw the outline only; keep going
             }
-
             break
 
           default:
@@ -1299,8 +1298,8 @@ export function MapPreview({
       }
 
       // Utility ─ find a country feature by several possible identifiers
-      function findCountryFeature(countries: any[], candidates: (string | number)[]) {
-        return countries.find((f) => {
+      function findCountryFeature(features: any[], candidates: (string | number)[]) {
+        return features.find((f) => {
           const props = f.properties ?? {}
           return candidates.some((c) =>
             [props.name, props.name_long, props.admin, props.iso_a3, String(f.id)]
@@ -1313,50 +1312,69 @@ export function MapPreview({
 
       // Determine nation mesh and countryFeatureForClipping based on selectedGeography
       if (selectedGeography === "usa-nation") {
-        if (objects.countries) {
-          const all = topojson.feature(geoAtlasData, objects.countries).features
-          countryFeatureForClipping = findCountryFeature(all, ["United States of America", "United States", "USA", 840])
-          nationMesh = topojson.mesh(geoAtlasData, countryFeatureForClipping)
-        } else if (objects.nation) {
-          // Fallback to the us-atlas file
-          countryFeatureForClipping = topojson.feature(geoAtlasData, objects.nation)
-          nationMesh = topojson.mesh(geoAtlasData, objects.nation)
+        const primaryFeatureSource = objects.countries || objects.nation
+        if (primaryFeatureSource) {
+          const allFeatures = topojson.feature(geoAtlasData, primaryFeatureSource).features
+          countryFeatureForClipping = findCountryFeature(allFeatures, [
+            "United States of America",
+            "United States",
+            "USA",
+            840,
+          ])
+          if (countryFeatureForClipping) {
+            nationMesh = topojson.mesh(geoAtlasData, countryFeatureForClipping)
+          } else {
+            console.error("Could not locate United States feature in provided data.")
+          }
         } else {
-          console.error("No suitable USA outline found in topojson.")
-          return
+          console.error("No suitable USA outline found in topojson (missing 'countries' or 'nation').")
         }
         geoFeatures = [] // nation view => no sub-features
       } else if (selectedGeography === "canada-nation") {
-        if (objects.countries) {
-          const all = topojson.feature(geoAtlasData, objects.countries).features
-          countryFeatureForClipping = findCountryFeature(all, ["Canada", "CAN", 124])
-          nationMesh = topojson.mesh(geoAtlasData, countryFeatureForClipping)
-        } else if (objects.nation) {
-          countryFeatureForClipping = topojson.feature(geoAtlasData, objects.nation)
-          nationMesh = topojson.mesh(geoAtlasData, objects.nation)
+        const primaryFeatureSource = objects.countries || objects.nation
+        if (primaryFeatureSource) {
+          const allFeatures = topojson.feature(geoAtlasData, primaryFeatureSource).features
+          countryFeatureForClipping = findCountryFeature(allFeatures, ["Canada", "CAN", 124])
+          if (countryFeatureForClipping) {
+            nationMesh = topojson.mesh(geoAtlasData, countryFeatureForClipping)
+          } else {
+            console.error("Could not locate Canada feature in provided data.")
+          }
         } else {
-          console.error("No suitable Canada outline found in topojson.")
-          return
+          console.error("No suitable Canada outline found in topojson (missing 'countries' or 'nation').")
         }
         geoFeatures = []
       } else if (selectedGeography === "world") {
-        if (!objects.countries) {
-          console.error("World atlas missing 'countries' object for world:", objects)
+        if (objects.countries) {
+          nationMesh = topojson.mesh(geoAtlasData, objects.countries, (a: any, b: any) => a !== b)
+          countryFeatureForClipping = topojson.feature(geoAtlasData, objects.countries)
+          geoFeatures = topojson.feature(geoAtlasData, objects.countries).features // Render individual countries as features
+        } else if (objects.land) {
+          // Fallback for world if countries is missing
+          console.warn("[map-studio] World atlas missing 'countries' object, falling back to 'land' object.")
+          nationMesh = topojson.mesh(geoAtlasData, objects.land)
+          countryFeatureForClipping = topojson.feature(geoAtlasData, objects.land)
+          geoFeatures = topojson.feature(geoAtlasData, objects.land).features
+        } else {
+          console.error("World atlas missing 'countries' or 'land' object for world:", objects)
           toast({
             title: "Map data error",
-            description: "The world map data is incomplete (missing 'countries' object).",
+            description: "The world map data is incomplete (missing 'countries' or 'land' object).",
             variant: "destructive",
             duration: 4000,
           })
-          return
+          return // Return if no world outline can be found
         }
-        nationMesh = topojson.mesh(geoAtlasData, objects.countries, (a: any, b: any) => a !== b)
-        countryFeatureForClipping = topojson.feature(geoAtlasData, objects.countries)
-        geoFeatures = topojson.feature(geoAtlasData, objects.countries).features // Render individual countries as features
       } else if (selectedGeography === "usa-states") {
         // For usa-states, use us-atlas states and nation
         if (!objects.nation || !objects.states) {
           console.error("US atlas missing 'nation' or 'states' object:", objects)
+          toast({
+            title: "Map data error",
+            description: "US states map data is incomplete.",
+            variant: "destructive",
+            duration: 4000,
+          })
           return
         }
         nationMesh = topojson.mesh(geoAtlasData, objects.nation)
@@ -1366,15 +1384,19 @@ export function MapPreview({
         // For usa-counties, use us-atlas counties and nation
         if (!objects.nation || !objects.counties) {
           console.error("US atlas missing 'nation' or 'counties' object:", objects)
+          toast({
+            title: "Map data error",
+            description: "US counties map data is incomplete.",
+            variant: "destructive",
+            duration: 4000,
+          })
           return
         }
         nationMesh = topojson.mesh(geoAtlasData, objects.nation)
         countryFeatureForClipping = topojson.feature(geoAtlasData, objects.nation) // For clipping US outline
         geoFeatures = topojson.feature(geoAtlasData, objects.counties).features
       } else if (selectedGeography === "canada-provinces") {
-        // For canada-provinces, use the normalized Canada topojson
-
-        // If provinces exist – great – draw them.  Otherwise fall back to outline-only.
+        // If provinces exist – great – draw them. Otherwise fall back to outline-only.
         if (objects.provinces) {
           if (!objects.nation) {
             // some older files put Canada in 'countries'
@@ -1389,16 +1411,39 @@ export function MapPreview({
         } else {
           // No provinces layer – treat like canada-nation
           console.warn("[map-studio] No provinces layer – drawing single-country outline.")
-          if (objects.countries) {
-            const all = topojson.feature(geoAtlasData, objects.countries).features
-            countryFeatureForClipping = all.find((f: any) => f.properties?.name === "Canada")
-            nationMesh = topojson.mesh(geoAtlasData, countryFeatureForClipping)
-          } else if (objects.nation) {
-            countryFeatureForClipping = topojson.feature(geoAtlasData, objects.nation)
-            nationMesh = topojson.mesh(geoAtlasData, objects.nation)
+          const primaryFeatureSource = objects.countries || objects.nation
+          if (primaryFeatureSource) {
+            const allFeatures = topojson.feature(geoAtlasData, primaryFeatureSource).features
+            countryFeatureForClipping = findCountryFeature(allFeatures, ["Canada", "CAN", 124])
+            if (countryFeatureForClipping) {
+              nationMesh = topojson.mesh(geoAtlasData, countryFeatureForClipping)
+            } else {
+              console.error("Could not locate Canada feature in provided data for provinces fallback.")
+            }
+          } else {
+            console.error("No suitable Canada outline found in topojson for provinces fallback.")
+            toast({
+              title: "Map data error",
+              description: "Canadian provinces map data is incomplete.",
+              variant: "destructive",
+              duration: 4000,
+            })
+            return
           }
           geoFeatures = [] // nothing internal to draw
         }
+      }
+
+      // Only proceed if we have a nationMesh or geoFeatures to draw
+      if (!nationMesh && geoFeatures.length === 0) {
+        console.warn("No map features or nation mesh to render for selected geography.")
+        toast({
+          title: "Map data unavailable",
+          description: `No map data found for ${selectedGeography}.`,
+          variant: "destructive",
+          duration: 3000,
+        })
+        return
       }
 
       // Apply clipping if enabled and applicable
@@ -1921,10 +1966,15 @@ export function MapPreview({
           featuresForLabels = topojson.feature(geoAtlasData, geoAtlasData.objects.countries).features
         } else if (selectedGeography === "usa-nation" || selectedGeography === "canada-nation") {
           // For single nation views, we need to get the specific country feature from the world atlas
-          if (geoAtlasData.objects.countries) {
-            const allCountries = topojson.feature(geoAtlasData, geoAtlasData.objects.countries).features
+          const primaryFeatureSource = geoAtlasData.objects.countries || geoAtlasData.objects.nation
+          if (primaryFeatureSource) {
+            const allFeatures = topojson.feature(geoAtlasData, primaryFeatureSource).features
             const targetCountryName = selectedGeography === "usa-nation" ? "United States" : "Canada"
-            const specificCountryFeature = allCountries.find((f: any) => f.properties.name === targetCountryName)
+            const specificCountryFeature = findCountryFeature(allFeatures, [
+              targetCountryName,
+              targetCountryName === "United States" ? "USA" : "CAN",
+              targetCountryName === "United States" ? 840 : 124,
+            ])
             if (specificCountryFeature) {
               featuresForLabels = [specificCountryFeature] // Only this one feature for labels
             }
