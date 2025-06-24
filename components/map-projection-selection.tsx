@@ -37,31 +37,31 @@ export function MapProjectionSelection({
   sampleRows,
 }: MapProjectionSelectionProps) {
   const [searchQuery, setSearchQuery] = useState("")
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(true)
 
   const filteredGeographies = geographies.filter((g) => g.label.toLowerCase().includes(searchQuery.toLowerCase()))
 
   return (
-    <Card className="w-full rounded-xl">
-      <Collapsible open={!isCollapsed} onOpenChange={setIsCollapsed}>
-        <CollapsibleTrigger className="w-full flex justify-between items-center px-6 py-5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out rounded-t-xl">
-          <div className="text-2xl font-semibold text-gray-900 dark:text-white">Map and projection</div>
-          <ChevronDownIcon
-            className={`h-4 w-4 text-gray-600 dark:text-gray-400 transition-transform duration-200 ${isCollapsed ? "" : "rotate-180"}`}
-          />
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 pt-6">
-            {" "}
-            {/* Adjusted padding to pt-6 */}
-            {/* Geography Selection */}
-            <div>
+    <Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
+      <CardHeader
+        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-4 px-6 rounded-t-xl relative"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">Map and projection</CardTitle>
+          </div>
+          <div className="flex items-center gap-2">            
+            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className={cn("transition-all duration-200", isExpanded ? "pb-6" : "pb-0 h-0 overflow-hidden")}>
+        <div>
               <Label htmlFor="geography-search" className="mb-2 block">
                 Select geography
               </Label>
-              <ScrollArea className={`w-full rounded-md border p-4 ${!isCollapsed ? "h-[200px]" : "h-0"}`}>
-                {" "}
-                {/* Conditional height for collapse */}
+              <ScrollArea className="h-[200px] w-full rounded-md border p-4">
                 <ToggleGroup
                   type="single"
                   value={geography}
@@ -89,9 +89,7 @@ export function MapProjectionSelection({
               <Label htmlFor="projection-select" className="mb-2 block">
                 Select projection
               </Label>
-              <ScrollArea className={`w-full rounded-md border p-4 ${!isCollapsed ? "h-[200px]" : "h-0"}`}>
-                {" "}
-                {/* Conditional height for collapse */}
+              <ScrollArea className="h-[200px] w-full rounded-md border p-4">
                 <ToggleGroup
                   type="single"
                   value={projection}
@@ -114,9 +112,7 @@ export function MapProjectionSelection({
                 </ToggleGroup>
               </ScrollArea>
             </div>
-          </CardContent>
-        </CollapsibleContent>
-      </Collapsible>
+      </CardContent>
     </Card>
   )
 }
