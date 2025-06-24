@@ -1307,14 +1307,18 @@ export function MapPreview({
       }
 
       if (selectedGeography === "usa-states") {
-        nationMesh = topojson.mesh(geoAtlasData, objects.nation)
-        featureToFit = topojson.feature(geoAtlasData, objects.states)
-        clipFeature = topojson.feature(geoAtlasData, objects.nation)
+        if (objects.nation) {
+          nationMesh = topojson.mesh(geoAtlasData, objects.nation)
+          clipFeature = topojson.feature(geoAtlasData, objects.nation)
+        }
+
         geoFeatures = topojson.feature(geoAtlasData, objects.states).features
       } else if (selectedGeography === "usa-counties") {
-        nationMesh = topojson.mesh(geoAtlasData, objects.nation)
-        featureToFit = topojson.feature(geoAtlasData, objects.counties)
-        clipFeature = topojson.feature(geoAtlasData, objects.nation)
+        if (objects.nation) {
+          nationMesh = topojson.mesh(geoAtlasData, objects.nation)
+          clipFeature = topojson.feature(geoAtlasData, objects.nation)
+        }
+
         geoFeatures = topojson.feature(geoAtlasData, objects.counties).features
       } else if (selectedGeography === "canada-provinces") {
         if (objects.provinces) {
@@ -1593,8 +1597,9 @@ export function MapPreview({
                 // For single nation views, the feature key is the nation itself
                 featureKey = selectedGeography === "usa-nation" ? "United States" : "Canada"
               }
-            }
-          }
+
+                featureKey = selectedGeography === "usa-nation" ? "United States" : "Canada"
+              }
 
           if (!featureKey) {
             element.attr("fill", stylingSettings.base.defaultStateFillColor)
@@ -1612,12 +1617,12 @@ export function MapPreview({
             console.log(`No data found for feature: ${featureKey}, applying default fill.`)
           }
         })
-        console.log("Features actually colored:", featuresColored)
-      } else {
-        console.log("❌ No map group found for choropleth rendering")
+        console.log(\"Features actually colored:", featuresColored)
+      } else {\
+        console.log(\"❌ No map group found for choropleth rendering")
       }
     }
-
+    \
     // Render symbol data if available, and only if not using a custom map
 
     console.log("=== SYMBOL RENDERING DEBUG ===")
@@ -2415,193 +2420,6 @@ export function MapPreview({
       currentLegendY += 80
     }
 
-    // Choropleth Color Legend
-    if (shouldShowChoroplethColorLegend) {
-      console.log("=== Rendering Choropleth Color Legend ===")
-
-      const choroplethColorLegendGroup = legendGroup.append("g").attr("id", "ChoroplethColorLegend")
-
-      if (dimensionSettings.choropleth.colorScale === "linear") {
-        // Linear color legend with wide gradient
-        const legendBg = choroplethColorLegendGroup
-          .append("rect")
-          .attr("x", 20)
-          .attr("y", currentLegendY - 10)
-          .attr("width", width - 40)
-          .attr("height", 60)
-          .attr("fill", "rgba(255, 255, 255, 0.95)")
-          .attr("stroke", "#ddd")
-          .attr("stroke-width", 1)
-          .attr("rx", 6)
-
-        // Legend title
-        choroplethColorLegendGroup
-          .append("text")
-          .attr("x", 35)
-          .attr("y", currentLegendY + 8)
-          .attr("font-family", "Arial, sans-serif")
-          .attr("font-size", "14px")
-          .attr("font-weight", "600")
-          .attr("fill", "#333")
-          .text(`Color: ${dimensionSettings.choropleth.colorBy}`)
-
-        // Create gradient
-        const gradient = svg
-          .append("defs")
-          .append("linearGradient")
-          .attr("id", "choroplethColorGradient")
-          .attr("x1", "0%")
-          .attr("x2", "100%")
-          .attr("y1", "0%")
-          .attr("y2", "0%")
-
-        const domain = [dimensionSettings.choropleth.colorMinValue, dimensionSettings.choropleth.colorMaxValue]
-        const rangeColors = [
-          stylingSettings.base.defaultStateFillColor, // Use default if not set
-          stylingSettings.base.defaultStateFillColor, // Use default if not set
-        ]
-
-        if (dimensionSettings.choropleth.colorMidColor) {
-          domain.splice(1, 0, dimensionSettings.choropleth.colorMidValue)
-          rangeColors.splice(1, 0, dimensionSettings.choropleth.colorMidColor)
-        }
-
-        rangeColors.forEach((color, index) => {
-          gradient
-            .append("stop")
-            .attr("offset", `${(index / (rangeColors.length - 1)) * 100}%`)
-            .attr("stop-color", color)
-        })
-
-        // Wide gradient bar
-        const gradientWidth = width - 200
-        const gradientX = (width - gradientWidth) / 2
-
-        choroplethColorLegendGroup
-          .append("rect")
-          .attr("x", gradientX)
-          .attr("y", currentLegendY + 25)
-          .attr("width", gradientWidth)
-          .attr("height", 12)
-          .attr("fill", "url(#choroplethColorGradient)")
-          .attr("stroke", "#ccc")
-          .attr("stroke-width", 1)
-          .attr("rx", 2)
-
-        // Min label (left)
-        choroplethColorLegendGroup
-          .append("text")
-          .attr("x", gradientX - 10)
-          .attr("y", currentLegendY + 33)
-          .attr("font-family", "Arial, sans-serif")
-          .attr("font-size", "11px")
-          .attr("fill", "#666")
-          .attr("text-anchor", "end")
-          .text(
-            formatLegendValue(
-              domain[0],
-              dimensionSettings.choropleth.colorBy,
-              columnTypes,
-              columnFormats,
-              selectedGeography,
-            ),
-          )
-
-        // Max label (right)
-        choroplethColorLegendGroup
-          .append("text")
-          .attr("x", gradientX + gradientWidth + 10)
-          .attr("y", currentLegendY + 33)
-          .attr("font-family", "Arial, sans-serif")
-          .attr("font-size", "11px")
-          .attr("fill", "#666")
-          .attr("text-anchor", "start")
-          .text(
-            formatLegendValue(
-              domain[domain.length - 1],
-              dimensionSettings.choropleth.colorBy,
-              columnTypes,
-              columnFormats,
-              selectedGeography,
-            ),
-          )
-      } else {
-        // Categorical color legend with horizontal square swatches
-        const uniqueValues = getUniqueValues(dimensionSettings.choropleth.colorBy, choroplethData)
-        const maxItems = Math.min(uniqueValues.length, 10)
-
-        // Calculate legend width based on content
-        const estimatedLegendWidth = Math.min(700, maxItems * 90 + 100)
-        const legendX = (width - estimatedLegendWidth) / 2
-
-        const legendBg = choroplethColorLegendGroup
-          .append("rect")
-          .attr("x", legendX)
-          .attr("y", currentLegendY - 10)
-          .attr("width", estimatedLegendWidth)
-          .attr("height", 60)
-          .attr("fill", "rgba(255, 255, 255, 0.95)")
-          .attr("stroke", "#ddd")
-          .attr("stroke-width", 1)
-          .attr("rx", 6)
-
-        // Legend title
-        choroplethColorLegendGroup
-          .append("text")
-          .attr("x", legendX + 15)
-          .attr("y", currentLegendY + 8)
-          .attr("font-family", "Arial, sans-serif")
-          .attr("font-size", "14px")
-          .attr("font-weight", "600")
-          .attr("fill", "#333")
-          .text(`Color: ${dimensionSettings.choropleth.colorBy}`)
-
-        // Calculate spacing for horizontal layout
-        let currentX = legendX + 25
-        const swatchY = currentLegendY + 25
-
-        uniqueValues.slice(0, maxItems).forEach((value, index) => {
-          const color = choroplethColorScale(value)
-          const labelText = formatLegendValue(
-            value,
-            dimensionSettings.choropleth.colorBy,
-            columnTypes,
-            columnFormats,
-            selectedGeography,
-          )
-
-          // Smaller square swatch for choropleth categorical
-          choroplethColorLegendGroup
-            .append("rect")
-            .attr("x", currentX - 6) // Smaller 12x12 square
-            .attr("y", swatchY - 6)
-            .attr("width", 12)
-            .attr("height", 12)
-            .attr("fill", color)
-            .attr("stroke", "#666")
-            .attr("stroke-width", 1)
-            .attr("rx", 2)
-
-          // Label positioned to the right of swatch, vertically centered
-          choroplethColorLegendGroup
-            .append("text")
-            .attr("x", currentX + 15) // Position to the right of swatch
-            .attr("y", swatchY + 3) // Vertically centered with swatch
-            .attr("font-family", "Arial, sans-serif")
-            .attr("font-size", "10px")
-            .attr("fill", "#666")
-            .attr("text-anchor", "start") // Left-aligned text
-            .text(labelText)
-
-          // Calculate next position based on label width with tighter spacing
-          const labelWidth = Math.max(60, labelText.length * 6 + 35) // Account for swatch + spacing
-          currentX += labelWidth
-        })
-      }
-
-      currentLegendY += 80
-    }
-
     console.log("=== MAP PREVIEW RENDER COMPLETE ===")
   }, [
     geoAtlasData,
@@ -2782,3 +2600,4 @@ export function MapPreview({
     </Card>
   )
 }
+</merged_code>
