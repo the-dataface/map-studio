@@ -305,7 +305,7 @@ const extractStateFromSVGId = (id: string): string | null => {
         }
       } else {
         normalized = normalizeStateValue(extracted)
-        console.log(`Pattern matched: ${pattern} -> extracted: "${extracted}" -> normalized: "${normalized}"`)
+        console.log(`Pattern matched: ${pattern} -> extracted: "${extracted}" -> normalized: "${normalized}`)
       }
 
       // Verify the normalized value is a valid state abbreviation
@@ -1227,7 +1227,7 @@ export function MapPreview({
         console.log("Created categorical color scale with map:", Array.from(colorMap.entries()))
       }
 
-      // Apply colors to state/country paths
+      // Apply colors to state/country paths and groups
       const mapGroup = svg.select("#Map")
       if (!mapGroup.empty()) {
         console.log("Found map group, applying choropleth colors...")
@@ -1239,14 +1239,23 @@ export function MapPreview({
           let featureKey: string | null = null
 
           if (id) {
-            if (topoType === "usa") {
-              featureKey = extractStateFromSVGId(id) // Use existing state extraction for US
-            } else if (topoType === "world") {
-              // For world map, try to get country name from ID or properties
-              // For custom maps, ID is often the primary identifier.
-              // For TopoJSON features, d.properties.name or d.id
-              const d = element.datum() as any
-              featureKey = d?.properties?.name || id
+            if (customMapData) {
+              // If it's a custom map
+              if (topoType === "usa") {
+                featureKey = extractStateFromSVGId(id)
+              } else {
+                // topoType === "world" for custom maps
+                featureKey = id // For custom world maps, assume ID is the key
+              }
+            } else {
+              // If it's a standard TopoJSON map
+              if (topoType === "usa") {
+                featureKey = extractStateFromSVGId(id)
+              } else {
+                // topoType === "world" for standard maps
+                const d = element.datum() as any // Here, d.properties.name is valid for TopoJSON
+                featureKey = d?.properties?.name || id
+              }
             }
           }
 
@@ -1565,21 +1574,26 @@ export function MapPreview({
         const rawStateValue = String(d[dimensionSettings.choropleth.stateColumn] || "")
         if (!rawStateValue.trim()) return
 
-        // Store by state abbreviation (normalized)
-        const normalizedStateAbbr = normalizeStateValue(rawStateValue)
-        stateDataMapByAbbr.set(normalizedStateAbbr, d)
-
-        // Also store by state name (lowercase for case-insensitive lookup)
-        if (stateMap[normalizedStateAbbr]) {
-          const stateName = stateMap[normalizedStateAbbr].toLowerCase()
-          stateDataMapByName.set(stateName, d)
+        // Normalize state/country value based on selected geography
+        let normalizedKey: string
+        if (topoType === "usa") {
+          normalizedKey = normalizeStateValue(rawStateValue)
+        } else {
+          // For world map, use the raw value as the key (assuming it's country name)
+          normalizedKey = rawStateValue.trim()
         }
 
-        // Try to find FIPS code for this state and store by FIPS
-        for (const [fips, abbr] of Object.entries(fipsToStateAbbrMap)) {
-          if (abbr === normalizedStateAbbr) {
-            stateDataMapByFips.set(fips, d)
-          }
+        const value =
+          dimensionSettings.choropleth.colorScale === "linear"
+            ? getNumericValue(d, dimensionSettings.choropleth.colorBy)
+            : String(d[dimensionSettings.choropleth.colorBy])
+
+        if (
+          value !== null &&
+          (dimensionSettings.choropleth.colorScale === "linear" ? !isNaN(value as number) : value)
+        ) {
+          stateDataMap.set(normalizedKey, value)
+          console.log(`✓ Mapped ${rawStateValue} → ${normalizedKey} = ${value}`)
         }
       })
 
@@ -1607,13 +1621,15 @@ export function MapPreview({
         // Collect elements from the States group
         if (!statesGroup.empty()) {
           statesGroup.selectAll("path, g").each(function (this: SVGElement) {
-            const element = d3.select(this)
+            const element = d3.select(this) // Use d3.select(this) to get the D3 selection for the current element
             const id = element.attr("id")
             let featureId = null
             if (id) {
-              featureId = topoType === "usa" ? extractStateFromSVGId(id) : id // Use state extraction for USA type
-              if (!featureId && topoType === "world") {
-                // For world type custom maps, assume ID is country name or code
+              // For USA custom maps, use extractStateFromSVGId
+              if (topoType === "usa") {
+                featureId = extractStateFromSVGId(id)
+              } else {
+                // For World custom maps, assume ID is the direct identifier
                 featureId = id
               }
             }
@@ -1628,14 +1644,14 @@ export function MapPreview({
         }
 
         // Collect elements from the Nations/Countries group if it exists and we're not dealing with US states
+        // This part is specifically for world maps where countries might be in a #Nations or #Countries group
         if (!nationsGroup.empty() && topoType === "world") {
-          // Only consider nations for world maps
           nationsGroup.selectAll("path, g").each(function (this: SVGElement) {
             const element = d3.select(this)
             const id = element.attr("id")
             const featureId = id // Assume ID is the country identifier for custom world maps
             if (featureId && !featuresForLabels.some((f) => f.id === featureId)) {
-              // Avoid duplicates
+              // Avoid duplicates if a country is also in #States (unlikely but safe)
               featuresForLabels.push({
                 id: featureId,
                 properties: { name: featureId },
@@ -1644,7 +1660,6 @@ export function MapPreview({
             }
           })
         }
-
         console.log("Custom map features for labels count:", featuresForLabels.length)
       }
 
@@ -1706,11 +1721,10 @@ export function MapPreview({
             }
           } else if (topoType === "world") {
             // For world maps, try to match by country name (d.properties.name or d.id)
-            const countryName = d.properties?.name || d.id
-            const stateDataMap = new Map()
-            if (countryName && stateDataMap.has(countryName)) {
-              dataRow = stateDataMap.get(countryName)
-              console.log(`✅ Found data for country: ${countryName}`)
+            // For custom maps, featureId is already the ID from the SVG element
+            if (featureId && stateDataMap.has(featureId)) {
+              dataRow = stateDataMap.get(featureId)
+              console.log(`✅ Found data for country: ${featureId}`)
             }
           }
 
@@ -2394,7 +2408,8 @@ export function MapPreview({
           <div className="flex items-center gap-2">
             <CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">Map preview</CardTitle>
           </div>
-          {/* Right side: Download and Copy buttons (with stopPropagation) */}
+          {/* Right side: Download and */}
+          Copy buttons (with stopPropagation)
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
