@@ -7,16 +7,19 @@ import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Checkbox } from "@/components/ui/checkbox" // Import Checkbox
 
 interface MapProjectionSelectionProps {
   geography: "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world"
-  projection: "albersUsa" | "mercator" | "equalEarth"
+  projection: "albersUsa" | "mercator" | "equalEarth" | "albers" // Added "albers"
   onGeographyChange: (
     geography: "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world",
   ) => void
-  onProjectionChange: (projection: "albersUsa" | "mercator" | "equalEarth") => void
+  onProjectionChange: (projection: "albersUsa" | "mercator" | "equalEarth" | "albers") => void // Added "albers"
   columns: string[]
   sampleRows: (string | number)[][]
+  clipToCountry: boolean // New prop
+  onClipToCountryChange: (clip: boolean) => void // New prop
 }
 
 const geographies = [
@@ -30,6 +33,7 @@ const geographies = [
 
 const projections = [
   { value: "albersUsa", label: "Albers USA" },
+  { value: "albers", label: "Albers" }, // Added Albers
   { value: "mercator", label: "Mercator" },
   { value: "equalEarth", label: "Equal Earth" },
 ]
@@ -41,6 +45,8 @@ export function MapProjectionSelection({
   onProjectionChange,
   columns,
   sampleRows,
+  clipToCountry, // Destructure new prop
+  onClipToCountryChange, // Destructure new prop
 }: MapProjectionSelectionProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [isExpanded, setIsExpanded] = useState(true)
@@ -104,7 +110,8 @@ export function MapProjectionSelection({
               <ToggleGroup
                 type="single"
                 value={projection}
-                onValueChange={(value: "albersUsa" | "mercator" | "equalEarth") => {
+                onValueChange={(value: "albersUsa" | "mercator" | "equalEarth" | "albers") => {
+                  // Added "albers"
                   if (value) onProjectionChange(value)
                 }}
                 orientation="vertical"
@@ -123,6 +130,23 @@ export function MapProjectionSelection({
               </ToggleGroup>
             </ScrollArea>
           </div>
+        </div>
+        {/* Clip to Country Checkbox */}
+        <div className="flex items-center space-x-2 mt-4">
+          <Checkbox
+            id="clip-to-country"
+            checked={clipToCountry}
+            onCheckedChange={onClipToCountryChange}
+            disabled={
+              !(
+                geography === "usa-nation" ||
+                geography === "canada-nation" ||
+                (geography === "world" &&
+                  (projection === "mercator" || projection === "equalEarth" || projection === "albers"))
+              )
+            }
+          />
+          <Label htmlFor="clip-to-country">Clip map to selected country</Label>
         </div>
       </CardContent>
     </Card>

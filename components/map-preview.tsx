@@ -24,7 +24,8 @@ interface MapPreviewProps {
   columnFormats: ColumnFormat
   customMapData: string
   selectedGeography: "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world" // New prop
-  selectedProjection: "albersUsa" | "mercator" | "equalEarth" // New prop
+  selectedProjection: "albersUsa" | "mercator" | "equalEarth" | "albers" // Added "albers"
+  clipToCountry: boolean // New prop
 }
 
 interface TopoJSONData {
@@ -545,7 +546,6 @@ const formatNumber = (value: any, format: string): string => {
   } else {
     const cleanedValue = strValue.replace(/[,$%]/g, "")
     parsedNum = Number.parseFloat(cleanedValue)
-    num = parsedNum
   }
 
   if (isNaN(num)) {
@@ -965,6 +965,7 @@ export function MapPreview({
   customMapData,
   selectedGeography, // Destructure new prop
   selectedProjection, // Destructure new prop
+  clipToCountry, // Destructure new prop
 }: MapPreviewProps) {
   console.log("=== MAP PREVIEW RENDER DEBUG ===")
   console.log("Map type:", mapType)
@@ -972,6 +973,7 @@ export function MapPreview({
   console.log("Dimension settings:", dimensionSettings)
   console.log("Selected Geography:", selectedGeography)
   console.log("Selected Projection:", selectedProjection)
+  console.log("Clip to Country:", clipToCountry)
 
   const [isExpanded, setIsExpanded] = useState(true)
   const [geoAtlasData, setGeoAtlasData] = useState<TopoJSONData | null>(null) // Renamed from usData
@@ -985,6 +987,7 @@ export function MapPreview({
     const loadGeoData = async () => {
       try {
         setIsLoading(true)
+        setGeoAtlasData(null) // Clear previous data immediately
         let dataUrl = ""
         let expectedObjects: string[] = [] // To check if the loaded TopoJSON has the expected objects
 
@@ -1180,6 +1183,13 @@ export function MapPreview({
         .scale(1300)
         .translate([width / 2, mapHeight / 2])
       console.log(`Using Albers USA projection with scale: 1300, translate: [${width / 2}, ${mapHeight / 2}]`)
+    } else if (selectedProjection === "albers") {
+      // Albers projection (suitable for single countries or continents)
+      projection = d3
+        .geoAlbers()
+        .scale(1300) // Default scale, will be adjusted by fitSize if clipping
+        .translate([width / 2, mapHeight / 2])
+      console.log(`Using Albers projection with scale: 1300, translate: [${width / 2}, ${mapHeight / 2}]`)
     } else if (selectedProjection === "mercator") {
       // Adjust scale for Mercator to fit the world
       projection = d3
@@ -1298,6 +1308,7 @@ export function MapPreview({
 
       let geoFeatures: any[] = []
       let nationMesh: any = null
+      let countryFeatureForClipping: any = null // To store the feature for clipping
 
       const { objects } = geoAtlasData as TopoJSONData
       if (!objects) {
@@ -1317,27 +1328,50 @@ export function MapPreview({
           return
         }
         nationMesh = topojson.mesh(geoAtlasData, objects.nation)
+        countryFeatureForClipping = topojson.feature(geoAtlasData, objects.nation)
       } else if (selectedGeography.startsWith("canada")) {
         if (!objects.nation) {
           console.error("Canada topojson missing 'nation' object:", objects)
           return
         }
         nationMesh = topojson.mesh(geoAtlasData, objects.nation)
+        countryFeatureForClipping = topojson.feature(geoAtlasData, objects.nation)
       } else if (selectedGeography === "world") {
-        /* Primary expectation is objects.countries (from world-atlas).
-         * If it’s missing (e.g. user fed a Canada-only topo), grab the
-         * first GeometryCollection we can find and treat it as ‘countries’.
-         */
-        const countryObj =
-          objects.countries ??
-          objects[Object.keys(objects).find((k) => Array.isArray(objects[k]?.geometries)) as string]
-
-        if (!countryObj) {
-          console.error("World-type map has no GeometryCollection to render:", objects)
-          return
+        if (!objects.countries) {
+          // STRICTLY check for 'countries'
+          console.error("World atlas missing 'countries' object:", objects)
+          toast({
+            title: "Map data error",
+            description: "The world map data is incomplete (missing 'countries' object).",
+            variant: "destructive",
+            duration: 4000,
+          })
+          return // Stop rendering if essential object is missing
         }
+        nationMesh = topojson.mesh(geoAtlasData, objects.countries, (a: any, b: any) => a !== b)
+        countryFeatureForClipping = topojson.feature(geoAtlasData, objects.countries)
+      }
 
-        nationMesh = topojson.mesh(geoAtlasData, countryObj, (a: any, b: any) => a !== b)
+      // Apply clipping if enabled and applicable
+      if (clipToCountry && countryFeatureForClipping && selectedProjection !== "albersUsa") {
+        const clipPathId = "clip-path-country"
+        const defs = svg.append("defs")
+        defs.append("clipPath").attr("id", clipPathId).append("path").attr("d", path(countryFeatureForClipping))
+        mapGroup.attr("clip-path", `url(#${clipPathId})`)
+
+        // Adjust projection to fit the clipped country if not Albers USA
+        const bounds = path.bounds(countryFeatureForClipping)
+        const dx = bounds[1][0] - bounds[0][0]
+        const dy = bounds[1][1] - bounds[0][1]
+        const x = (bounds[0][0] + bounds[1][0]) / 2
+        const y = (bounds[0][1] + bounds[1][1]) / 2
+        const scale = Math.max(1, Math.min(8, 0.9 / Math.max(dx / width, dy / mapHeight)))
+        const translate = [width / 2 - scale * x, mapHeight / 2 - scale * y]
+
+        projection.scale(projection.scale() * scale).translate(translate)
+        path.projection(projection) // Update path generator with new projection
+      } else {
+        mapGroup.attr("clip-path", null) // Remove clip path if not enabled or not applicable
       }
 
       if (nationMesh) {
@@ -2533,6 +2567,7 @@ export function MapPreview({
     customMapData,
     selectedGeography,
     selectedProjection,
+    clipToCountry, // Added to dependencies
     toast,
   ])
 
@@ -2552,6 +2587,7 @@ export function MapPreview({
     customMapData,
     selectedGeography,
     selectedProjection,
+    clipToCountry, // Added to dependencies
     toast,
   ])
 
