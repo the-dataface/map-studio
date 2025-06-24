@@ -1331,7 +1331,7 @@ export function MapPreview({
             const allCountries = topojson.feature(geoAtlasData, objects.countries).features
             const specificCanadaFeature = findCountryFeature(allCountries, ["Canada", "CAN", 124])
             if (specificCanadaFeature) {
-              nationMesh = topojson.mesh(geoAtlasData, specificCanadaFeature)
+              nationMesh = specificCanadaFeature
               featureToFit = specificCanadaFeature
               clipFeature = specificCanadaFeature
             } else {
@@ -1358,7 +1358,7 @@ export function MapPreview({
         const specificCountryFeature = findCountryFeature(allCountries, targetCountryCandidates)
 
         if (specificCountryFeature) {
-          nationMesh = topojson.mesh(geoAtlasData, specificCountryFeature)
+          nationMesh = specificCountryFeature // already a valid GeoJSON feature
           featureToFit = specificCountryFeature
           clipFeature = specificCountryFeature
         } else {
