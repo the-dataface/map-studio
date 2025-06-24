@@ -186,7 +186,10 @@ export default function MapStudio() {
   const [selectedGeography, setSelectedGeography] = useState<
     "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world"
   >("usa-states")
-  const [selectedProjection, setSelectedProjection] = useState<"albersUsa" | "mercator" | "equalEarth">("albersUsa")
+  const [selectedProjection, setSelectedProjection] = useState<"albersUsa" | "mercator" | "equalEarth" | "albers">(
+    "albersUsa",
+  ) // Added "albers"
+  const [clipToCountry, setClipToCountry] = useState(false) // New state for clipping
 
   // Update the state management to connect dimension settings between components
   const [columnTypes, setColumnTypes] = useState<ColumnType>({})
@@ -728,6 +731,23 @@ export default function MapStudio() {
     setShowGeocoding(symbolData.parsedData.length > 0)
   }, [symbolData.parsedData])
 
+  // Effect to handle projection changes based on geography
+  useEffect(() => {
+    const isUSGeography =
+      selectedGeography === "usa-states" || selectedGeography === "usa-counties" || selectedGeography === "usa-nation"
+
+    if (!isUSGeography && (selectedProjection === "albersUsa" || selectedProjection === "albers")) {
+      setSelectedProjection("mercator")
+    }
+
+    // If geography is not a single country, disable clipping
+    const isSingleCountryGeography =
+      selectedGeography === "usa-nation" || selectedGeography === "canada-nation" || selectedGeography === "world"
+    if (!isSingleCountryGeography) {
+      setClipToCountry(false)
+    }
+  }, [selectedGeography, selectedProjection])
+
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-200">
       <Header />
@@ -749,6 +769,8 @@ export default function MapStudio() {
               onProjectionChange={setSelectedProjection}
               columns={getCurrentColumns()}
               sampleRows={getCurrentSampleRows()}
+              clipToCountry={clipToCountry} // New prop
+              onClipToCountryChange={setClipToCountry} // New prop
             />
           )}
 
@@ -829,6 +851,7 @@ export default function MapStudio() {
               customMapData={customData.customMapData}
               selectedGeography={selectedGeography}
               selectedProjection={selectedProjection}
+              clipToCountry={clipToCountry} // New prop
             />
           </>
         )}

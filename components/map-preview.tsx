@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import * as d3 from "d3"
 import * as topojson from "topojson-client"
 import type { DataRow, GeocodedRow } from "@/app/page"
@@ -988,55 +988,79 @@ export function MapPreview({
       try {
         setIsLoading(true)
         setGeoAtlasData(null) // Clear previous data immediately
-        let dataUrl = ""
-        let expectedObjects: string[] = [] // To check if the loaded TopoJSON has the expected objects
+
+        let data: TopoJSONData | null = null
 
         switch (selectedGeography) {
           case "usa-states":
-          case "usa-nation": // Both use the same US atlas, but render differently
-            dataUrl = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json"
-            expectedObjects = ["nation", "states"]
-            break
-          case "usa-counties": {
-            const candidates = [
-              "https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json",
-              "https://cdn.jsdelivr.net/npm/us-atlas@3/dist/counties-10m.json",
-              "https://unpkg.com/us-atlas@3/counties-10m.json",
-              "https://cdn.jsdelivr.net/npm/us-atlas@3/counties-albers-10m.json",
-            ]
-
-            /*  Require only the counties object.
-              Some variants lack ‘nation’.                                   */
-            const data = await fetchTopoJSON(candidates, ["counties"])
+          case "usa-nation":
+            data = await fetchTopoJSON(
+              [
+                "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json",
+                "https://cdn.jsdelivr.net/npm/us-atlas@3/dist/states-10m.json",
+                "https://unpkg.com/us-atlas@3/states-10m.json",
+              ],
+              ["nation", "states"],
+            )
             if (!data) {
               toast({
                 title: "Map data error",
-                description: "Couldn’t load U S county boundaries. Please retry or check your connection.",
+                description: "Couldn’t load US state boundaries. Please retry or check your connection.",
                 variant: "destructive",
                 duration: 4000,
               })
-              setGeoAtlasData(null)
               return
             }
-            setGeoAtlasData(data)
-            return
-          }
+            break
+          case "usa-counties":
+            data = await fetchTopoJSON(
+              [
+                "https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json",
+                "https://cdn.jsdelivr.net/npm/us-atlas@3/dist/counties-10m.json",
+                "https://unpkg.com/us-atlas@3/counties-10m.json",
+                "https://cdn.jsdelivr.net/npm/us-atlas@3/counties-albers-10m.json", // last-ditch albers-projected version
+              ],
+              ["nation", "counties"],
+            )
+            if (!data) {
+              toast({
+                title: "Map data error",
+                description: "Couldn’t load US county boundaries. Please retry or check your connection.",
+                variant: "destructive",
+                duration: 4000,
+              })
+              return
+            }
+            break
           case "world":
-            dataUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"
-            expectedObjects = ["countries"]
+            data = await fetchTopoJSON(
+              [
+                "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json",
+                "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json", // Smaller version as fallback
+                "https://unpkg.com/world-atlas@2/countries-110m.json",
+              ],
+              ["countries"], // Explicitly expect 'countries' object
+            )
+            if (!data) {
+              toast({
+                title: "Map data error",
+                description: "Couldn’t load world country boundaries. Please retry or check your connection.",
+                variant: "destructive",
+                duration: 4000,
+              })
+              return
+            }
             break
           case "canada-provinces":
-          case "canada-nation": {
-            const candidates = [
-              // Gist (original)
-              "https://gist.githubusercontent.com/Brideau/2391df60938462571ca9/raw/f5a1f3b47ff671eaf2fb7e7b798bacfc6962606a/canadaprovtopo.json",
-              // GitHub raw backup
-              "https://raw.githubusercontent.com/deldersveld/topojson/master/countries/canada/canada-provinces.json",
-              // jsDelivr mirror
-              "https://cdn.jsdelivr.net/gh/deldersveld/topojson@master/countries/canada/canada-provinces.json",
-            ]
-
-            const data = await fetchTopoJSON(candidates, []) // accept any objects, we'll normalise below
+          case "canada-nation":
+            data = await fetchTopoJSON(
+              [
+                "https://gist.githubusercontent.com/Brideau/2391df60938462571ca9/raw/f5a1f3b47ff671eaf2fb7e7b798bacfc6962606a/canadaprovtopo.json",
+                "https://raw.githubusercontent.com/deldersveld/topojson/master/countries/canada/canada-provinces.json",
+                "https://cdn.jsdelivr.net/gh/deldersveld/topojson@master/countries/canada/canada-provinces.json",
+              ],
+              [], // Accept any objects, normalise below
+            )
             if (!data) {
               toast({
                 title: "Map data error",
@@ -1047,13 +1071,9 @@ export function MapPreview({
               setGeoAtlasData(null)
               return
             }
-
-            // Coerce keys to the canonical names we use elsewhere
-            const fixed = normaliseCanadaObjects(data)
-
-            // Double-check we now have provinces (adm1) data
-            if (!fixed.objects?.provinces) {
-              console.error("No provincial geometries recognised in topo:", Object.keys(fixed.objects ?? {}))
+            data = normaliseCanadaObjects(data) // Normalise after fetching
+            if (!data.objects?.provinces && selectedGeography === "canada-provinces") {
+              console.error("No provincial geometries recognised in topo:", Object.keys(data.objects ?? {}))
               toast({
                 title: "Map data error",
                 description: "The downloaded Canada topojson has no provincial shapes.",
@@ -1063,42 +1083,24 @@ export function MapPreview({
               setGeoAtlasData(null)
               return
             }
-
-            setGeoAtlasData(fixed)
-            return
-          }
+            if (!data.objects?.nation && selectedGeography === "canada-nation") {
+              console.error("No nation geometry recognised in topo:", Object.keys(data.objects ?? {}))
+              toast({
+                title: "Map data error",
+                description: "The downloaded Canada topojson has no national outline.",
+                variant: "destructive",
+                duration: 4000,
+              })
+              setGeoAtlasData(null)
+              return
+            }
+            break
           default:
             setGeoAtlasData(null)
             setIsLoading(false)
             return
         }
-
-        if (dataUrl) {
-          const response = await fetch(dataUrl)
-          const data = await response.json()
-
-          // Basic validation for expected objects
-          const hasAllExpectedObjects = expectedObjects.every((obj) => data.objects && data.objects[obj])
-          if (!hasAllExpectedObjects) {
-            console.error(
-              `Loaded TopoJSON for ${selectedGeography} is missing expected objects:`,
-              expectedObjects,
-              data.objects,
-            )
-            toast({
-              title: "Map data error",
-              description: `The map data for ${selectedGeography} is incomplete.`,
-              variant: "destructive",
-              duration: 3000,
-            })
-            setGeoAtlasData(null)
-            return
-          }
-
-          setGeoAtlasData(data)
-        } else {
-          setGeoAtlasData(null)
-        }
+        setGeoAtlasData(data)
       } catch (error) {
         console.error("Error loading geo data:", error)
         toast({
@@ -1321,17 +1323,12 @@ export function MapPreview({
 
       // Determine nation mesh based on selectedGeography
       if (selectedGeography.startsWith("usa")) {
-        if (objects.nation) {
-          nationMesh = topojson.mesh(geoAtlasData, objects.nation)
-        } else if (objects.states) {
-          // counties topo lacks ‘nation’ – build one from the state collection
-          nationMesh = topojson.mesh(geoAtlasData, objects.states, (a: any, b: any) => a !== b)
-        } else {
-          console.error("US atlas has neither 'nation' nor 'states' objects:", objects)
+        if (!objects.nation) {
+          console.error("US atlas missing 'nation' object:", objects)
+          return
         }
-        countryFeatureForClipping = objects.nation
-          ? topojson.feature(geoAtlasData, objects.nation)
-          : topojson.feature(geoAtlasData, objects.states)
+        nationMesh = topojson.mesh(geoAtlasData, objects.nation)
+        countryFeatureForClipping = topojson.feature(geoAtlasData, objects.nation)
       } else if (selectedGeography.startsWith("canada")) {
         if (!objects.nation) {
           console.error("Canada topojson missing 'nation' object:", objects)
@@ -2341,21 +2338,23 @@ export function MapPreview({
             .attr("d", pathData)
             .attr("transform", `translate(${currentX}, ${swatchY})`)
             .attr("fill", color)
-            .attr("stroke", stylingSettings.symbol.symbolStrokeColor)
+            .attr("stroke", "#666")
             .attr("stroke-width", 1)
 
-          // Label below swatch
+          // Label positioned to the right of swatch, vertically centered
           colorLegendGroup
             .append("text")
-            .attr("x", currentX)
-            .attr("y", swatchY + 20)
+            .attr("x", currentX + 15) // Position to the right of swatch
+            .attr("y", swatchY + 3) // Vertically centered with swatch
             .attr("font-family", "Arial, sans-serif")
-            .attr("font-size", "11px")
-            .attr("fill", "#333")
-            .attr("text-anchor", "middle")
+            .attr("font-size", "10px")
+            .attr("fill", "#666")
+            .attr("text-anchor", "start") // Left-aligned text
             .text(labelText)
 
-          currentX += 90
+          // Calculate next position based on label width with tighter spacing
+          const labelWidth = Math.max(60, labelText.length * 6 + 35) // Account for swatch + spacing
+          currentX += labelWidth
         })
       }
 
@@ -2366,11 +2365,11 @@ export function MapPreview({
     if (shouldShowChoroplethColorLegend) {
       console.log("=== Rendering Choropleth Color Legend ===")
 
-      const colorLegendGroup = legendGroup.append("g").attr("id", "ChoroplethColorLegend")
+      const choroplethColorLegendGroup = legendGroup.append("g").attr("id", "ChoroplethColorLegend")
 
       if (dimensionSettings.choropleth.colorScale === "linear") {
         // Linear color legend with wide gradient
-        const legendBg = colorLegendGroup
+        const legendBg = choroplethColorLegendGroup
           .append("rect")
           .attr("x", 20)
           .attr("y", currentLegendY - 10)
@@ -2382,7 +2381,7 @@ export function MapPreview({
           .attr("rx", 6)
 
         // Legend title
-        colorLegendGroup
+        choroplethColorLegendGroup
           .append("text")
           .attr("x", 35)
           .attr("y", currentLegendY + 8)
@@ -2408,6 +2407,10 @@ export function MapPreview({
           stylingSettings.base.defaultStateFillColor, // Use default if not set
         ]
 
+        // Ensure min/max colors are set, fallback to default state fill
+        rangeColors[0] = dimensionSettings.choropleth.colorMinColor || stylingSettings.base.defaultStateFillColor
+        rangeColors[1] = dimensionSettings.choropleth.colorMaxColor || stylingSettings.base.defaultStateFillColor
+
         if (dimensionSettings.choropleth.colorMidColor) {
           domain.splice(1, 0, dimensionSettings.choropleth.colorMidValue)
           rangeColors.splice(1, 0, dimensionSettings.choropleth.colorMidColor)
@@ -2424,7 +2427,7 @@ export function MapPreview({
         const gradientWidth = width - 200
         const gradientX = (width - gradientWidth) / 2
 
-        colorLegendGroup
+        choroplethColorLegendGroup
           .append("rect")
           .attr("x", gradientX)
           .attr("y", currentLegendY + 25)
@@ -2436,7 +2439,7 @@ export function MapPreview({
           .attr("rx", 2)
 
         // Min label (left)
-        colorLegendGroup
+        choroplethColorLegendGroup
           .append("text")
           .attr("x", gradientX - 10)
           .attr("y", currentLegendY + 33)
@@ -2455,7 +2458,7 @@ export function MapPreview({
           )
 
         // Max label (right)
-        colorLegendGroup
+        choroplethColorLegendGroup
           .append("text")
           .attr("x", gradientX + gradientWidth + 10)
           .attr("y", currentLegendY + 33)
@@ -2473,7 +2476,7 @@ export function MapPreview({
             ),
           )
       } else {
-        // Categorical color legend with horizontal swatches
+        // Categorical color legend with horizontal square swatches
         const uniqueValues = getUniqueValues(dimensionSettings.choropleth.colorBy, choroplethData)
         const maxItems = Math.min(uniqueValues.length, 10)
 
@@ -2481,7 +2484,7 @@ export function MapPreview({
         const estimatedLegendWidth = Math.min(700, maxItems * 90 + 100)
         const legendX = (width - estimatedLegendWidth) / 2
 
-        const legendBg = colorLegendGroup
+        const legendBg = choroplethColorLegendGroup
           .append("rect")
           .attr("x", legendX)
           .attr("y", currentLegendY - 10)
@@ -2493,7 +2496,7 @@ export function MapPreview({
           .attr("rx", 6)
 
         // Legend title
-        colorLegendGroup
+        choroplethColorLegendGroup
           .append("text")
           .attr("x", legendX + 15)
           .attr("y", currentLegendY + 8)
@@ -2505,7 +2508,7 @@ export function MapPreview({
 
         // Calculate spacing for horizontal layout
         let currentX = legendX + 25
-        const swatchY = currentLegendY + 30
+        const swatchY = currentLegendY + 25
 
         uniqueValues.slice(0, maxItems).forEach((value, index) => {
           const color = choroplethColorScale(value)
@@ -2517,48 +2520,41 @@ export function MapPreview({
             selectedGeography,
           )
 
-          // Create a fixed-size color swatch for categorical legend
-          colorLegendGroup
+          // Smaller square swatch for choropleth categorical
+          choroplethColorLegendGroup
             .append("rect")
-            .attr("x", currentX - 10)
-            .attr("y", swatchY - 10)
-            .attr("width", 20)
-            .attr("height", 20)
+            .attr("x", currentX - 6) // Smaller 12x12 square
+            .attr("y", swatchY - 6)
+            .attr("width", 12)
+            .attr("height", 12)
             .attr("fill", color)
-            .attr("stroke", "#ccc")
+            .attr("stroke", "#666")
             .attr("stroke-width", 1)
+            .attr("rx", 2)
 
-          // Label below swatch
-          colorLegendGroup
+          // Label positioned to the right of swatch, vertically centered
+          choroplethColorLegendGroup
             .append("text")
-            .attr("x", currentX)
-            .attr("y", swatchY + 20)
+            .attr("x", currentX + 15) // Position to the right of swatch
+            .attr("y", swatchY + 3) // Vertically centered with swatch
             .attr("font-family", "Arial, sans-serif")
-            .attr("font-size", "11px")
-            .attr("fill", "#333")
-            .attr("text-anchor", "middle")
+            .attr("font-size", "10px")
+            .attr("fill", "#666")
+            .attr("text-anchor", "start") // Left-aligned text
             .text(labelText)
 
-          currentX += 90
+          // Calculate next position based on label width with tighter spacing
+          const labelWidth = Math.max(60, labelText.length * 6 + 35) // Account for swatch + spacing
+          currentX += labelWidth
         })
       }
 
       currentLegendY += 80
     }
 
-    // No legends to render
-    if (!shouldShowSymbolSizeLegend && !shouldShowSymbolColorLegend && !shouldShowChoroplethColorLegend) {
-      legendGroup
-        .append("text")
-        .attr("x", width / 2)
-        .attr("y", currentLegendY)
-        .attr("font-family", "Arial, sans-serif")
-        .attr("font-size", "14px")
-        .attr("fill", "#666")
-        .attr("text-anchor", "middle")
-        .text("No legend to display")
-    }
+    console.log("=== MAP PREVIEW RENDER COMPLETE ===")
   }, [
+    geoAtlasData,
     symbolData,
     choroplethData,
     mapType,
@@ -2566,120 +2562,172 @@ export function MapPreview({
     stylingSettings,
     symbolDataExists,
     choroplethDataExists,
-    geoAtlasData,
     columnTypes,
     columnFormats,
     customMapData,
     selectedGeography,
     selectedProjection,
-    clipToCountry,
+    clipToCountry, // Added to dependencies
+    toast,
   ])
 
+  const renderMap = useCallback(() => {
+    console.log("renderMap useCallback triggered")
+  }, [
+    geoAtlasData,
+    symbolData,
+    choroplethData,
+    mapType,
+    dimensionSettings,
+    stylingSettings,
+    symbolDataExists,
+    choroplethDataExists,
+    columnTypes,
+    columnFormats,
+    customMapData,
+    selectedGeography,
+    selectedProjection,
+    clipToCountry, // Added to dependencies
+    toast,
+  ])
+
+  useEffect(() => {
+    renderMap()
+  }, [renderMap])
+
   const handleDownloadSVG = () => {
-    if (!svgRef.current) {
-      toast({
-        title: "Download failed",
-        description: "SVG element not found.",
-        variant: "destructive",
-      })
-      return
-    }
+    if (!svgRef.current) return
 
     try {
-      const svgData = svgRef.current.outerHTML
-      const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" })
-      const svgUrl = URL.createObjectURL(svgBlob)
-      const downloadLink = document.createElement("a")
-      downloadLink.href = svgUrl
-      downloadLink.download = "map.svg"
-      document.body.appendChild(downloadLink)
-      downloadLink.click()
-      document.body.removeChild(downloadLink)
-      URL.revokeObjectURL(svgUrl)
+      const svgElement = svgRef.current
+      const serializer = new XMLSerializer()
+      const svgString = serializer.serializeToString(svgElement)
+
+      const blob = new Blob([svgString], { type: "image/svg+xml" })
+      const url = URL.createObjectURL(blob)
+
+      const link = document.createElement("a")
+      link.href = url
+      link.download = "map.svg"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      URL.revokeObjectURL(url)
 
       toast({
-        title: "Download successful",
-        description: "Map downloaded as SVG.",
+        icon: <Download className="h-4 w-4" />,
+        description: "SVG downloaded successfully.",
+        duration: 3000,
       })
     } catch (error) {
       console.error("Error downloading SVG:", error)
       toast({
         title: "Download failed",
-        description: "An error occurred while downloading the SVG.",
+        description: "Failed to download SVG file",
         variant: "destructive",
+        duration: 3000,
       })
     }
   }
 
-  const handleCopySVG = () => {
-    if (!svgRef.current) {
-      toast({
-        title: "Copy failed",
-        description: "SVG element not found.",
-        variant: "destructive",
-      })
-      return
-    }
+  const handleCopySVG = async () => {
+    if (!svgRef.current) return
 
     try {
-      const svgData = svgRef.current.outerHTML
-      navigator.clipboard.writeText(svgData)
+      const svgElement = svgRef.current
+      const serializer = new XMLSerializer()
+      const svgString = serializer.serializeToString(svgElement)
+
+      await navigator.clipboard.writeText(svgString)
+
       toast({
-        title: "Copy successful",
-        description: "SVG code copied to clipboard.",
+        icon: <Copy className="h-4 w-4" />,
+        description: "SVG copied to clipboard.",
+        duration: 3000,
       })
     } catch (error) {
       console.error("Error copying SVG:", error)
       toast({
         title: "Copy failed",
-        description: "An error occurred while copying the SVG code.",
+        description: "Failed to copy SVG to clipboard",
         variant: "destructive",
+        duration: 3000,
       })
     }
   }
 
-  return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          Map Preview
-          <Button variant="ghost" size="sm" onClick={() => setIsExpanded(!isExpanded)}>
-            {isExpanded ? (
-              <>
-                Collapse <ChevronUp className="ml-2 h-4 w-4" />
-              </>
-            ) : (
-              <>
-                Expand <ChevronDown className="ml-2 h-4 w-4" />
-              </>
-            )}
-          </Button>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className={cn(isExpanded ? "block" : "hidden")}>
-        {isLoading ? (
-          <div className="flex h-[600px] items-center justify-center">Loading map data...</div>
-        ) : !geoAtlasData && !customMapData ? (
-          <div className="flex h-[600px] items-center justify-center">
-            No map data loaded. Please select a geography.
+  if (isLoading) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Map Preview</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center h-64">
+            <div className="text-muted-foreground">Loading map data...</div>
           </div>
-        ) : (
-          <>
-            <div ref={mapContainerRef} className="w-full overflow-hidden rounded-md border">
-              <svg ref={svgRef} />
-            </div>
-            <div className="mt-4 flex justify-end space-x-2">
-              <Button size="sm" onClick={handleCopySVG}>
-                <Copy className="mr-2 h-4 w-4" />
-                Copy SVG
-              </Button>
-              <Button size="sm" onClick={handleDownloadSVG}>
-                <Download className="mr-2 h-4 w-4" />
-                Download SVG
-              </Button>
-            </div>
-          </>
-        )}
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
+      <CardHeader
+        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-4 px-6 rounded-t-xl relative"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">Map preview</CardTitle>
+          </div>
+          {/* Right side: Download and Copy buttons (with stopPropagation) */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "flex items-center gap-2 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700",
+                "group",
+              )}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleCopySVG()
+              }}
+            >
+              <Copy className="h-3 w-3 transition-transform duration-300 group-hover:translate-x-1" />
+              Copy to Figma
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "flex items-center gap-2 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700",
+                "group",
+              )}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleDownloadSVG()
+              }}
+            >
+              <Download className="h-3 w-3 transition-transform duration-300 group-hover:translate-y-1" />
+              Download SVG
+            </Button>
+            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className={cn("transition-all duration-200", isExpanded ? "pb-6 pt-2" : "pb-0 h-0 overflow-hidden")}>
+        <div
+          ref={mapContainerRef}
+          className="w-full border rounded-lg overflow-hidden"
+          style={{
+            backgroundColor: stylingSettings.base.mapBackgroundColor,
+          }}
+        >
+          <svg ref={svgRef} className="w-full h-full" />
+        </div>
       </CardContent>
     </Card>
   )

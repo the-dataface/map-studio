@@ -53,6 +53,9 @@ export function MapProjectionSelection({
 
   const filteredGeographies = geographies.filter((g) => g.label.toLowerCase().includes(searchQuery.toLowerCase()))
 
+  // Determine if Albers projections should be enabled
+  const isUSGeography = geography === "usa-states" || geography === "usa-counties" || geography === "usa-nation"
+
   return (
     <Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
       <CardHeader
@@ -111,7 +114,6 @@ export function MapProjectionSelection({
                 type="single"
                 value={projection}
                 onValueChange={(value: "albersUsa" | "mercator" | "equalEarth" | "albers") => {
-                  // Added "albers"
                   if (value) onProjectionChange(value)
                 }}
                 orientation="vertical"
@@ -123,6 +125,7 @@ export function MapProjectionSelection({
                     value={p.value}
                     aria-label={`Select ${p.label}`}
                     className="w-full justify-start"
+                    disabled={(p.value === "albersUsa" || p.value === "albers") && !isUSGeography}
                   >
                     {p.label}
                   </ToggleGroupItem>
@@ -139,10 +142,8 @@ export function MapProjectionSelection({
             onCheckedChange={onClipToCountryChange}
             disabled={
               !(
-                geography === "usa-nation" ||
-                geography === "canada-nation" ||
-                (geography === "world" &&
-                  (projection === "mercator" || projection === "equalEarth" || projection === "albers"))
+                (geography === "usa-nation" || geography === "canada-nation" || geography === "world") &&
+                (projection === "mercator" || projection === "equalEarth" || projection === "albers")
               )
             }
           />
