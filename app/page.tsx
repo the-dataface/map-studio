@@ -713,16 +713,17 @@ export default function MapStudio() {
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
         <DataInput onDataLoad={handleDataLoad} isExpanded={dataInputExpanded} setIsExpanded={setDataInputExpanded} />
 
-        {hasAnyData() && ( // Conditional rendering for MapProjectionSelection
-          <MapProjectionSelection
-            geography={selectedGeography}
-            projection={selectedProjection}
-            onGeographyChange={setSelectedGeography}
-            onProjectionChange={setSelectedProjection}
-            columns={getCurrentColumns()}
-            sampleRows={getCurrentSampleRows()}
-          />
-        )}
+        {hasAnyData() &&
+          !hasDataForType("custom") && ( // Conditional rendering for MapProjectionSelection
+            <MapProjectionSelection
+              geography={selectedGeography}
+              projection={selectedProjection}
+              onGeographyChange={setSelectedGeography}
+              onProjectionChange={setSelectedProjection}
+              columns={getCurrentColumns()}
+              sampleRows={getCurrentSampleRows()}
+            />
+          )}
 
         {showGeocoding && (
           <GeocodingSection
