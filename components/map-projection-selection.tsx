@@ -56,6 +56,12 @@ export function MapProjectionSelection({
   // Determine if Albers projections should be enabled
   const isUSGeography = geography === "usa-states" || geography === "usa-counties" || geography === "usa-nation"
 
+  // Determine if clipping should be enabled
+  const isSingleCountryGeography = geography === "usa-nation" || geography === "canada-nation" || geography === "world"
+  const isProjectionClippable = projection !== "albersUsa" // Albers USA is already clipped
+
+  const isClipCheckboxDisabled = !isSingleCountryGeography || !isProjectionClippable
+
   return (
     <Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
       <CardHeader
@@ -140,12 +146,7 @@ export function MapProjectionSelection({
             id="clip-to-country"
             checked={clipToCountry}
             onCheckedChange={onClipToCountryChange}
-            disabled={
-              !(
-                (geography === "usa-nation" || geography === "canada-nation" || geography === "world") &&
-                (projection === "mercator" || projection === "equalEarth" || projection === "albers")
-              )
-            }
+            disabled={isClipCheckboxDisabled}
           />
           <Label htmlFor="clip-to-country">Clip map to selected country</Label>
         </div>

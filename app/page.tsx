@@ -826,7 +826,6 @@ export default function MapStudio() {
                 />
               </>
             )}
-
             <MapStyling
               stylingSettings={stylingSettings}
               onUpdateStylingSettings={updateStylingSettings}

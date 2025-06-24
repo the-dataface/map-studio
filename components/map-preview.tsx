@@ -1072,6 +1072,7 @@ export function MapPreview({
               return
             }
             data = normaliseCanadaObjects(data) // Normalise after fetching
+            console.log("Normalized Canada data objects:", data.objects) // Debugging
             if (!data.objects?.provinces && selectedGeography === "canada-provinces") {
               console.error("No provincial geometries recognised in topo:", Object.keys(data.objects ?? {}))
               toast({
@@ -1359,16 +1360,8 @@ export function MapPreview({
         defs.append("clipPath").attr("id", clipPathId).append("path").attr("d", path(countryFeatureForClipping))
         mapGroup.attr("clip-path", `url(#${clipPathId})`)
 
-        // Adjust projection to fit the clipped country if not Albers USA
-        const bounds = path.bounds(countryFeatureForClipping)
-        const dx = bounds[1][0] - bounds[0][0]
-        const dy = bounds[1][1] - bounds[0][1]
-        const x = (bounds[0][0] + bounds[1][0]) / 2
-        const y = (bounds[0][1] + bounds[1][1]) / 2
-        const scale = Math.max(1, Math.min(8, 0.9 / Math.max(dx / width, dy / mapHeight)))
-        const translate = [width / 2 - scale * x, mapHeight / 2 - scale * y]
-
-        projection.scale(projection.scale() * scale).translate(translate)
+        // Adjust projection to fit the clipped country
+        projection.fitSize([width, mapHeight], countryFeatureForClipping)
         path.projection(projection) // Update path generator with new projection
       } else {
         mapGroup.attr("clip-path", null) // Remove clip path if not enabled or not applicable
