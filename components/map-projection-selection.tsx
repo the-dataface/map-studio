@@ -20,11 +20,11 @@ interface MapProjectionSelectionProps {
 }
 
 const geographies = [
+  { value: "canada-nation", label: "Canada" },
+  { value: "canada-provinces", label: "Canada (provinces)" },
+  { value: "usa-nation", label: "United States" },
   { value: "usa-states", label: "United States (states)" },
   { value: "usa-counties", label: "United States (counties)" },
-  { value: "usa-nation", label: "United States (no outlines)" },
-  { value: "canada-provinces", label: "Canada (provinces)" },
-  { value: "canada-nation", label: "Canada (no outlines)" },
   { value: "world", label: "World" },
 ]
 
