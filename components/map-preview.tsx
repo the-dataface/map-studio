@@ -1061,17 +1061,15 @@ export function MapPreview({
             }
             data = normaliseCanadaObjects(data) // Normalise after fetching
             console.log("Normalized Canada data objects:", data.objects) // Debugging
+
             if (!data.objects?.provinces) {
-              console.error("No provincial geometries recognised in topo:", Object.keys(data.objects ?? {}))
-              toast({
-                title: "Map data error",
-                description: "The downloaded Canada topojson has no provincial shapes.",
-                variant: "destructive",
-                duration: 4000,
-              })
-              setGeoAtlasData(null)
-              return
+              console.warn(
+                "[map-studio] Canada topojson has no provincial shapes – falling back to nation view.",
+                Object.keys(data.objects ?? {}),
+              )
+              // we’ll draw the outline only; keep going
             }
+
             break
 
           default:
@@ -1375,13 +1373,32 @@ export function MapPreview({
         geoFeatures = topojson.feature(geoAtlasData, objects.counties).features
       } else if (selectedGeography === "canada-provinces") {
         // For canada-provinces, use the normalized Canada topojson
-        if (!objects.nation || !objects.provinces) {
-          console.error("Canada topojson missing 'nation' or 'provinces' object:", objects)
-          return
+
+        // If provinces exist – great – draw them.  Otherwise fall back to outline-only.
+        if (objects.provinces) {
+          if (!objects.nation) {
+            // some older files put Canada in 'countries'
+            const cFeat = topojson
+              .feature(geoAtlasData, objects.countries)
+              .features.find((f: any) => (f.properties?.name ?? "").toLowerCase() === "canada")
+            objects.nation = cFeat ? { type: "GeometryCollection", geometries: [cFeat] } : undefined
+          }
+          nationMesh = topojson.mesh(geoAtlasData, objects.nation)
+          countryFeatureForClipping = topojson.feature(geoAtlasData, objects.nation)
+          geoFeatures = topojson.feature(geoAtlasData, objects.provinces).features
+        } else {
+          // No provinces layer – treat like canada-nation
+          console.warn("[map-studio] No provinces layer – drawing single-country outline.")
+          if (objects.countries) {
+            const all = topojson.feature(geoAtlasData, objects.countries).features
+            countryFeatureForClipping = all.find((f: any) => f.properties?.name === "Canada")
+            nationMesh = topojson.mesh(geoAtlasData, countryFeatureForClipping)
+          } else if (objects.nation) {
+            countryFeatureForClipping = topojson.feature(geoAtlasData, objects.nation)
+            nationMesh = topojson.mesh(geoAtlasData, objects.nation)
+          }
+          geoFeatures = [] // nothing internal to draw
         }
-        nationMesh = topojson.mesh(geoAtlasData, objects.nation)
-        countryFeatureForClipping = topojson.feature(geoAtlasData, objects.nation) // For clipping Canada outline
-        geoFeatures = topojson.feature(geoAtlasData, objects.provinces).features
       }
 
       // Apply clipping if enabled and applicable
