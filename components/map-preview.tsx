@@ -949,7 +949,8 @@ export function MapPreview({
             expectedObjects = ["nation", "states"]
             break
           case "usa-counties":
-            dataUrl = "https://cdn.jsdelivr.net/npm/us-atlas@3/count-10m.json" // Corrected URL for counties
+            // Correct URL – contains { nation, states, counties }
+            dataUrl = "https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json"
             expectedObjects = ["nation", "counties"]
             break
           case "world":
