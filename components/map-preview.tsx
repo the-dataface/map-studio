@@ -996,27 +996,35 @@ export function MapPreview({
 
         switch (selectedGeography) {
           case "usa-states":
-          case "usa-counties":
-            // These still load US-specific atlases for internal boundaries
             data = await fetchTopoJSON(
               [
+                // states file
                 "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json",
-                "https://cdn.jsdelivr.net/npm/us-atlas@3/dist/states-10m.json",
                 "https://unpkg.com/us-atlas@3/states-10m.json",
               ],
-              ["nation", selectedGeography === "usa-states" ? "states" : "counties"],
+              ["nation", "states"],
+            )
+            break
+
+          case "usa-counties":
+            data = await fetchTopoJSON(
+              [
+                // counties file
+                "https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json",
+                "https://unpkg.com/us-atlas@3/counties-10m.json",
+              ],
+              ["nation", "counties"],
             )
             if (!data) {
               toast({
                 title: "Map data error",
-                description: `Couldn’t load US ${selectedGeography.includes("states") ? "state" : "county"} boundaries. Please retry or check your connection.`,
+                description: "Couldn’t load US county boundaries. Please retry or check your connection.",
                 variant: "destructive",
                 duration: 4000,
               })
               return
             }
             break
-
           case "usa-nation":
           case "canada-nation":
           case "world":
