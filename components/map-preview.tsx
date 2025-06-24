@@ -941,9 +941,11 @@ async function fetchTopoJSON(urls: string[], expected: string[]): Promise<TopoJS
       const res = await fetch(url)
       if (!res.ok) continue
       const data = (await res.json()) as TopoJSONData
-      const ok = expected.every((k) => data.objects && data.objects[k])
+      console.log(`Fetched data from ${url}. Objects found:`, Object.keys(data.objects || {})) // Debugging
+      const ok = expected.every((k) => data.objects && data.objects[k] && Object.keys(data.objects[k]).length > 0) // Check if object exists and is not empty
       if (ok) return data
-    } catch {
+    } catch (error) {
+      console.error(`Error fetching or parsing ${url}:`, error) // More detailed error logging
       // ignore and try the next URL
     }
   }
@@ -1363,8 +1365,12 @@ export function MapPreview({
         // Adjust projection to fit the clipped country
         projection.fitSize([width, mapHeight], countryFeatureForClipping)
         path.projection(projection) // Update path generator with new projection
+        console.log(
+          `Projection adjusted for clipping. New scale: ${projection.scale()}, translate: ${projection.translate()}`,
+        )
       } else {
         mapGroup.attr("clip-path", null) // Remove clip path if not enabled or not applicable
+        console.log("Clipping not applied or removed.")
       }
 
       if (nationMesh) {
@@ -1384,6 +1390,9 @@ export function MapPreview({
           .attr("stroke-linejoin", "round")
           .attr("stroke-linecap", "round")
           .attr("d", path(nationMesh))
+        console.log(
+          `Nation mesh rendered with fill: ${stylingSettings.base.nationFillColor}, stroke: ${stylingSettings.base.nationStrokeColor}`,
+        )
       }
 
       // Conditionally render states/counties/provinces

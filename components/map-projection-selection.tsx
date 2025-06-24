@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Checkbox } from "@/components/ui/checkbox" // Import Checkbox
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip" // Import Tooltip components
 
 interface MapProjectionSelectionProps {
   geography: "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world"
@@ -61,6 +62,10 @@ export function MapProjectionSelection({
   const isProjectionClippable = projection !== "albersUsa" // Albers USA is already clipped
 
   const isClipCheckboxDisabled = !isSingleCountryGeography || !isProjectionClippable
+
+  const clipTooltipContent = isClipCheckboxDisabled
+    ? "Clipping is only available for single-country geographies (USA, Canada, World) and non-Albers USA projections."
+    : "Clip the map to the boundaries of the selected country."
 
   return (
     <Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
@@ -140,14 +145,25 @@ export function MapProjectionSelection({
             </ScrollArea>
           </div>
         </div>
-        {/* Clip to Country Checkbox */}
+        {/* Clip to Country Checkbox with Tooltip */}
         <div className="flex items-center space-x-2 mt-4">
-          <Checkbox
-            id="clip-to-country"
-            checked={clipToCountry}
-            onCheckedChange={onClipToCountryChange}
-            disabled={isClipCheckboxDisabled}
-          />
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <Checkbox
+                    id="clip-to-country"
+                    checked={clipToCountry}
+                    onCheckedChange={onClipToCountryChange}
+                    disabled={isClipCheckboxDisabled}
+                  />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{clipTooltipContent}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <Label htmlFor="clip-to-country">Clip map to selected country</Label>
         </div>
       </CardContent>
