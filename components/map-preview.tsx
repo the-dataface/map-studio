@@ -460,12 +460,13 @@ const formatNumber = (value: any, format: string): string => {
   let num: number
   const strValue = String(value).trim()
 
-  const compactNum = parseCompactNumber(strValue)
-  if (compactNum !== null) {
-    num = compactNum
+  let parsedNum: number | null = parseCompactNumber(strValue)
+  if (parsedNum !== null) {
+    num = parsedNum
   } else {
     const cleanedValue = strValue.replace(/[,$%]/g, "")
-    num = Number.parseFloat(cleanedValue)
+    parsedNum = Number.parseFloat(cleanedValue)
+    num = parsedNum
   }
 
   if (isNaN(num)) {
@@ -1232,7 +1233,7 @@ export function MapPreview({
         console.log("Found map group, applying choropleth colors...")
         let featuresColored = 0
 
-        mapGroup.selectAll("path").each(function (this: SVGPathElement) {
+        mapGroup.selectAll("path, g").each(function (this: SVGElement) {
           const pathElement = d3.select(this)
           const id = pathElement.attr("id")
           let featureKey: string | null = null
