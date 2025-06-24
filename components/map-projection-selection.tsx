@@ -70,7 +70,7 @@ export function MapProjectionSelection({
             <Label htmlFor="geography-search" className="mb-2 block">
               Select geography
             </Label>
-            <ScrollArea className="h-[200px] w-full rounded-md border p-4">
+            <ScrollArea className="h-[200px] w-full rounded-md border p-2">
               <ToggleGroup
                 type="single"
                 value={geography}
