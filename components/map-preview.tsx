@@ -1251,10 +1251,8 @@ export function MapPreview({
           if (id) {
             if (customMapData) {
               // For custom maps, always try to extract state/province first
-              featureKey = extractStateFromSVGId(id)
-              if (!featureKey) {
-                featureKey = id // Fallback to raw ID if not a recognized state/province format
-              }
+              const extractedId = extractStateFromSVGId(id)
+              featureKey = extractedId || id // Fallback to raw ID if not a recognized state/province format
             } else {
               // For standard TopoJSON maps
               if (topoType === "usa") {
@@ -1268,19 +1266,38 @@ export function MapPreview({
           }
 
           if (!featureKey) {
-            element.attr("fill", stylingSettings.base.defaultStateFillColor)
+            // If no featureKey can be determined, apply default fill to the element itself
+            // This handles cases where a path/group might not represent a state/country
+            if (this.tagName.toLowerCase() === "g") {
+              element.selectAll("path").attr("fill", stylingSettings.base.defaultStateFillColor)
+            } else if (this.tagName.toLowerCase() === "path") {
+              element.attr("fill", stylingSettings.base.defaultStateFillColor)
+            }
             return
           }
 
           const value = stateDataMap.get(featureKey)
           if (value !== undefined) {
             const color = choroplethColorScale(value)
-            element.attr("fill", color)
+            if (this.tagName.toLowerCase() === "g") {
+              // If it's a group, apply color to all its direct path children
+              element.selectAll("path").attr("fill", color)
+              console.log(`✅ Applied color ${color} to paths within group ${featureKey} (value: ${value})`)
+            } else if (this.tagName.toLowerCase() === "path") {
+              // If it's a path, apply color directly
+              element.attr("fill", color)
+              console.log(`✅ Applied color ${color} to path ${featureKey} (value: ${value})`)
+            }
             featuresColored++
-            console.log(`✅ Applied color ${color} to feature ${featureKey} (value: ${value})`)
           } else {
-            element.attr("fill", stylingSettings.base.defaultStateFillColor)
-            console.log(`No data found for feature: ${featureKey}, applying default fill.`)
+            // If no data, apply default fill
+            if (this.tagName.toLowerCase() === "g") {
+              element.selectAll("path").attr("fill", stylingSettings.base.defaultStateFillColor)
+              console.log(`No data found for group: ${featureKey}, applying default fill to its paths.`)
+            } else if (this.tagName.toLowerCase() === "path") {
+              element.attr("fill", stylingSettings.base.defaultStateFillColor)
+              console.log(`No data found for path: ${featureKey}, applying default fill.`)
+            }
           }
         })
         console.log("Features actually colored:", featuresColored)
