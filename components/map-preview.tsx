@@ -1324,11 +1324,20 @@ export function MapPreview({
         }
         nationMesh = topojson.mesh(geoAtlasData, objects.nation)
       } else if (selectedGeography === "world") {
-        if (!objects.countries) {
-          console.error("World atlas missing 'countries' object:", objects)
+        /* Primary expectation is objects.countries (from world-atlas).
+         * If it’s missing (e.g. user fed a Canada-only topo), grab the
+         * first GeometryCollection we can find and treat it as ‘countries’.
+         */
+        const countryObj =
+          objects.countries ??
+          objects[Object.keys(objects).find((k) => Array.isArray(objects[k]?.geometries)) as string]
+
+        if (!countryObj) {
+          console.error("World-type map has no GeometryCollection to render:", objects)
           return
         }
-        nationMesh = topojson.mesh(geoAtlasData, objects.countries, (a: any, b: any) => a !== b)
+
+        nationMesh = topojson.mesh(geoAtlasData, countryObj, (a: any, b: any) => a !== b)
       }
 
       if (nationMesh) {
