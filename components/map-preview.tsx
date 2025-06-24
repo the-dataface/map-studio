@@ -904,6 +904,25 @@ const createFormattedText = (
   })
 }
 
+/**
+ * Try a list of candidate URLs until we find one that contains the
+ * expected TopoJSON object(s).  Returns null if all attempts fail.
+ */
+async function fetchTopoJSON(urls: string[], expected: string[]): Promise<TopoJSONData | null> {
+  for (const url of urls) {
+    try {
+      const res = await fetch(url)
+      if (!res.ok) continue
+      const data = (await res.json()) as TopoJSONData
+      const ok = expected.every((k) => data.objects && data.objects[k])
+      if (ok) return data
+    } catch {
+      // ignore and try the next URL
+    }
+  }
+  return null
+}
+
 export function MapPreview({
   symbolData,
   choroplethData,
@@ -948,11 +967,26 @@ export function MapPreview({
             dataUrl = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json"
             expectedObjects = ["nation", "states"]
             break
-          case "usa-counties":
-            // Correct URL – contains { nation, states, counties }
-            dataUrl = "https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json"
-            expectedObjects = ["nation", "counties"]
-            break
+          case "usa-counties": {
+            // Two equivalent county files shipped by us-atlas.
+            const candidates = [
+              "https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json",
+              "https://cdn.jsdelivr.net/npm/us-atlas@3/counties-albers-10m.json",
+            ]
+            const data = await fetchTopoJSON(candidates, ["counties"])
+            if (!data) {
+              toast({
+                title: "Map data error",
+                description: "Couldn’t load U S county boundaries. Please retry or check your connection.",
+                variant: "destructive",
+                duration: 4000,
+              })
+              setGeoAtlasData(null)
+              return
+            }
+            setGeoAtlasData(data)
+            return
+          }
           case "world":
             dataUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"
             expectedObjects = ["countries"]
