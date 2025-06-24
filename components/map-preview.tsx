@@ -1595,7 +1595,7 @@ export function MapPreview({
 
             // Ensure min/max colors are set, fallback to default symbol fill
             rangeColors[0] = dimensionSettings.symbol.colorMinColor || stylingSettings.symbol.symbolFillColor
-            rangeColors[1] = dimensionSettings.symbol.colorMaxColor ||
+            rangeColors[1] = dimensionSettings.symbol.colorMaxColor || stylingSettings.symbol.symbolFillColor
 
             if (dimensionSettings.symbol.colorMidColor) {
               domain.splice(1, 0, dimensionSettings.symbol.colorMidValue)
