@@ -1004,6 +1004,15 @@ export function MapPreview({
               ],
               ["nation", "states"],
             )
+            if (!data) {
+              toast({
+                title: "Map data error",
+                description: "Couldn’t load US state boundaries. Please retry or check your connection.",
+                variant: "destructive",
+                duration: 4000,
+              })
+              return
+            }
             break
 
           case "usa-counties":
@@ -1028,7 +1037,6 @@ export function MapPreview({
           case "usa-nation":
           case "canada-nation":
           case "world":
-            // For single nation or world, load world-atlas
             data = await fetchTopoJSON(
               [
                 "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json",
@@ -1049,7 +1057,6 @@ export function MapPreview({
             break
 
           case "canada-provinces":
-            // This still loads Canada provinces atlas
             data = await fetchTopoJSON(
               [
                 "https://gist.githubusercontent.com/Brideau/2391df60938462571ca9/raw/f5a1f3b47ff671eaf2fb7e7b798bacfc6962606a/canadaprovtopo.json",
@@ -1069,8 +1076,6 @@ export function MapPreview({
               return
             }
             data = normaliseCanadaObjects(data) // Normalise after fetching
-
-            // No longer return here if provinces are missing, allow fallback to nation outline
             if (!data.objects?.provinces) {
               console.warn(
                 "[map-studio] Canada topojson has no provincial shapes – falling back to nation view.",
@@ -1099,7 +1104,7 @@ export function MapPreview({
       }
     }
     loadGeoData()
-  }, [selectedGeography, toast]) // Re-run when selectedGeography changes
+  }, [selectedGeography, toast])
 
   useEffect(() => {
     console.log("=== MAP PREVIEW USEEFFECT TRIGGERED ===")
@@ -1117,12 +1122,10 @@ export function MapPreview({
 
     const width = 975
 
-    // Create scales that will be used by both symbols and legends
     let sizeScale: any = null
     let symbolColorScale: any = null
     let choroplethColorScale: any = null
 
-    // Determine what should be rendered
     const shouldRenderSymbols =
       symbolDataExists &&
       dimensionSettings?.symbol?.latitude &&
@@ -1136,7 +1139,6 @@ export function MapPreview({
       dimensionSettings?.choropleth?.colorBy &&
       choroplethData.length > 0
 
-    // Calculate dynamic height based on legends needed
     let legendHeight = 0
     const shouldShowSymbolSizeLegend =
       shouldRenderSymbols &&
@@ -1166,28 +1168,22 @@ export function MapPreview({
         .geoAlbersUsa()
         .scale(1300)
         .translate([width / 2, mapHeight / 2])
-      console.log(`Using Albers USA projection with scale: 1300, translate: [${width / 2}, ${mapHeight / 2}]`)
     } else if (selectedProjection === "albers") {
-      // Albers projection (suitable for single countries or continents)
       projection = d3
         .geoAlbers()
-        .scale(1300) // Default scale, will be adjusted by fitSize if clipping
+        .scale(1300)
         .translate([width / 2, mapHeight / 2])
-      console.log(`Using Albers projection with scale: 1300, translate: [${width / 2}, ${mapHeight / 2}]`)
     } else if (selectedProjection === "mercator") {
-      // Adjust scale for Mercator to fit the world
       projection = d3
         .geoMercator()
         .scale(150)
         .translate([width / 2, mapHeight / 2])
     } else if (selectedProjection === "equalEarth") {
-      // Adjust scale for Equal Earth to fit the world
       projection = d3
         .geoEqualEarth()
         .scale(150)
         .translate([width / 2, mapHeight / 2])
     } else {
-      // Fallback to Albers USA
       projection = d3
         .geoAlbersUsa()
         .scale(1300)
@@ -1196,11 +1192,7 @@ export function MapPreview({
 
     const path = d3.geoPath().projection(projection)
 
-    // PRIORITY: Custom map takes precedence if custom map data exists
     if (customMapData && customMapData.trim().length > 0) {
-      console.log("=== CUSTOM MAP RENDERING START ===")
-      console.log("Custom map data length:", customMapData.length)
-
       try {
         const parser = new DOMParser()
         const doc = parser.parseFromString(customMapData, "image/svg+xml")
@@ -1220,7 +1212,6 @@ export function MapPreview({
         const customMapElement = doc.documentElement
         console.log("Parsed SVG element:", customMapElement.tagName)
 
-        // Try multiple approaches to import the custom map
         const mapGroupToImport = d3.select(customMapElement).select("#Map")
         if (!mapGroupToImport.empty()) {
           const importedMapGroup = document.importNode(mapGroupToImport.node()!, true)
@@ -1236,7 +1227,6 @@ export function MapPreview({
           console.log("✅ Imported", customMapElement.children.length, "elements into new Map group")
         }
 
-        // Look for Nations and States/Counties/Provinces groups
         let nationsGroup = svg.select("#Nations")
         let statesOrCountiesGroup = svg.select("#States")
 
@@ -1255,7 +1245,6 @@ export function MapPreview({
           statesOrCountiesGroup.selectAll("path").size(),
         )
 
-        // Apply styling
         if (!nationsGroup.empty()) {
           nationsGroup
             .selectAll("path")
@@ -1283,16 +1272,16 @@ export function MapPreview({
         })
       }
     } else if (geoAtlasData) {
-      // Render standard US or World map
       console.log("=== STANDARD MAP RENDERING START ===")
 
       const mapGroup = svg.append("g").attr("id", "Map")
       const nationsGroup = mapGroup.append("g").attr("id", "Nations")
-      const statesOrCountiesGroup = mapGroup.append("g").attr("id", "StatesOrCounties") // New group name
+      const statesOrCountiesGroup = mapGroup.append("g").attr("id", "StatesOrCounties")
 
       let geoFeatures: any[] = []
       let nationMesh: any = null
-      let countryFeatureForClipping: any = null // To store the feature for clipping
+      let featureToFit: any = null // The GeoJSON object to fit the projection to
+      let clipFeature: any = null // The GeoJSON object to use for clipping
 
       const { objects } = geoAtlasData as TopoJSONData
       if (!objects) {
@@ -1305,7 +1294,6 @@ export function MapPreview({
         return
       }
 
-      // Utility ─ find a country feature by several possible identifiers
       function findCountryFeature(features: any[], candidates: (string | number)[]) {
         return features.find((f) => {
           const props = f.properties ?? {}
@@ -1318,99 +1306,79 @@ export function MapPreview({
         })
       }
 
-      // Determine nation mesh and countryFeatureForClipping based on selectedGeography
       if (selectedGeography === "usa-states") {
-        // US States: use us-atlas with states + nation outline
-        if (!objects.nation || !objects.states) {
-          console.error("US atlas missing 'nation' or 'states' object:", objects)
-          toast({
-            title: "Map data error",
-            description: "US states map data is incomplete.",
-            variant: "destructive",
-            duration: 4000,
-          })
-          return
-        }
         nationMesh = topojson.mesh(geoAtlasData, objects.nation)
-        countryFeatureForClipping = topojson.feature(geoAtlasData, objects.nation)
+        featureToFit = topojson.feature(geoAtlasData, objects.states)
+        clipFeature = topojson.feature(geoAtlasData, objects.nation)
         geoFeatures = topojson.feature(geoAtlasData, objects.states).features
       } else if (selectedGeography === "usa-counties") {
-        // US Counties: use us-atlas with counties + nation outline
-        if (!objects.nation || !objects.counties) {
-          console.error("US atlas missing 'nation' or 'counties' object:", objects)
-          toast({
-            title: "Map data error",
-            description: "US counties map data is incomplete.",
-            variant: "destructive",
-            duration: 4000,
-          })
-          return
-        }
         nationMesh = topojson.mesh(geoAtlasData, objects.nation)
-        countryFeatureForClipping = topojson.feature(geoAtlasData, objects.nation)
+        featureToFit = topojson.feature(geoAtlasData, objects.counties)
+        clipFeature = topojson.feature(geoAtlasData, objects.nation)
         geoFeatures = topojson.feature(geoAtlasData, objects.counties).features
       } else if (selectedGeography === "canada-provinces") {
-        // Canada Provinces: use canada-specific atlas
         if (objects.provinces) {
-          // Has provinces - render them with nation outline
           const nationSource = objects.nation || objects.countries
           if (nationSource) {
             nationMesh = topojson.mesh(geoAtlasData, nationSource)
-            countryFeatureForClipping = topojson.feature(geoAtlasData, nationSource)
+            clipFeature = topojson.feature(geoAtlasData, nationSource)
           }
+          featureToFit = topojson.feature(geoAtlasData, objects.provinces)
           geoFeatures = topojson.feature(geoAtlasData, objects.provinces).features
         } else {
-          // No provinces - fall back to nation-only view using world atlas
-          console.warn("[map-studio] No provinces found, falling back to Canada nation view")
+          console.warn("[map-studio] No provinces found, falling back to Canada nation view.")
           if (objects.countries) {
             const allCountries = topojson.feature(geoAtlasData, objects.countries).features
-            countryFeatureForClipping = findCountryFeature(allCountries, ["Canada", "CAN", 124])
-            if (countryFeatureForClipping) {
-              nationMesh = topojson.mesh(geoAtlasData, countryFeatureForClipping)
+            const specificCanadaFeature = findCountryFeature(allCountries, ["Canada", "CAN", 124])
+            if (specificCanadaFeature) {
+              nationMesh = topojson.mesh(geoAtlasData, specificCanadaFeature)
+              featureToFit = specificCanadaFeature
+              clipFeature = specificCanadaFeature
+            } else {
+              console.error("Could not locate Canada feature in provided data for provinces fallback.")
+              toast({
+                title: "Map data error",
+                description: "Canadian provinces map data is incomplete.",
+                variant: "destructive",
+                duration: 4000,
+              })
+              return
             }
           }
           geoFeatures = []
         }
-      } else if (selectedGeography === "usa-nation") {
-        // USA Nation: use world atlas, find USA
-        if (objects.countries) {
-          const allCountries = topojson.feature(geoAtlasData, objects.countries).features
-          countryFeatureForClipping = findCountryFeature(allCountries, [
-            "United States of America",
-            "United States",
-            "USA",
-            840,
-          ])
-          if (countryFeatureForClipping) {
-            nationMesh = topojson.mesh(geoAtlasData, countryFeatureForClipping)
-          } else {
-            console.warn("[map-studio] Could not find USA in world atlas, rendering all countries")
-            nationMesh = topojson.mesh(geoAtlasData, objects.countries)
-          }
-        }
-        geoFeatures = []
-      } else if (selectedGeography === "canada-nation") {
-        // Canada Nation: use world atlas, find Canada
-        if (objects.countries) {
-          const allCountries = topojson.feature(geoAtlasData, objects.countries).features
-          countryFeatureForClipping = findCountryFeature(allCountries, ["Canada", "CAN", 124])
-          if (countryFeatureForClipping) {
-            nationMesh = topojson.mesh(geoAtlasData, countryFeatureForClipping)
-          } else {
-            console.warn("[map-studio] Could not find Canada in world atlas, rendering all countries")
-            nationMesh = topojson.mesh(geoAtlasData, objects.countries)
-          }
+      } else if (selectedGeography === "usa-nation" || selectedGeography === "canada-nation") {
+        const allCountries = topojson.feature(geoAtlasData, objects.countries).features
+        const targetCountryName = selectedGeography === "usa-nation" ? "United States" : "Canada"
+        const targetCountryCandidates =
+          selectedGeography === "usa-nation"
+            ? ["United States of America", "United States", "USA", 840]
+            : ["Canada", "CAN", 124]
+
+        const specificCountryFeature = findCountryFeature(allCountries, targetCountryCandidates)
+
+        if (specificCountryFeature) {
+          nationMesh = topojson.mesh(geoAtlasData, specificCountryFeature)
+          featureToFit = specificCountryFeature
+          clipFeature = specificCountryFeature
+        } else {
+          console.warn(
+            `[map-studio] Could not find ${targetCountryName} in world atlas. Rendering all countries as fallback.`,
+          )
+          nationMesh = topojson.mesh(geoAtlasData, objects.countries) // Fallback to world outline
+          featureToFit = topojson.feature(geoAtlasData, objects.countries) // Fit to world
+          clipFeature = null // No specific country to clip to
         }
         geoFeatures = []
       } else if (selectedGeography === "world") {
-        // World: use world atlas, render all countries
         const countriesSource = objects.countries || objects.land
         if (countriesSource) {
           nationMesh = topojson.mesh(geoAtlasData, countriesSource, (a: any, b: any) => a !== b)
-          countryFeatureForClipping = topojson.feature(geoAtlasData, countriesSource)
+          featureToFit = topojson.feature(geoAtlasData, countriesSource)
+          clipFeature = null
           geoFeatures = topojson.feature(geoAtlasData, countriesSource).features
         } else {
-          console.error("World atlas missing 'countries' or 'land' object:", objects)
+          console.error("World atlas missing 'countries' or 'land' object for world:", objects)
           toast({
             title: "Map data error",
             description: "The world map data is incomplete.",
@@ -1422,32 +1390,31 @@ export function MapPreview({
       }
 
       // Apply clipping and projection fitting
-      if (clipToCountry && countryFeatureForClipping && selectedProjection !== "albersUsa") {
+      if (clipToCountry && clipFeature && selectedProjection !== "albersUsa") {
         const clipPathId = "clip-path-country"
         const defs = svg.append("defs")
-        defs.append("clipPath").attr("id", clipPathId).append("path").attr("d", path(countryFeatureForClipping))
+        defs.append("clipPath").attr("id", clipPathId).append("path").attr("d", path(clipFeature))
         mapGroup.attr("clip-path", `url(#${clipPathId})`)
 
-        // Fit projection to the specific country/region
-        projection.fitSize([width, mapHeight], countryFeatureForClipping)
-        path.projection(projection) // Update path generator with new projection
-        console.log(
-          `Projection fitted to bounds. New scale: ${projection.scale()}, translate: ${projection.translate()}`,
-        )
-      } else if (geoFeatures.length > 0 && selectedProjection !== "albersUsa") {
-        // If no clipping but we have sub-features, fit to those bounds
-        const featureCollection = { type: "FeatureCollection", features: geoFeatures }
-        projection.fitSize([width, mapHeight], featureCollection)
+        projection.fitSize([width, mapHeight], clipFeature)
         path.projection(projection)
         console.log(
-          `Projection fitted to sub-features. New scale: ${projection.scale()}, translate: ${projection.translate()}`,
+          `Projection fitted to bounds with clipping. New scale: ${projection.scale()}, translate: ${projection.translate()}`,
         )
       } else {
         mapGroup.attr("clip-path", null) // Remove clip path if not enabled
-        console.log("Using default projection scale and translate.")
+
+        if (featureToFit && selectedProjection !== "albersUsa") {
+          projection.fitSize([width, mapHeight], featureToFit)
+          path.projection(projection)
+          console.log(
+            `Projection fitted to bounds without clipping. New scale: ${projection.scale()}, translate: ${projection.translate()}`,
+          )
+        } else {
+          console.log("Using default projection scale and translate (AlbersUsa or no specific fit).")
+        }
       }
 
-      // Only proceed if we have a nationMesh or geoFeatures to draw
       if (!nationMesh && geoFeatures.length === 0) {
         console.warn("No map features or nation mesh to render for selected geography.")
         toast({
@@ -1459,7 +1426,6 @@ export function MapPreview({
         return
       }
 
-      // Render the main nation outline (or single country outline)
       if (nationMesh) {
         nationsGroup
           .append("path")
@@ -1469,7 +1435,7 @@ export function MapPreview({
               ? "Country-US"
               : selectedGeography === "canada-nation"
                 ? "Country-CA"
-                : "World-Outline", // This ID might need to be more dynamic for world countries
+                : "World-Outline",
           )
           .attr("fill", stylingSettings.base.nationFillColor)
           .attr("stroke", stylingSettings.base.nationStrokeColor)
@@ -1482,7 +1448,6 @@ export function MapPreview({
         )
       }
 
-      // Render sub-features (states, counties, provinces, or individual countries for world map)
       console.log("=== SUB-FEATURE FEATURES DEBUG ===")
       console.log("Number of features:", geoFeatures.length)
       geoFeatures.slice(0, 5).forEach((feature, index) => {
@@ -1499,12 +1464,12 @@ export function MapPreview({
         .data(geoFeatures)
         .join("path")
         .attr("id", (d) => {
-          const identifier = d.properties?.postal || d.properties?.name || d.id // Prioritize postal, then name, then id
+          const identifier = d.properties?.postal || d.properties?.name || d.id
           let prefix = ""
           if (selectedGeography === "usa-states") prefix = "State"
           else if (selectedGeography === "usa-counties") prefix = "County"
           else if (selectedGeography === "canada-provinces") prefix = "Province"
-          else if (selectedGeography === "world") prefix = "Country" // For world, each feature is a country
+          else if (selectedGeography === "world") prefix = "Country"
 
           const featureId = `${prefix}-${identifier || ""}`
           console.log(`Creating feature path with ID: ${featureId}`)
@@ -2496,10 +2461,6 @@ export function MapPreview({
           stylingSettings.base.defaultStateFillColor, // Use default if not set
         ]
 
-        // Ensure min/max colors are set, fallback to default state fill
-        rangeColors[0] = dimensionSettings.choropleth.colorMinColor || stylingSettings.base.defaultStateFillColor
-        rangeColors[1] = dimensionSettings.choropleth.colorMaxColor || stylingSettings.base.defaultStateFillColor
-
         if (dimensionSettings.choropleth.colorMidColor) {
           domain.splice(1, 0, dimensionSettings.choropleth.colorMidValue)
           rangeColors.splice(1, 0, dimensionSettings.choropleth.colorMidColor)
@@ -2656,7 +2617,7 @@ export function MapPreview({
     customMapData,
     selectedGeography,
     selectedProjection,
-    clipToCountry, // Added to dependencies
+    clipToCountry,
     toast,
   ])
 
@@ -2676,7 +2637,7 @@ export function MapPreview({
     customMapData,
     selectedGeography,
     selectedProjection,
-    clipToCountry, // Added to dependencies
+    clipToCountry,
     toast,
   ])
 
