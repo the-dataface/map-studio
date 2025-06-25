@@ -22,7 +22,23 @@ interface MapPreviewProps {
 }
 
 const MapPreview: React.FC<MapPreviewProps> = ({ latitude, longitude, zoom = 13 }) => {
-  const position: [number, number] = [latitude, longitude]
+  // convert to numbers
+  const lat = Number(latitude)
+  const lng = Number(longitude)
+
+  const coordsAreValid = Number.isFinite(lat) && Number.isFinite(lng)
+
+  if (!coordsAreValid) {
+    /* If the caller hasn’t supplied valid coordinates, show a placeholder
+       instead of crashing Leaflet. */
+    return (
+      <div className="flex h-48 items-center justify-center rounded-md border text-sm text-muted-foreground">
+        Invalid or missing coordinates
+      </div>
+    )
+  }
+
+  const position: [number, number] = [lat, lng]
 
   return (
     <MapContainer center={position} zoom={zoom} style={{ height: "300px", width: "100%" }}>
