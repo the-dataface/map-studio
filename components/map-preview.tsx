@@ -315,20 +315,23 @@ const normalizeGeoIdentifier = (
 const extractCandidateFromSVGId = (id: string): string | null => {
   if (!id) return null
 
-  const geoNameOrAbbrPatterns = [
-    /State-([a-zA-Z\s]{2,})$/i, // State-California, State-CA
-    /Province-([a-zA-Z\s]{2,})$/i, // Province-Alberta, Province-AB
-    /Country-([a-zA-Z\s]{2,})$/i, // Country-Canada, Country-US
+  // Prioritize direct matches first for clean IDs (e.g., "CA", "California", "06001", "06")
+  const directMatchPatterns = [
     /^([A-Z]{2})$/, // Direct 2-letter abbreviation like "CA"
-    /^([a-zA-Z\s]+)$/, // Direct full name like "California"
-  ]
-
-  const fipsPatterns = [
+    /^([a-zA-Z\s]+)$/, // Direct full name like "California", "New York"
     /^(\d{5})$/, // Direct 5-digit FIPS (for counties)
     /^(\d{2})$/, // Direct 2-digit FIPS (for states)
   ]
 
-  const allPatterns = [...fipsPatterns, ...geoNameOrAbbrPatterns]
+  // Then try patterns with common prefixes and flexible separators
+  const prefixedPatterns = [
+    // Matches "State-California", "state_CA", "County-06001", "province AB", "country-USA"
+    // Allows for optional underscore, hyphen, or space after prefix.
+    // Captures alphanumeric, spaces, and periods (for complex IDs) in the identifier.
+    /^(?:state|province|country|county)[_\- ]?([a-zA-Z0-9.\s]+)$/i,
+  ]
+
+  const allPatterns = [...directMatchPatterns, ...prefixedPatterns]
 
   for (const pattern of allPatterns) {
     const match = id.match(pattern)
@@ -1239,7 +1242,6 @@ export function MapPreview({
           title: "Invalid TopoJSON",
           description: "The downloaded map file is missing required data.",
           variant: "destructive",
-          duration: 4000,
         })
         return
       }
@@ -1588,7 +1590,7 @@ export function MapPreview({
       }
     }
 
-    // Render symbol data if available
+    // Render symbol data if available, and only if not using a custom map
 
     console.log("=== SYMBOL RENDERING DEBUG ===")
     console.log("Should render symbols:", shouldRenderSymbols)
@@ -2001,18 +2003,7 @@ export function MapPreview({
             if (d.pathNode) {
               // For custom maps, calculate centroid from the actual path or group element
               const bbox = d.pathNode.getBBox()
-              const ctm = d.pathNode.getCTM() // Get the Current Transformation Matrix
-              if (ctm && svgRef.current) {
-                // Transform the center of the bounding box using the CTM
-                const transformedPoint = svgRef.current.createSVGPoint()
-                transformedPoint.x = bbox.x + bbox.width / 2
-                transformedPoint.y = bbox.y + bbox.height / 2
-                const screenPoint = transformedPoint.matrixTransform(ctm)
-                centroid = [screenPoint.x, screenPoint.y]
-              } else {
-                // Fallback if CTM is not available or svgRef.current is null
-                centroid = [bbox.x + bbox.width / 2, bbox.y + bbox.height / 2]
-              }
+              centroid = [bbox.x + bbox.width / 2, bbox.y + bbox.height / 2]
             } else {
               // For TopoJSON data, use d3 path centroid
               centroid = path.centroid(d)
