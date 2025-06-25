@@ -29,6 +29,9 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { TooltipProvider } from "@/components/ui/tooltip"
 import * as d3 from "d3"
 
+// Import color schemes and categories
+import { d3ColorSchemes, colorSchemeCategories, renderColorSchemePreview } from "@/lib/color-schemes"
+
 // Update the component props to include dimensionSettings and onUpdateSettings
 interface DimensionMappingProps {
   mapType: "symbol" | "choropleth" | "custom" // Still receive mapType for initial sync
@@ -534,7 +537,7 @@ export function DimensionMapping({
   selectedGeography,
 }: DimensionMappingProps) {
   // Add this log at the beginning of the function
-  console.log("Current symbol size range:", dimensionSettings.symbol.sizeMin, "-", dimensionSettings.symbol.sizeMax)
+  console.log("Current symbol size range:", dimensionSettings.symbol.sizeMin, "-\", dimensionSettings.symbol.sizeMax")
 
   const geography = selectedGeography ?? "usa-states"
 
@@ -1451,6 +1454,47 @@ export function DimensionMapping({
       </Button>
     )
   }
+  // --- sub panel helper ----------------------------------------------------
+  function renderSubPanel(
+    panelKey: string,
+    title: string,
+    icon: React.ReactNode,
+    description: string,
+    content: React.ReactNode,
+  ) {
+    const isPanelExpanded = expandedPanels[panelKey]
+
+    return (
+      <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
+        <div
+          className="flex items-center justify-between gap-2 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
+          onClick={() => togglePanel(panelKey)}
+        >
+          <div className="flex items-center gap-2">
+            {icon}
+            <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">{title}</h4>
+          </div>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>
+            {isPanelExpanded ? (
+              <ChevronUp className="h-4 w-4 text-gray-600 dark:text-gray-400 transition-colors duration-200" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400 transition-colors duration-200" />
+            )}
+          </div>
+        </div>
+
+        <div
+          className={`transition-all duration-300 ease-in-out ${
+            isPanelExpanded ? "max-h-[9999px] opacity-100" : "max-h-0 opacity-0"
+          } overflow-hidden`}
+        >
+          <div className="px-4 pb-4 pt-2">{content}</div>
+        </div>
+      </div>
+    )
+  }
+
   // --------------------------------------------------------------------------
 
   return (
@@ -1736,7 +1780,7 @@ export function DimensionMapping({
                                   <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-t bg-gray-50 dark:bg-gray-800">
                                     Categorical
                                   </div>
-                                  {colorSchemeCategories.categorical.map((scheme) => (
+                                  {colorSchemeCategories.map((scheme) => (
                                     <SelectItem
                                       key={scheme}
                                       value={scheme}
@@ -1933,7 +1977,7 @@ export function DimensionMapping({
                           )}
 
                           <div className="space-y-1">
-                            <Label htmlFor="colorMaxColor" className="text-xs">
+                            <Label htmlFor="colorMaxValue" className="text-xs">
                               Max color
                             </Label>
                             <input
