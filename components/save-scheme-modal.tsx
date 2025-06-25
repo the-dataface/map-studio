@@ -34,9 +34,6 @@ export function SaveSchemeModal({
   const [schemeName, setSchemeName] = React.useState("")
   const inputRef = React.useRef<HTMLInputElement>(null)
 
-  // Ensure we always have an array to work with
-  const safeColors = Array.isArray(currentSchemeColors) ? currentSchemeColors : []
-
   React.useEffect(() => {
     if (isOpen) {
       setSchemeName("") // Reset name when modal opens
@@ -117,7 +114,7 @@ export function SaveSchemeModal({
                   <div className="font-medium">Colors to be saved:</div>
                   {currentSchemeType === "categorical" ? (
                     <div className="flex flex-wrap gap-1 mt-1">
-                      {safeColors.map((color, index) => (
+                      {currentSchemeColors.map((color, index) => (
                         <div
                           key={index}
                           className="w-4 h-4 rounded-sm border border-gray-300 dark:border-gray-600"
@@ -130,16 +127,11 @@ export function SaveSchemeModal({
                     <div
                       className="h-6 w-full rounded border border-gray-300 dark:border-gray-600 mt-1"
                       style={{
-                        background:
-                          safeColors.length >= 2
-                            ? `linear-gradient(to right, ${safeColors[0]}, ${
-                                currentSchemeHasMidpoint && safeColors[1] ? `${safeColors[1]}, ` : ""
-                              }${safeColors[safeColors.length - 1]})`
-                            : safeColors.length === 1
-                              ? safeColors[0]
-                              : "transparent",
+                        background: `linear-gradient(to right, ${currentSchemeColors[0]}, ${
+                          currentSchemeHasMidpoint ? `${currentSchemeColors[1]}, ` : ""
+                        }${currentSchemeColors[currentSchemeColors.length - 1]})`,
                       }}
-                      title={`Linear scheme: ${safeColors.length} colors`}
+                      title={`Linear scheme: ${currentSchemeColors.length} colors`}
                     />
                   )}
                 </div>
