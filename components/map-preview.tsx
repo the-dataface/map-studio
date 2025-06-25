@@ -1310,7 +1310,7 @@ export function MapPreview({
       }
 
       // Utility ─ find a country feature by several possible identifiers
-      function findCountryFeature(features: any[], candidates: (string | number)[]) {
+      function findCountryFeature(features: any[], candidates: (string | number)[]): any {
         return features.find((f) => {
           const props = f.properties ?? {}
           return candidates.some((c) =>
@@ -1607,10 +1607,11 @@ export function MapPreview({
 
           if (effectiveId) {
             if (customMapData) {
-              // For custom maps, always try to extract state/province/county first from the effective ID
+              // For custom maps, first try to extract and normalize using specific patterns
               featureKey = extractStateFromSVGId(effectiveId, selectedGeography)
+              // If extraction failed, try to normalize the raw effectiveId as a last resort
               if (!featureKey) {
-                featureKey = effectiveId // Fallback to raw effective ID if not a recognized format
+                featureKey = normalizeGeoIdentifier(effectiveId, selectedGeography)
               }
             } else {
               // For standard TopoJSON maps (which use d.id on paths)
@@ -2000,8 +2001,12 @@ export function MapPreview({
 
           let featureId = null
           if (effectiveId) {
-            const extractedId = extractStateFromSVGId(effectiveId, selectedGeography)
-            featureId = extractedId || effectiveId // Fallback to raw effective ID
+            // For custom maps, first try to extract and normalize using specific patterns
+            featureId = extractStateFromSVGId(effectiveId, selectedGeography)
+            // If extraction failed, try to normalize the raw effectiveId as a last resort
+            if (!featureId) {
+              featureId = normalizeGeoIdentifier(effectiveId, selectedGeography)
+            }
           }
 
           if (featureId && !featuresForLabels.some((f) => f.id === featureId)) {
