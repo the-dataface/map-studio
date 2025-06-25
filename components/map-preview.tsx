@@ -968,12 +968,32 @@ export function MapPreview({
             break
           case "usa-nation":
           case "canada-nation":
+            // For single nation, load higher detail world-atlas
+            data = await fetchTopoJSON(
+              [
+                "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-10m.json", // Higher detail
+                "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json",
+                "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json",
+                "https://unpkg.com/world-atlas@2/countries-10m.json",
+              ],
+              ["countries"], // Always expect 'countries' for world-atlas
+            )
+            if (!data) {
+              toast({
+                title: "Map data error",
+                description: "Couldn’t load country boundaries. Please retry or check your connection.",
+                variant: "destructive",
+                duration: 4000,
+              })
+              return
+            }
+            break
           case "world":
-            // For single nation or world, load world-atlas
+            // For world, load lower detail world-atlas
             data = await fetchTopoJSON(
               [
                 "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json",
-                "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json", // Added this as a primary option
+                "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json",
                 "https://unpkg.com/world-atlas@2/countries-110m.json",
               ],
               ["countries"], // Always expect 'countries' for world-atlas
