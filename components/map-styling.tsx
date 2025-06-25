@@ -1058,11 +1058,163 @@ export function MapStyling({
                               stylingSettings.symbol.labelAlignment === item.value
                                 ? "bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-white"
                                 : "bg-transparent text-muted-foreground",
-                            "hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-white",
+                              "hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-white",
                             )}
                             onClick={() => updateSetting("symbol", "labelAlignment", item.value)}
                           >
                             <item.icon className="h-4 w-4" />
                           </Button>
                         ))}
-\
+                      </div>
+                    </div>
+                  </div>,
+                )}
+              </div>
+            )}
+
+            {activeTab === "choropleth" && (
+              <div className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                {renderSubPanel(
+                  "choroplethLabels",
+                  "Labels", // Sentence case
+                  <Type className="w-4 h-4" />,
+                  <div className="space-y-4">
+                    <div className="flex items-end gap-4">
+                      <div className="space-y-2 flex-1">
+                        <Label htmlFor="choropleth-label-font-family" className="text-sm">
+                          Font family
+                        </Label>
+                        <Select
+                          value={stylingSettings.choropleth.labelFontFamily || "Inter"}
+                          onValueChange={(value) => updateSetting("choropleth", "labelFontFamily", value)}
+                        >
+                          <SelectTrigger id="choropleth-label-font-family">
+                            <SelectValue placeholder="Inter" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {googleFontFamilies.map((font) => (
+                              <SelectItem key={font} value={font} style={{ fontFamily: font }}>
+                                {font}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <ToggleGroup
+                        type="multiple"
+                        value={
+                          [
+                            stylingSettings.choropleth.labelBold && "bold",
+                            stylingSettings.choropleth.labelItalic && "italic",
+                            stylingSettings.choropleth.labelUnderline && "underline",
+                            stylingSettings.choropleth.labelStrikethrough && "strikethrough",
+                          ].filter(Boolean) as string[]
+                        }
+                        onValueChange={(values) => {
+                          console.log("Choropleth Label ToggleGroup onValueChange - received values:", values)
+                          onUpdateStylingSettings({
+                            ...stylingSettings,
+                            choropleth: {
+                              ...stylingSettings.choropleth,
+                              labelBold: values.includes("bold"),
+                              labelItalic: values.includes("italic"),
+                              labelUnderline: values.includes("underline"),
+                              labelStrikethrough: values.includes("strikethrough"),
+                            },
+                          })
+                        }}
+                        className="inline-flex h-10 items-center justify-center rounded-md border border-gray-200 bg-white p-1 text-muted-foreground dark:border-gray-700 dark:bg-gray-800"
+                      >
+                        <ToggleGroupItem
+                          value="bold"
+                          aria-label="Toggle bold"
+                          className="p-2 rounded-md transition-all duration-200 data-[state=on]:bg-gray-100 data-[state=on]:text-gray-900 dark:data-[state=on]:bg-gray-700 dark:data-[state=on]:text-white hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-white h-full"
+                        >
+                          <Bold className="h-4 w-4" />
+                        </ToggleGroupItem>
+                        <ToggleGroupItem
+                          value="italic"
+                          aria-label="Toggle italic"
+                          className="p-2 rounded-md transition-all duration-200 data-[state=on]:bg-gray-100 data-[state=on]:text-gray-900 dark:data-[state=on]:bg-gray-700 dark:data-[state=on]:text-white hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-white leading-4 leading-3 leading-4 leading-3 h-full"
+                        >
+                          <Italic className="h-4 w-4" />
+                        </ToggleGroupItem>
+                        <ToggleGroupItem
+                          value="underline"
+                          aria-label="Toggle underline"
+                          className="p-2 rounded-md transition-all duration-200 data-[state=on]:bg-gray-100 data-[state=on]:text-gray-900 dark:data-[state=on]:bg-gray-700 dark:data-[state=on]:text-white hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-white h-full"
+                        >
+                          <Underline className="h-4 w-4" />
+                        </ToggleGroupItem>
+                        <ToggleGroupItem
+                          value="strikethrough"
+                          aria-label="Toggle strikethrough"
+                          className="p-2 rounded-md transition-all duration-200 data-[state=on]:bg-gray-100 data-[state=on]:text-gray-900 dark:data-[state=on]:bg-gray-700 dark:data-[state=on]:text-white hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-white h-full"
+                        >
+                          <Strikethrough className="h-4 w-4" />
+                        </ToggleGroupItem>
+                      </ToggleGroup>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="choropleth-label-color" className="text-sm">
+                          Label color
+                        </Label>
+                        <ColorInput
+                          id="choropleth-label-color"
+                          value={stylingSettings.choropleth.labelColor}
+                          onChange={(value) => updateSetting("choropleth", "labelColor", value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="choropleth-label-outline-color" className="text-sm">
+                          Label outline color
+                        </Label>
+                        <ColorInput
+                          id="choropleth-label-outline-color"
+                          value={stylingSettings.choropleth.labelOutlineColor}
+                          onChange={(value) => updateSetting("choropleth", "labelOutlineColor", value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="choropleth-label-font-size" className="text-sm">
+                          Font size ({stylingSettings.choropleth.labelFontSize}px)
+                        </Label>
+                        <Slider
+                          id="choropleth-label-font-size"
+                          value={[stylingSettings.choropleth.labelFontSize]}
+                          onValueChange={(value) => updateSetting("choropleth", "labelFontSize", value[0])}
+                          min={8}
+                          max={30}
+                          step={1}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="choropleth-label-outline-thickness" className="text-sm">
+                          Outline thickness ({stylingSettings.choropleth.labelOutlineThickness}px)
+                        </Label>
+                        <Slider
+                          id="choropleth-label-outline-thickness"
+                          value={[stylingSettings.choropleth.labelOutlineThickness]}
+                          onValueChange={(value) => updateSetting("choropleth", "labelOutlineThickness", value[0])}
+                          min={0}
+                          max={10}
+                          step={0.5}
+                        />
+                      </div>
+                    </div>
+                  </div>,
+                )}
+              </div>
+            )}
+          </CardContent>
+        </div>
+      </Card>
+    </TooltipProvider>
+  )
+}
