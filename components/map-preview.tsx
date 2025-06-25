@@ -973,7 +973,7 @@ export function MapPreview({
             data = await fetchTopoJSON(
               [
                 "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json",
-                "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json",
+                "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json", // Added this as a primary option
                 "https://unpkg.com/world-atlas@2/countries-110m.json",
               ],
               ["countries"], // Always expect 'countries' for world-atlas
@@ -1312,26 +1312,8 @@ export function MapPreview({
           }
           geoFeatures = []
         }
-      } else if (selectedGeography === "usa-nation") {
-        // USA Nation: use world atlas, find USA
-        if (objects.countries) {
-          const allCountries = topojson.feature(geoAtlasData, objects.countries).features
-          countryFeatureForClipping = findCountryFeature(allCountries, [
-            "United States of America",
-            "United States",
-            "USA",
-            840,
-          ])
-          if (countryFeatureForClipping) {
-            nationMesh = topojson.mesh(geoAtlasData, countryFeatureForClipping)
-          } else {
-            console.warn("[map-studio] Could not find USA in world atlas, rendering all countries")
-            nationMesh = topojson.mesh(geoAtlasData, objects.countries)
-          }
-        }
-        geoFeatures = []
-      } else if (selectedGeography === "canada-nation") {
-        // Canada Nation: use world atlas, find Canada
+      } else if (selectedGeography === "usa-nation" || selectedGeography === "canada-nation") {
+        // USA Nation or Canada Nation: use world atlas, find specific country
         if (objects.countries) {
           const allCountries = topojson.feature(geoAtlasData, objects.countries).features
           const targetCountryName = selectedGeography === "usa-nation" ? "United States" : "Canada"
@@ -1342,12 +1324,21 @@ export function MapPreview({
           ])
           if (specificCountryFeature) {
             nationMesh = topojson.mesh(geoAtlasData, specificCountryFeature)
+            countryFeatureForClipping = specificCountryFeature // Set for clipping
+            geoFeatures = [specificCountryFeature] // Render this single feature
           } else {
-            console.warn("[map-studio] Could not find Canada in world atlas, rendering all countries")
+            console.warn(`[map-studio] Could not find ${targetCountryName} in world atlas.`)
+            toast({
+              title: "Map data error",
+              description: `Could not find ${targetCountryName} in the world map data.`,
+              variant: "destructive",
+              duration: 4000,
+            })
+            // Fallback to rendering all countries if specific country not found
             nationMesh = topojson.mesh(geoAtlasData, objects.countries)
+            geoFeatures = topojson.feature(geoAtlasData, objects.countries).features
           }
         }
-        geoFeatures = []
       } else if (selectedGeography === "world") {
         // World: use world atlas, render all countries
         const countriesSource = objects.countries || objects.land
@@ -1450,7 +1441,12 @@ export function MapPreview({
           if (selectedGeography === "usa-states") prefix = "State"
           else if (selectedGeography === "usa-counties") prefix = "County"
           else if (selectedGeography === "canada-provinces") prefix = "Province"
-          else if (selectedGeography === "world") prefix = "Country" // For world, each feature is a country
+          else if (
+            selectedGeography === "world" ||
+            selectedGeography === "usa-nation" ||
+            selectedGeography === "canada-nation"
+          )
+            prefix = "Country" // For world, each feature is a country
 
           const featureId = `${prefix}-${identifier || ""}`
           console.log(`Creating feature path with ID: ${featureId}`)
@@ -1560,10 +1556,12 @@ export function MapPreview({
                 featureKey = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null // Use d.id (FIPS) for US counties
               } else if (selectedGeography.startsWith("canada-provinces")) {
                 featureKey = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null // Use d.id (abbr) for Canadian provinces
-              } else if (selectedGeography === "world") {
+              } else if (
+                selectedGeography === "world" ||
+                selectedGeography === "usa-nation" ||
+                selectedGeography === "canada-nation"
+              ) {
                 featureKey = d?.properties?.name || String(d?.id) || effectiveId // For world maps, use name or ID directly
-              } else if (selectedGeography === "usa-nation" || selectedGeography === "canada-nation") {
-                featureKey = selectedGeography === "usa-nation" ? "United States" : "Canada"
               }
             }
           }
@@ -1642,7 +1640,7 @@ export function MapPreview({
             const domain = [dimensionSettings.symbol.colorMinValue, dimensionSettings.symbol.colorMaxValue]
             const rangeColors = [
               dimensionSettings.symbol.colorMinColor || stylingSettings.symbol.symbolFillColor,
-              dimensionSettings.symbol.colorMaxColor || stylingSettings.symbol.symbolFillColor,
+              stylingSettings.symbol.colorMaxColor || stylingSettings.symbol.symbolFillColor,
             ]
 
             if (dimensionSettings.symbol.colorMidColor) {
@@ -2002,9 +2000,11 @@ export function MapPreview({
               featureIdentifier = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null
             } else if (selectedGeography.startsWith("canada-provinces")) {
               featureIdentifier = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null
-            } else if (selectedGeography === "world") {
-              featureIdentifier = d?.properties?.name || String(d?.id) || null
-            } else if (selectedGeography === "usa-nation" || selectedGeography === "canada-nation") {
+            } else if (
+              selectedGeography === "world" ||
+              selectedGeography === "usa-nation" ||
+              selectedGeography === "canada-nation"
+            ) {
               featureIdentifier = d?.properties?.name || String(d?.id) || null
             }
           }
@@ -2264,7 +2264,7 @@ export function MapPreview({
         const domain = [dimensionSettings.symbol.colorMinValue, dimensionSettings.symbol.colorMaxValue]
         const rangeColors = [
           dimensionSettings.symbol.colorMinColor || stylingSettings.symbol.symbolFillColor,
-          dimensionSettings.symbol.colorMaxColor || stylingSettings.symbol.symbolFillColor,
+          stylingSettings.symbol.colorMaxColor || stylingSettings.symbol.symbolFillColor,
         ]
 
         if (dimensionSettings.symbol.colorMidColor) {
