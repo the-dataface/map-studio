@@ -833,6 +833,7 @@ export default function MapStudio() {
               symbolDataExists={hasDataForType("symbol")}
               choroplethDataExists={hasDataForType("choropleth")}
               customDataExists={hasDataForType("custom")}
+              selectedGeography={selectedGeography} // Pass selectedGeography to MapStyling
             />
 
             <MapPreview
