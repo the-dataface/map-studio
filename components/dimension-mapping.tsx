@@ -593,23 +593,6 @@ const formatState = (value: any, format: string): string => {
   }
 }
 
-// Helper function to format legend values based on column type and format
-export const formatLegendValue = (value: any, column: string, columnTypes: any, columnFormats: any): string => {
-  const type = columnTypes[column] || "text"
-  const format = columnFormats[column]
-
-  if (type === "number" && format) {
-    return formatNumber(value, format)
-  }
-  if (type === "date" && format) {
-    return formatDate(value, format)
-  }
-  if (type === "state" && format) {
-    return formatState(value, format)
-  }
-  return String(value)
-}
-
 // Helper to get default format for a type (replicated from data-preview)
 const getDefaultFormat = (type: "number" | "date" | "state" | "coordinate"): string => {
   switch (type) {
@@ -624,6 +607,24 @@ const getDefaultFormat = (type: "number" | "date" | "state" | "coordinate"): str
     default:
       return "raw"
   }
+}
+
+// Helper function to format legend values based on column type and format
+export const formatLegendValue = (value: any, column: string, columnTypes: any, columnFormats: any): string => {
+  const type = columnTypes[column] || "text"
+  // FIX: Add fallback to getDefaultFormat if columnFormats[column] is not set
+  const format = columnFormats[column] || getDefaultFormat(type as "number" | "date" | "state" | "coordinate")
+
+  if (type === "number") {
+    return formatNumber(value, format)
+  }
+  if (type === "date") {
+    return formatDate(value, format)
+  }
+  if (type === "state") {
+    return formatState(value, format)
+  }
+  return String(value)
 }
 
 // NEW: Helper function to render the label preview
@@ -651,39 +652,6 @@ const renderLabelPreview = (
   previewHtml = previewHtml.replace(/\n/g, "<br/>") // Handle actual newlines for line breaks
 
   return previewHtml
-}
-
-// Helper function to render color scheme preview
-const renderColorSchemePreview = (colors: string[], type: "linear" | "categorical", schemeName?: string) => {
-  if (type === "categorical") {
-    return (
-      <div className="flex h-4 w-full rounded overflow-hidden border border-gray-200 dark:border-gray-600">
-        {colors.slice(0, 8).map((color, index) => (
-          <div
-            key={index}
-            className="flex-1 min-w-[2px]"
-            style={{ backgroundColor: color }}
-            title={`Color ${index + 1}: ${color}`}
-          />
-        ))}
-        {colors.length > 8 && (
-          <div className="flex-1 bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-xs text-gray-600 dark:text-gray-300">
-            +{colors.length - 8}
-          </div>
-        )}
-      </div>
-    )
-  } else {
-    // Linear gradient for sequential/diverging schemes
-    const gradient = `linear-gradient(to right, ${colors.join(", ")})`
-    return (
-      <div
-        className="h-4 w-full rounded border border-gray-200 dark:border-gray-600"
-        style={{ background: gradient }}
-        title={`${schemeName || "Color scheme"}: ${colors.length} colors`}
-      />
-    )
-  }
 }
 
 // Refactored applyColorSchemePreset to return new settings (NO onUpdateSettings call inside)
@@ -3244,5 +3212,34 @@ export function DimensionMapping({
         />
       </Card>
     </TooltipProvider>
+  )
+}
+
+// Helper function to render color scheme preview
+const renderColorSchemePreview = (colors: string[], scaleType: "linear" | "categorical", schemeName: string) => {
+  const numColors = colors.length
+  const isDiverging =
+    schemeName === "RdYlBu" ||
+    schemeName === "RdBu" ||
+    schemeName === "PiYG" ||
+    schemeName === "BrBG" ||
+    schemeName === "PRGn" ||
+    schemeName === "RdYlGn" ||
+    schemeName === "Spectral"
+
+  return (
+    <div className="flex items-center h-5">
+      {colors.map((color, index) => (
+        <div
+          key={index}
+          className="h-5"
+          style={{
+            width: `${100 / numColors}%`,
+            backgroundColor: color,
+            borderRight: index < numColors - 1 ? "1px solid rgba(0,0,0,0.1)" : "none",
+          }}
+        />
+      ))}
+    </div>
   )
 }
