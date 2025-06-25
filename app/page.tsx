@@ -402,6 +402,22 @@ export default function MapStudio() {
     }
   }, [stylingSettings])
 
+  // Add this helper function to the component, e.g., right after `const [stylingSettings, setStylingSettings] = useState(...)`
+  const getGeographyTerms = useCallback((geography: typeof selectedGeography) => {
+    let singular = "State"
+    let plural = "States"
+    if (geography === "usa-counties") {
+      singular = "County"
+      plural = "Counties"
+    } else if (geography === "canada-provinces") {
+      singular = "Province"
+      plural = "Provinces"
+    }
+    return { singular, plural }
+  }, [])
+
+  const { singular: geoSingularTerm, plural: geoPluralTerm } = getGeographyTerms(selectedGeography)
+
   // Add a function to update dimension settings
   const updateDimensionSettings = (newSettings: any) => {
     setDimensionSettings(newSettings)
@@ -823,7 +839,8 @@ export default function MapStudio() {
                   choroplethParsedData={choroplethData.parsedData}
                   choroplethGeocodedData={choroplethData.geocodedData}
                   choroplethColumns={choroplethData.columns}
-                  selectedGeography={selectedGeography} // Pass selectedGeography
+                  selectedGeography={selectedGeography}
+                  geoTermLabel={geoSingularTerm}
                 />
               </>
             )}
@@ -834,7 +851,8 @@ export default function MapStudio() {
               symbolDataExists={hasDataForType("symbol")}
               choroplethDataExists={hasDataForType("choropleth")}
               customDataExists={hasDataForType("custom")}
-              selectedGeography={selectedGeography} // Pass selectedGeography
+              selectedGeography={selectedGeography}
+              geoPluralTermLabel={geoPluralTerm}
             />
 
             <MapPreview
