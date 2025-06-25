@@ -1332,7 +1332,11 @@ export function MapPreview({
         if (objects.countries) {
           const allCountries = topojson.feature(geoAtlasData, objects.countries).features
           const targetCountryName = selectedGeography === "usa-nation" ? "United States" : "Canada"
-          const specificCountryFeature = findCountryFeature(allCountries, ["Canada", "CAN", 124])
+          const specificCountryFeature = findCountryFeature(allCountries, [
+            targetCountryName,
+            targetCountryName === "United States" ? "USA" : "CAN",
+            targetCountryName === "United States" ? 840 : 124,
+          ])
           if (specificCountryFeature) {
             nationMesh = topojson.mesh(geoAtlasData, specificCountryFeature)
           } else {
@@ -2359,6 +2363,11 @@ export function MapPreview({
             .attr("transform", `translate(${currentX}, ${swatchY})`)
             .attr("fill", color)
             .attr("stroke", "#666")
+            .append("path")
+            .attr("d", pathData)
+            .attr("transform", `translate(${currentX}, ${swatchY})`)
+            .attr("fill", color)
+            .attr("stroke", "#666")
             .attr("stroke-width", 1)
 
           // Label positioned to the right of swatch, vertically centered
@@ -2747,4 +2756,3 @@ export function MapPreview({
     </Card>
   )
 }
-</merged_code>
