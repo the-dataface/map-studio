@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { Input } from "./ui/input"
 import type { ColumnType, DataRow, GeocodedRow } from "@/app/page" // Import ColumnType and DataRow
@@ -116,7 +116,7 @@ export function DimensionMapping({
               Custom Map
             </TabsTrigger>
           </TabsList>
-          <TabContent value="symbol" className={cn(mapType !== "symbol" && "hidden")}>
+          <TabsContent value="symbol" className={cn(mapType !== "symbol" && "hidden")}>
             <div className="grid gap-4">
               {/* Latitude column */}
               <div className="grid gap-2">
@@ -238,9 +238,9 @@ export function DimensionMapping({
                 </div>
               </div>
             </div>
-          </TabContent>
+          </TabsContent>
 
-          <TabContent value="choropleth" className={cn(mapType !== "choropleth" && "hidden")}>
+          <TabsContent value="choropleth" className={cn(mapType !== "choropleth" && "hidden")}>
             <div className="grid gap-4">
               {/* State/Province/County column */}
               <div className="grid gap-2">
@@ -317,9 +317,9 @@ export function DimensionMapping({
                 </div>
               </div>
             </div>
-          </TabContent>
+          </TabsContent>
 
-          <TabContent value="custom" className={cn(mapType !== "custom" && "hidden")}>
+          <TabsContent value="custom" className={cn(mapType !== "custom" && "hidden")}>
             {/* ... existing Custom Map Mapping ... */}
             <div className="grid gap-2">
               <Label htmlFor="custom-state-column">
@@ -394,7 +394,7 @@ export function DimensionMapping({
                 />
               </div>
             </div>
-          </TabContent>
+          </TabsContent>
         </Tabs>
       </CardContent>
     </Card>
