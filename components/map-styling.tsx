@@ -58,3 +58,4 @@ const MapStyling: React.FC<MapStylingProps> = ({
 }
 
 export default MapStyling
+export { MapStyling }
