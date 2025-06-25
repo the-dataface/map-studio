@@ -1910,27 +1910,53 @@ export function MapPreview({
         }
         console.log("Using geoAtlasData for labels, features count:", featuresForLabels.length)
       } else if (customMapData) {
-        // For custom maps, iterate through all relevant elements (paths and groups) in the #States and #Nations groups
+        // For custom maps, iterate through all relevant elements (paths and groups)
+        // within the main #Map group that was imported/created.
         const elementsToProcess: SVGElement[] = []
-        svg
-          .select("#StatesOrCounties")
-          .selectAll("path, g")
-          .each(function (this: SVGElement) {
-            elementsToProcess.push(this)
-          })
-        const nationsOrCountriesGroup = svg.select("#Nations") || svg.select("#Countries")
-        if (!nationsOrCountriesGroup.empty() && selectedGeography === "world") {
-          // Only process nations for world maps in custom SVG
-          nationsOrCountriesGroup.selectAll("path, g").each(function (this: SVGElement) {
-            elementsToProcess.push(this)
+        const mapGroup = svg.select("#Map") // This is the group where custom SVG content is imported
+
+        if (!mapGroup.empty()) {
+          mapGroup.selectAll("path, g").each(function (this: SVGElement) {
+            const element = d3.select(this)
+            const id = element.attr("id")
+            // Exclude the main container groups themselves if they are selected as 'g'
+            // We want the individual paths/sub-groups that represent regions.
+            if (
+              id !== "Nations" &&
+              id !== "States" &&
+              id !== "Counties" &&
+              id !== "Provinces" &&
+              id !== "Regions" &&
+              id !== "Countries"
+            ) {
+              elementsToProcess.push(this)
+            }
           })
         }
 
-        elementsToProcess.forEach((el) => {
+        // The existing logic for nationsOrCountriesGroup for world maps in custom SVG is still relevant
+        // if the custom SVG explicitly separates nations.
+        const nationsOrCountriesGroup = svg.select("#Nations") || svg.select("#Countries")
+        if (!nationsOrCountriesGroup.empty() && selectedGeography === "world") {
+          nationsOrCountriesGroup.selectAll("path, g").each(function (this: SVGElement) {
+            const element = d3.select(this)
+            const id = element.attr("id")
+            if (id !== "Nations" && id !== "Countries") {
+              // Avoid adding the group itself again
+              elementsToProcess.push(this)
+            }
+          })
+        }
+
+        // Ensure uniqueness in elementsToProcess if there's overlap
+        const uniqueElements = Array.from(new Set(elementsToProcess))
+
+        uniqueElements.forEach((el) => {
           const element = d3.select(el)
           const id = element.attr("id")
           let effectiveId = id
 
+          // This part is still relevant for paths without direct IDs but within a named group
           if (el.tagName === "path" && !effectiveId && el.parentElement && el.parentElement.tagName === "g") {
             effectiveId = d3.select(el.parentElement).attr("id")
           }
@@ -1944,7 +1970,6 @@ export function MapPreview({
           if (featureIdCandidate) {
             normalizedFeatureId = normalizeGeoIdentifier(featureIdCandidate, selectedGeography)
           } else {
-            // Fallback: If no specific pattern matched, try to normalize the raw effectiveId
             normalizedFeatureId = normalizeGeoIdentifier(effectiveId, selectedGeography)
           }
 
