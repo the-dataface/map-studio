@@ -50,7 +50,6 @@ interface SavedStyle {
     nationStrokeWidth: number
     defaultStateFillColor: string
     defaultStateStrokeColor: string
-    defaultStateStrokeWidth: number
   }
 }
 
@@ -541,7 +540,12 @@ export default function MapStudio() {
       sampleDataString.includes("california") ||
       sampleDataString.includes("texas") ||
       sampleDataString.includes("new york") ||
-      sampleDataString.includes("florida")
+      sampleDataString.includes("florida") ||
+      sampleDataString.includes("al") || // Check for abbreviations too
+      sampleDataString.includes("ca") ||
+      sampleDataString.includes("ny") ||
+      sampleDataString.includes("fl")
+
     const containsWorldCountries =
       sampleDataString.includes("canada") ||
       sampleDataString.includes("china") ||
@@ -555,23 +559,39 @@ export default function MapStudio() {
     const containsCanadaProvinces =
       sampleDataString.includes("ontario") ||
       sampleDataString.includes("quebec") ||
-      sampleDataString.includes("alberta")
+      sampleDataString.includes("alberta") ||
+      sampleDataString.includes("on") || // Check for abbreviations
+      sampleDataString.includes("qc") ||
+      sampleDataString.includes("ab")
 
-    // Check for US counties
+    // Check for US counties (more specific check for FIPS codes)
     const hasCountyColumn = lowerCaseColumns.some((col) => col.includes("county") || col.includes("fips"))
-    const containsUsCounties = sampleDataString.match(/\b\d{5}\b/) // Simple check for 5-digit FIPS
+    // Refined check: look for 5-digit numbers that are likely FIPS codes (e.g., "01001")
+    const containsUsCounties = parsedData.some((row) =>
+      Object.values(row).some(
+        (val) =>
+          (typeof val === "string" && /^\d{5}$/.test(val.trim()) && val.trim().startsWith("0")) ||
+          val.trim().startsWith("1") ||
+          val.trim().startsWith("2") ||
+          val.trim().startsWith("3") ||
+          val.trim().startsWith("4") ||
+          val.trim().startsWith("5"),
+      ),
+    )
 
+    // Reordered priority for inference
     if (hasCountryColumn || containsWorldCountries) {
       inferredGeo = "world"
       inferredProj = "equalEarth"
     } else if (hasCanadaProvinceColumn || containsCanadaProvinces) {
       inferredGeo = "canada-provinces"
       inferredProj = "mercator" // Mercator is often used for Canada
+    } else if (hasStateColumn || containsUsStates) {
+      // Prioritize states over counties
+      inferredGeo = "usa-states"
+      inferredProj = "albersUsa"
     } else if (hasCountyColumn || containsUsCounties) {
       inferredGeo = "usa-counties"
-      inferredProj = "albersUsa"
-    } else if (hasStateColumn || containsUsStates) {
-      inferredGeo = "usa-states"
       inferredProj = "albersUsa"
     } else if (hasLatLon) {
       inferredGeo = "world" // Default to world for lat/lon if no other geo hint

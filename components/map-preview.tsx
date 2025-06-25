@@ -276,6 +276,10 @@ const normalizeGeoIdentifier = (
     if (trimmed.length === 2 && stateMap[trimmed.toUpperCase()]) {
       return trimmed.toUpperCase()
     }
+    // Try to convert FIPS code to abbreviation
+    if (trimmed.length === 2 && fipsToStateAbbrMap[trimmed]) {
+      return fipsToStateAbbrMap[trimmed]
+    }
     const lowerValue = trimmed.toLowerCase()
     const abbreviation = reverseStateMap[lowerValue]
     if (abbreviation) return abbreviation
@@ -306,97 +310,15 @@ const normalizeGeoIdentifier = (
   return trimmed // Default fallback
 }
 
-// Enhanced function to extract state/county/province from SVG ID
-const extractStateFromSVGId = (id: string, geoType: string): string | null => {
+// Helper function to extract raw ID from SVG ID (e.g., "State-CA" -> "CA", "County-01001" -> "01001")
+const extractRawIdFromSVGId = (id: string): string | null => {
   if (!id) return null
-
-  console.log(`Extracting geo ID from SVG ID: "${id}" for geoType: "${geoType}"`)
-
-  // Patterns for US States
-  const usStatePatterns = [
-    /^State-(\d{2})$/i, // State-01 (FIPS code)
-    /^State-([A-Z]{2})$/i, // State-CA
-    /^State-([a-zA-Z\s]+)$/i, // State-California
-    /State.*?([A-Z]{2})$/i, // Any State prefix with 2-letter code at end
-    /State.*?([a-zA-Z\s]{4,})$/i, // Any State prefix with longer name
-  ]
-
-  // Patterns for US Counties (expecting 5-digit FIPS)
-  const usCountyPatterns = [
-    /^County-(\d{5})$/i, // County-01001 (FIPS code)
-    /^(\d{5})$/i, // 01001 (FIPS code directly)
-  ]
-
-  // Patterns for Canadian Provinces
-  const canadaProvincePatterns = [
-    /^Province-(\d{2})$/i, // Province-01 (numeric, if any)
-    /^Province-([A-Z]{2})$/i, // Province-AB
-    /^Province-([a-zA-Z\s]+)$/i, // Province-Alberta
-    /Province.*?([A-Z]{2})$/i,
-    /Province.*?([a-zA-Z\s]{4,})$/i,
-  ]
-
-  // General patterns (e.g., for world countries or direct IDs)
-  const generalPatterns = [
-    /^(\d{2})$/i, // 01 (FIPS code directly, for states)
-    /^([A-Z]{2})$/i, // CA (state abbr directly)
-    /^([a-zA-Z\s]+)$/i, // California (state name directly)
-  ]
-
-  let patternsToUse: RegExp[] = []
-  if (geoType.startsWith("usa-states")) {
-    patternsToUse = [...usStatePatterns, ...generalPatterns]
-  } else if (geoType.startsWith("usa-counties")) {
-    patternsToUse = [...usCountyPatterns]
-  } else if (geoType.startsWith("canada-provinces")) {
-    patternsToUse = [...canadaProvincePatterns, ...generalPatterns] // General for direct abbr/name
-  } else {
-    patternsToUse = [...generalPatterns] // For world or other custom
+  // Try to match common patterns for IDs like "State-CA", "County-01001", "Country-US", or just "CA", "01001"
+  const match =
+    id.match(/(?:State|County|Province|Country|Nation|Region)-?([a-zA-Z0-9\s]+)$/i) || id.match(/^([a-zA-Z0-9\s]+)$/i)
+  if (match && match[1]) {
+    return match[1].trim()
   }
-
-  for (const pattern of patternsToUse) {
-    const match = id.match(pattern)
-    if (match && match[1]) {
-      const extracted = match[1].trim()
-      let normalized: string
-
-      // Handle FIPS codes for US states/counties
-      if (pattern.source.includes("\\d{2}") || pattern.source.includes("\\d{5}")) {
-        if (geoType.startsWith("usa-states")) {
-          const fipsAbbr = fipsToStateAbbrMap[extracted]
-          if (fipsAbbr) {
-            normalized = fipsAbbr
-            console.log(
-              `Pattern matched FIPS: ${pattern} -> extracted: "${extracted}" -> converted to abbr: "${normalized}"`,
-            )
-          } else {
-            console.log(`Pattern matched FIPS: ${pattern} -> extracted: "${extracted}" but no FIPS mapping found.`)
-            continue
-          }
-        } else if (geoType.startsWith("usa-counties")) {
-          normalized = extracted // For counties, FIPS is the identifier
-          console.log(`Pattern matched FIPS (county): ${pattern} -> extracted: "${extracted}"`)
-        } else {
-          normalized = normalizeGeoIdentifier(extracted, geoType)
-        }
-      } else {
-        normalized = normalizeGeoIdentifier(extracted, geoType)
-        console.log(`Pattern matched: ${pattern} -> extracted: "${extracted}" -> normalized: "${normalized}"`)
-      }
-
-      // Verify the normalized value is a valid identifier for the current geoType
-      if (
-        (geoType.startsWith("usa-states") && stateMap[normalized]) ||
-        (geoType.startsWith("canada-provinces") && canadaProvinceMap[normalized]) ||
-        (geoType.startsWith("usa-counties") && normalized.length === 5 && /^\d{5}$/.test(normalized)) || // Simple FIPS check
-        (geoType === "world" && normalized.length > 0) // For world, any non-empty string is fine
-      ) {
-        return normalized
-      }
-    }
-  }
-
-  console.log(`No valid geo identifier extracted from ID: "${id}" for geoType: "${geoType}"`)
   return null
 }
 
@@ -1549,7 +1471,7 @@ export function MapPreview({
           (dimensionSettings.choropleth.colorScale === "linear" ? !isNaN(value as number) : value)
         ) {
           geoDataMap.set(normalizedKey, value)
-          console.log(`✓ Mapped ${rawGeoValue} → ${normalizedKey} = ${value}`)
+          console.log(`✓ Mapped data value "${rawGeoValue}" → normalized key "${normalizedKey}" = ${value}`)
         }
       })
 
@@ -1602,31 +1524,27 @@ export function MapPreview({
 
           if (effectiveId) {
             if (customMapData) {
-              // For custom maps, always try to extract state/province/county first from the effective ID
-              featureKey = extractStateFromSVGId(effectiveId, selectedGeography)
-              if (!featureKey) {
-                featureKey = effectiveId // Fallback to raw effective ID if not a recognized format
-              }
+              // For custom maps, extract raw ID and then normalize it
+              const rawExtractedId = extractRawIdFromSVGId(effectiveId)
+              featureKey = rawExtractedId ? normalizeGeoIdentifier(rawExtractedId, selectedGeography) : null
+              console.log(
+                `Custom map: effectiveId "${effectiveId}" -> rawExtractedId "${rawExtractedId}" -> featureKey "${featureKey}"`,
+              )
             } else {
-              // For standard TopoJSON maps (which use d.id on paths)
+              // For standard TopoJSON maps, use d.id and normalize it
               const d = element.datum() as any // Here, d.properties.name or d.id is valid for TopoJSON
-              if (selectedGeography.startsWith("usa-states")) {
-                featureKey = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null // Use d.id for TopoJSON US states
-              } else if (selectedGeography.startsWith("usa-counties")) {
-                featureKey = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null // Use d.id (FIPS) for US counties
-              } else if (selectedGeography.startsWith("canada-provinces")) {
-                featureKey = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null // Use d.id (abbr) for Canadian provinces
-              } else if (selectedGeography === "world") {
-                featureKey = d?.properties?.name || String(d?.id) || effectiveId // For world maps, use name or ID directly
-              } else if (selectedGeography === "usa-nation" || selectedGeography === "canada-nation") {
-                // For single nation views, the feature key is the nation itself
-                featureKey = selectedGeography === "usa-nation" ? "United States" : "Canada"
+              if (d?.id) {
+                featureKey = normalizeGeoIdentifier(String(d.id), selectedGeography)
+                console.log(`TopoJSON map: d.id "${d.id}" -> featureKey "${featureKey}"`)
+              } else {
+                console.log(`TopoJSON map: No d.id for element ID "${id}"`)
               }
             }
           }
 
           if (!featureKey) {
             element.attr("fill", stylingSettings.base.defaultStateFillColor)
+            console.log(`DEBUG: No featureKey for element ID: ${id}, effectiveId: ${effectiveId}. Default fill.`)
             return
           }
 
@@ -1635,10 +1553,14 @@ export function MapPreview({
             const color = choroplethColorScale(value)
             element.attr("fill", color)
             featuresColored++
-            console.log(`✅ Applied color ${color} to feature ${featureKey} (value: ${value})`)
+            console.log(
+              `DEBUG: Applied color ${color} to feature ${featureKey} (value: ${value}). Element ID: ${id}, effectiveId: ${effectiveId}`,
+            )
           } else {
             element.attr("fill", stylingSettings.base.defaultStateFillColor)
-            console.log(`No data found for feature: ${featureKey}, applying default fill.`)
+            console.log(
+              `DEBUG: No data found for featureKey: ${featureKey}. Applying default fill. Element ID: ${id}, effectiveId: ${effectiveId}`,
+            )
           }
         })
         console.log("Features actually colored:", featuresColored)
@@ -1995,8 +1917,8 @@ export function MapPreview({
 
           let featureId = null
           if (effectiveId) {
-            const extractedId = extractStateFromSVGId(effectiveId, selectedGeography)
-            featureId = extractedId || effectiveId // Fallback to raw effective ID
+            const rawExtractedId = extractRawIdFromSVGId(effectiveId)
+            featureId = rawExtractedId ? normalizeGeoIdentifier(rawExtractedId, selectedGeography) : null
           }
 
           if (featureId && !featuresForLabels.some((f) => f.id === featureId)) {
