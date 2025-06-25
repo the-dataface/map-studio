@@ -1,322 +1,222 @@
 "use client"
-
-import type React from "react"
-import { useState, useEffect } from "react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Input } from "@/components/ui/input"
+import { useEffect } from "react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
-import { Form, FormControl, FormDescription, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useForm } from "react-hook-form"
-import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 
 interface DimensionMappingProps {
   columns: string[]
-  activeMapType: string
-  dimensionSettings: any
-  setDimensionSettings: (settings: any) => void
+  activeMapType: "symbol" | "choropleth" | "custom"
+  dimensionSettings: Record<string, any>
+  setDimensionSettings: (s: any) => void
   selectedGeography: string
 }
 
-const DimensionMapping: React.FC<DimensionMappingProps> = ({
+/* ---------------- helpers ------------------ */
+const safeArray = (cols: string[] | undefined) => (Array.isArray(cols) ? cols : [])
+const colItems = (cols: string[]) =>
+  cols.map((c) => (
+    <SelectItem key={c} value={c}>
+      {c}
+    </SelectItem>
+  ))
+
+/* ------------------- component -------------------- */
+export function DimensionMapping({
   columns,
   activeMapType,
   dimensionSettings,
   setDimensionSettings,
   selectedGeography,
-}) => {
-  // Safe reference to the settings object for the current tab
-  const currentSettings = dimensionSettings?.[activeMapType] ?? {}
+}: DimensionMappingProps) {
+  const current = dimensionSettings?.[activeMapType] ?? {}
   const { toast } = useToast()
 
-  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false)
-
-  const formSchema = z.object({
-    latitudeColumn: z.string(),
-    longitudeColumn: z.string(),
-    stateColumn: z.string(),
-    valueColumn: z.string(),
-    labelColumn: z.string(),
-    tooltipColumn: z.string(),
-    clusterRadius: z.string(),
-    clusterMaxZoom: z.string(),
-    clusterTextColor: z.string(),
-    clusterTextSize: z.string(),
-    clusterColor: z.string(),
+  const schema = z.object({
+    latitudeColumn: z.string().optional(),
+    longitudeColumn: z.string().optional(),
+    stateColumn: z.string().optional(),
+    valueColumn: z.string().optional(),
+    labelColumn: z.string().optional(),
+    tooltipColumn: z.string().optional(),
+    clusterRadius: z.string().default("120"),
+    clusterMaxZoom: z.string().default("14"),
+    clusterTextColor: z.string().default("#FFFFFF"),
+    clusterTextSize: z.string().default("16"),
+    clusterColor: z.string().default("#000000"),
   })
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<z.infer<typeof schema>>({
+    resolver: zodResolver(schema),
     defaultValues: {
-      latitudeColumn: currentSettings.latitudeColumn || "",
-      longitudeColumn: currentSettings.longitudeColumn || "",
-      stateColumn: currentSettings.stateColumn || "",
-      valueColumn: currentSettings.valueColumn || "",
-      labelColumn: currentSettings.labelColumn || "",
-      tooltipColumn: currentSettings.tooltipColumn || "",
-      clusterRadius: currentSettings.clusterRadius || "120",
-      clusterMaxZoom: currentSettings.clusterMaxZoom || "14",
-      clusterTextColor: currentSettings.clusterTextColor || "#FFFFFF",
-      clusterTextSize: currentSettings.clusterTextSize || "16",
-      clusterColor: currentSettings.clusterColor || "#000000",
+      latitudeColumn: current.latitudeColumn ?? "",
+      longitudeColumn: current.longitudeColumn ?? "",
+      stateColumn: current.stateColumn ?? "",
+      valueColumn: current.valueColumn ?? "",
+      labelColumn: current.labelColumn ?? "",
+      tooltipColumn: current.tooltipColumn ?? "",
+      clusterRadius: current.clusterRadius ?? "120",
+      clusterMaxZoom: current.clusterMaxZoom ?? "14",
+      clusterTextColor: current.clusterTextColor ?? "#FFFFFF",
+      clusterTextSize: current.clusterTextSize ?? "16",
+      clusterColor: current.clusterColor ?? "#000000",
     },
-    mode: "onChange",
   })
 
+  /* sync defaults when user switches tab / geography */
   useEffect(() => {
     form.reset({
-      latitudeColumn: currentSettings.latitudeColumn || "",
-      longitudeColumn: currentSettings.longitudeColumn || "",
-      stateColumn: currentSettings.stateColumn || "",
-      valueColumn: currentSettings.valueColumn || "",
-      labelColumn: currentSettings.labelColumn || "",
-      tooltipColumn: currentSettings.tooltipColumn || "",
-      clusterRadius: currentSettings.clusterRadius || "120",
-      clusterMaxZoom: currentSettings.clusterMaxZoom || "14",
-      clusterTextColor: currentSettings.clusterTextColor || "#FFFFFF",
-      clusterTextSize: currentSettings.clusterTextSize || "16",
-      clusterColor: currentSettings.clusterColor || "#000000",
+      latitudeColumn: current.latitudeColumn ?? "",
+      longitudeColumn: current.longitudeColumn ?? "",
+      stateColumn: current.stateColumn ?? "",
+      valueColumn: current.valueColumn ?? "",
+      labelColumn: current.labelColumn ?? "",
+      tooltipColumn: current.tooltipColumn ?? "",
+      clusterRadius: current.clusterRadius ?? "120",
+      clusterMaxZoom: current.clusterMaxZoom ?? "14",
+      clusterTextColor: current.clusterTextColor ?? "#FFFFFF",
+      clusterTextSize: current.clusterTextSize ?? "16",
+      clusterColor: current.clusterColor ?? "#000000",
     })
-  }, [activeMapType, dimensionSettings])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMapType, selectedGeography, dimensionSettings])
 
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    setDimensionSettings((prevSettings: any) => ({
-      ...prevSettings,
-      [activeMapType]: {
-        ...values,
-      },
-    }))
+  const save = form.handleSubmit((vals) => {
+    setDimensionSettings((p: any) => ({ ...p, [activeMapType]: vals }))
+    toast({ title: "Settings saved" })
+  })
 
-    toast({
-      title: "Settings saved!",
-      description: "Your dimension settings have been saved.",
-    })
-  }
-
-  const getColumnsForCurrentMapType = () => {
-    return Array.isArray(columns) ? columns : []
-  }
+  /* ------------- shared JSX snippets -------------- */
+  const columnSelect = (name: keyof z.infer<typeof schema>, label: string, placeholder = "Select column") => (
+    <FormField
+      control={form.control}
+      name={name}
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>{label}</FormLabel>
+          <Select value={field.value} onValueChange={field.onChange}>
+            <FormControl>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={placeholder} />
+              </SelectTrigger>
+            </FormControl>
+            <SelectContent>{colItems(safeArray(columns))}</SelectContent>
+          </Select>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  )
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+      <form onSubmit={save} className="space-y-8">
         {activeMapType === "symbol" && (
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <FormItem>
-                <FormLabel>Latitude Column</FormLabel>
-                <Select onValueChange={form.setValue("latitudeColumn")}>
-                  <FormControl>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder={currentSettings.latitudeColumn || "Select latitude column"} />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {getColumnsForCurrentMapType().map((col) => (
-                      <SelectItem key={col} value={col}>
-                        {col}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormDescription>Please select the column that contains the latitude values.</FormDescription>
-                <FormMessage />
-              </FormItem>
-            </div>
-            <div>
-              <FormItem>
-                <FormLabel>Longitude Column</FormLabel>
-                <Select onValueChange={form.setValue("longitudeColumn")}>
-                  <FormControl>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder={currentSettings.longitudeColumn || "Select longitude column"} />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {getColumnsForCurrentMapType().map((col) => (
-                      <SelectItem key={col} value={col}>
-                        {col}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormDescription>Please select the column that contains the longitude values.</FormDescription>
-                <FormMessage />
-              </FormItem>
-            </div>
+            {columnSelect("latitudeColumn", "Latitude Column")}
+            {columnSelect("longitudeColumn", "Longitude Column")}
           </div>
         )}
 
         {(activeMapType === "choropleth" || activeMapType === "custom") && (
-          <div>
-            <FormItem>
-              <FormLabel>State/Province Column</FormLabel>
-              <Select onValueChange={form.setValue("stateColumn")}>
-                <FormControl>
-                  <SelectTrigger className="w-full">
-                    <SelectValue
-                      placeholder={
-                        activeMapType === "choropleth" || activeMapType === "custom"
-                          ? currentSettings.stateColumn
-                          : selectedGeography === "usa-counties"
-                            ? "Select county column"
-                            : selectedGeography === "canada-provinces" || selectedGeography === "canada-nation"
-                              ? "Select province column"
-                              : "Select state/province column"
-                      }
-                    />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {getColumnsForCurrentMapType().map((col) => (
-                    <SelectItem key={col} value={col}>
-                      {col}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormDescription>Please select the column that contains the state/province values.</FormDescription>
-              <FormMessage />
-            </FormItem>
+          <div className="mb-4">
+            {columnSelect(
+              "stateColumn",
+              selectedGeography === "usa-counties"
+                ? "County Column"
+                : selectedGeography.startsWith("canada")
+                  ? "Province Column"
+                  : "State/Province Column",
+            )}
           </div>
         )}
 
-        <div>
-          <FormItem>
-            <FormLabel>Value Column</FormLabel>
-            <Select onValueChange={form.setValue("valueColumn")}>
-              <FormControl>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder={currentSettings.valueColumn || "Select value column"} />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                {getColumnsForCurrentMapType().map((col) => (
-                  <SelectItem key={col} value={col}>
-                    {col}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormDescription>
-              Please select the column that contains the values to be displayed on the map.
-            </FormDescription>
-            <FormMessage />
-          </FormItem>
-        </div>
+        {columnSelect("valueColumn", "Value Column")}
+        {columnSelect("labelColumn", "Label Column")}
+        {columnSelect("tooltipColumn", "Tooltip Column")}
 
-        <div>
-          <FormItem>
-            <FormLabel>Label Column</FormLabel>
-            <Select onValueChange={form.setValue("labelColumn")}>
-              <FormControl>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder={currentSettings.labelColumn || "Select label column"} />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                {getColumnsForCurrentMapType().map((col) => (
-                  <SelectItem key={col} value={col}>
-                    {col}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormDescription>This column will be used to display labels on the map.</FormDescription>
-            <FormMessage />
-          </FormItem>
-        </div>
-
-        <div>
-          <FormItem>
-            <FormLabel>Tooltip Column</FormLabel>
-            <Select onValueChange={form.setValue("tooltipColumn")}>
-              <FormControl>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder={currentSettings.tooltipColumn || "Select tooltip column"} />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                {getColumnsForCurrentMapType().map((col) => (
-                  <SelectItem key={col} value={col}>
-                    {col}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormDescription>This column will be used to display tooltips on the map.</FormDescription>
-            <FormMessage />
-          </FormItem>
-        </div>
-
-        <Accordion type="single" collapsible>
-          <AccordionItem value="advanced">
-            <AccordionTrigger>Advanced Settings</AccordionTrigger>
-            <AccordionContent>
-              {activeMapType === "symbol" && (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
+        {activeMapType === "symbol" && (
+          <Accordion type="single" collapsible>
+            <AccordionItem value="adv">
+              <AccordionTrigger>Advanced Cluster Settings</AccordionTrigger>
+              <AccordionContent>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="clusterRadius"
+                    render={({ field }) => (
                       <FormItem>
                         <FormLabel>Cluster Radius</FormLabel>
                         <FormControl>
-                          <Input type="number" {...form.register("clusterRadius")} />
+                          <Input type="number" {...field} />
                         </FormControl>
-                        <FormDescription>The radius of each cluster. Adjust to fit your data.</FormDescription>
                         <FormMessage />
                       </FormItem>
-                    </div>
-                    <div>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="clusterMaxZoom"
+                    render={({ field }) => (
                       <FormItem>
                         <FormLabel>Cluster Max Zoom</FormLabel>
                         <FormControl>
-                          <Input type="number" {...form.register("clusterMaxZoom")} />
+                          <Input type="number" {...field} />
                         </FormControl>
-                        <FormDescription>The maximum zoom level at which clustering is enabled.</FormDescription>
                         <FormMessage />
                       </FormItem>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="clusterTextColor"
+                    render={({ field }) => (
                       <FormItem>
                         <FormLabel>Cluster Text Color</FormLabel>
                         <FormControl>
-                          <Input type="color" {...form.register("clusterTextColor")} />
+                          <Input type="color" {...field} />
                         </FormControl>
-                        <FormDescription>The color of the cluster text.</FormDescription>
                         <FormMessage />
                       </FormItem>
-                    </div>
-                    <div>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="clusterTextSize"
+                    render={({ field }) => (
                       <FormItem>
                         <FormLabel>Cluster Text Size</FormLabel>
                         <FormControl>
-                          <Input type="number" {...form.register("clusterTextSize")} />
+                          <Input type="number" {...field} />
                         </FormControl>
-                        <FormDescription>The size of the cluster text.</FormDescription>
                         <FormMessage />
                       </FormItem>
-                    </div>
-                    <div>
-                      <FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="clusterColor"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2">
                         <FormLabel>Cluster Color</FormLabel>
                         <FormControl>
-                          <Input type="color" {...form.register("clusterColor")} />
+                          <Input type="color" {...field} />
                         </FormControl>
-                        <FormDescription>The color of the cluster.</FormDescription>
                         <FormMessage />
                       </FormItem>
-                    </div>
-                  </div>
-                </>
-              )}
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+                    )}
+                  />
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        )}
 
         <Button type="submit">Save Settings</Button>
       </form>
@@ -324,7 +224,5 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
   )
 }
 
+// default + named export
 export default DimensionMapping
-
-// Also provide a named export for consumers that import { DimensionMapping }
-export { DimensionMapping }
