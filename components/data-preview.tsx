@@ -91,3 +91,4 @@ const DataPreview: React.FC<DataPreviewProps> = ({ data, columnTypes, setColumnT
 }
 
 export default DataPreview
+export { DataPreview }
