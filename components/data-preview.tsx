@@ -29,6 +29,7 @@ interface DataPreviewProps {
   customDataLoaded: boolean
   onMapTypeChange: (mapType: "symbol" | "choropleth" | "custom") => void
   columnFormats: ColumnFormat
+  selectedGeography: "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world" // Add this
 }
 
 interface ColumnType {
@@ -226,6 +227,7 @@ export function DataPreview({
   customDataLoaded,
   onMapTypeChange,
   columnFormats,
+  selectedGeography, // Destructure new prop
 }: DataPreviewProps) {
   const [isExpanded, setIsExpanded] = useState(true)
   const [inferredTypes, setInferredTypes] = useState<ColumnType>({})
@@ -840,6 +842,14 @@ export function DataPreview({
 
   const tableData = data
 
+  // Determine the label for the "State" option in the column type dropdown
+  let stateColumnOptionLabel = "State"
+  if (selectedGeography === "usa-counties") {
+    stateColumnOptionLabel = "County"
+  } else if (selectedGeography === "canada-provinces") {
+    stateColumnOptionLabel = "Province"
+  }
+
   return (
     <TooltipProvider>
       <Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
@@ -1088,7 +1098,7 @@ export function DataPreview({
                                       <div className="flex items-center justify-between w-full">
                                         <div className="flex items-center gap-2">
                                           <Flag className="w-3 h-3" />
-                                          <span>State</span>
+                                          <span>{stateColumnOptionLabel}</span> {/* <--- Change made here */}
                                         </div>
                                       </div>
                                     </SelectItem>
