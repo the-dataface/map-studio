@@ -27,9 +27,9 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
   setDimensionSettings,
   selectedGeography,
 }) => {
-  const { toast } = useToast();
+  const { toast } = useToast()
 
-  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false)
 
   const formSchema = z.object({
     latitudeColumn: z.string(),
@@ -43,7 +43,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
     clusterTextColor: z.string(),
     clusterTextSize: z.string(),
     clusterColor: z.string(),
-  });
+  })
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -61,7 +61,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
       clusterColor: dimensionSettings[activeMapType]?.clusterColor || "#000000",
     },
     mode: "onChange",
-  });
+  })
 
   useEffect(() => {
     form.reset({
@@ -76,8 +76,8 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
       clusterTextColor: dimensionSettings[activeMapType]?.clusterTextColor || "#FFFFFF",
       clusterTextSize: dimensionSettings[activeMapType]?.clusterTextSize || "16",
       clusterColor: dimensionSettings[activeMapType]?.clusterColor || "#000000",
-    });
-  }, [activeMapType, dimensionSettings]);
+    })
+  }, [activeMapType, dimensionSettings])
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     setDimensionSettings((prevSettings: any) => ({
@@ -85,17 +85,17 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
       [activeMapType]: {
         ...values,
       },
-    }));
+    }))
 
     toast({
       title: "Settings saved!",
       description: "Your dimension settings have been saved.",
-    });
-  };
+    })
+  }
 
   const getColumnsForCurrentMapType = () => {
-    return columns;
-  };
+    return columns
+  }
 
   return (
     <Form {...form}>
@@ -109,10 +109,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
                   <FormControl>
                     <SelectTrigger className="w-full">
                       <SelectValue
-                        placeholder={
-                          dimensionSettings[activeMapType].latitudeColumn ||
-                          "Select latitude column"
-                        }
+                        placeholder={dimensionSettings[activeMapType].latitudeColumn || "Select latitude column"}
                       />
                     </SelectTrigger>
                   </FormControl>
@@ -124,9 +121,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
                     ))}
                   </SelectContent>
                 </Select>
-                <FormDescription>
-                  Please select the column that contains the latitude values.
-                </FormDescription>
+                <FormDescription>Please select the column that contains the latitude values.</FormDescription>
                 <FormMessage />
               </FormItem>
             </div>
@@ -137,10 +132,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
                   <FormControl>
                     <SelectTrigger className="w-full">
                       <SelectValue
-                        placeholder={
-                          dimensionSettings[activeMapType].longitudeColumn ||
-                          "Select longitude column"
-                        }
+                        placeholder={dimensionSettings[activeMapType].longitudeColumn || "Select longitude column"}
                       />
                     </SelectTrigger>
                   </FormControl>
@@ -152,9 +144,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
                     ))}
                   </SelectContent>
                 </Select>
-                <FormDescription>
-                  Please select the column that contains the longitude values.
-                </FormDescription>
+                <FormDescription>Please select the column that contains the longitude values.</FormDescription>
                 <FormMessage />
               </FormItem>
             </div>
@@ -174,27 +164,25 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
                           ? dimensionSettings[activeMapType].stateColumn
                           : selectedGeography === "usa-counties"
                             ? "Select county column"
-                            : selectedGeography === "canada-provinces" ||
-                              selectedGeography === "canada-nation"
+                            : selectedGeography === "canada-provinces" || selectedGeography === "canada-nation"
                               ? "Select province column"
                               : "Select state/province column"
                       }
                     />
                   </SelectTrigger>
-                  <SelectContent>
-                    {getColumnsForCurrentMapType().map((col) => (
-                      <SelectItem key={col} value={col}>
-                        {col}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              <FormDescription>
-                  Please select the column that contains the state/province values.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            </div>
+                </FormControl>
+                <SelectContent>
+                  {getColumnsForCurrentMapType().map((col) => (
+                    <SelectItem key={col} value={col}>
+                      {col}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormDescription>Please select the column that contains the state/province values.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          </div>
         )}
 
         <div>
@@ -203,12 +191,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
             <Select onValueChange={form.setValue("valueColumn")}>
               <FormControl>
                 <SelectTrigger className="w-full">
-                  <SelectValue
-                    placeholder={
-                      dimensionSettings[activeMapType].valueColumn ||
-                      "Select value column"
-                    }
-                  />
+                  <SelectValue placeholder={dimensionSettings[activeMapType].valueColumn || "Select value column"} />
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
@@ -220,8 +203,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
               </SelectContent>
             </Select>
             <FormDescription>
-              Please select the column that contains the values to be displayed
-              on the map.
+              Please select the column that contains the values to be displayed on the map.
             </FormDescription>
             <FormMessage />
           </FormItem>
@@ -233,12 +215,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
             <Select onValueChange={form.setValue("labelColumn")}>
               <FormControl>
                 <SelectTrigger className="w-full">
-                  <SelectValue
-                    placeholder={
-                      dimensionSettings[activeMapType].labelColumn ||
-                      "Select label column"
-                    }
-                  />
+                  <SelectValue placeholder={dimensionSettings[activeMapType].labelColumn || "Select label column"} />
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
@@ -249,9 +226,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
                 ))}
               </SelectContent>
             </Select>
-            <FormDescription>
-              This column will be used to display labels on the map.
-            </FormDescription>
+            <FormDescription>This column will be used to display labels on the map.</FormDescription>
             <FormMessage />
           </FormItem>
         </div>
@@ -263,10 +238,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
               <FormControl>
                 <SelectTrigger className="w-full">
                   <SelectValue
-                    placeholder={
-                      dimensionSettings[activeMapType].tooltipColumn ||
-                      "Select tooltip column"
-                    }
+                    placeholder={dimensionSettings[activeMapType].tooltipColumn || "Select tooltip column"}
                   />
                 </SelectTrigger>
               </FormControl>
@@ -278,9 +250,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
                 ))}
               </SelectContent>
             </Select>
-            <FormDescription>
-              This column will be used to display tooltips on the map.
-            </FormDescription>
+            <FormDescription>This column will be used to display tooltips on the map.</FormDescription>
             <FormMessage />
           </FormItem>
         </div>
@@ -296,14 +266,9 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
                       <FormItem>
                         <FormLabel>Cluster Radius</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            {...form.register("clusterRadius")}
-                          />
+                          <Input type="number" {...form.register("clusterRadius")} />
                         </FormControl>
-                        <FormDescription>
-                          The radius of each cluster. Adjust to fit your data.
-                        </FormDescription>
+                        <FormDescription>The radius of each cluster. Adjust to fit your data.</FormDescription>
                         <FormMessage />
                       </FormItem>
                     </div>
@@ -311,14 +276,9 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
                       <FormItem>
                         <FormLabel>Cluster Max Zoom</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            {...form.register("clusterMaxZoom")}
-                          />
+                          <Input type="number" {...form.register("clusterMaxZoom")} />
                         </FormControl>
-                        <FormDescription>
-                          The maximum zoom level at which clustering is enabled.
-                        </FormDescription>
+                        <FormDescription>The maximum zoom level at which clustering is enabled.</FormDescription>
                         <FormMessage />
                       </FormItem>
                     </div>
@@ -329,10 +289,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
                       <FormItem>
                         <FormLabel>Cluster Text Color</FormLabel>
                         <FormControl>
-                          <Input
-                            type="color"
-                            {...form.register("clusterTextColor")}
-                          />
+                          <Input type="color" {...form.register("clusterTextColor")} />
                         </FormControl>
                         <FormDescription>The color of the cluster text.</FormDescription>
                         <FormMessage />
@@ -342,10 +299,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
                       <FormItem>
                         <FormLabel>Cluster Text Size</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            {...form.register("clusterTextSize")}
-                          />
+                          <Input type="number" {...form.register("clusterTextSize")} />
                         </FormControl>
                         <FormDescription>The size of the cluster text.</FormDescription>
                         <FormMessage />
@@ -355,10 +309,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
                       <FormItem>
                         <FormLabel>Cluster Color</FormLabel>
                         <FormControl>
-                          <Input
-                            type="color"
-                            {...form.register("clusterColor")}
-                          />
+                          <Input type="color" {...form.register("clusterColor")} />
                         </FormControl>
                         <FormDescription>The color of the cluster.</FormDescription>
                         <FormMessage />
@@ -374,7 +325,10 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
         <Button type="submit">Save Settings</Button>
       </form>
     </Form>
-  );
-};
+  )
+}
 
-export default DimensionMapping;
+export default DimensionMapping
+
+// Also provide a named export for consumers that import { DimensionMapping }
+export { DimensionMapping }
