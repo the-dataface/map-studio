@@ -11,7 +11,9 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({ selectedGeography, 
     <div>
       {selectedGeography === "usa-states" && (
         <div>
-          <Label htmlFor="choropleth-state-column">{geoTermLabel} Column</Label>
+          <Label htmlFor="choropleth-state-column" className="text-sm">
+            {geoTermLabel} Column
+          </Label>
           <Select id="choropleth-state-column">
             <option value="">Select a column</option>
             <option value="state_name">State Name</option>
