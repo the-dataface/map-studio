@@ -96,7 +96,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
   }
 
   const getColumnsForCurrentMapType = () => {
-    return columns
+    return Array.isArray(columns) ? columns : []
   }
 
   return (
