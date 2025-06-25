@@ -70,6 +70,7 @@ interface StylingSettings {
         nationStrokeWidth: number
         defaultStateFillColor: string
         defaultStateStrokeColor: string
+        defaultStateStrokeWidth: number
       }
     }>
   }
@@ -289,14 +290,14 @@ export function MapStyling({
               {isPanelExpanded ? (
                 <ChevronUp className="w-4 h-4 text-gray-500" />
               ) : (
-                <ChevronDown className="w-4 h-4 text-gray-500" />
+                <ChevronDown className="h-4 w-4 text-gray-500" />
               )}
             </div>
           </div>
         </div>
         <div
           className={`transition-all duration-300 ease-in-out overflow-hidden ${
-            isPanelExpanded ? "max-h-[9999px] opacity-100" : "max-h-0 opacity-0"
+            isPanelExpanded ? "max-h-[9999px] opacity-100" : "max-h-0 opacity-0" // Ensure full height
           }`}
         >
           <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-600">{children}</div>
@@ -505,7 +506,7 @@ export function MapStyling({
                 {renderSubPanel(
                   "background",
                   "Background", // Sentence case
-                  <Palette className="w-4 h-4" />,
+                  <Palette className="w-4 h-4" />, // Changed icon to Palette for background
                   <div className="space-y-2">
                     <Label htmlFor="map-background-color" className="text-sm">
                       Map background color
@@ -520,7 +521,7 @@ export function MapStyling({
 
                 {renderSubPanel(
                   "nation",
-                  "Nation", // Sentence case
+                  "Nation/Country", // Updated title
                   <Map className="w-4 h-4" />,
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -561,58 +562,60 @@ export function MapStyling({
                   </div>,
                 )}
 
-                {renderSubPanel(
-                  "states",
-                  subFeatureLabel, // Sentence case
-                  <LandPlot className="w-4 h-4" />, // Changed icon
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="default-state-fill-color" className="text-sm">
-                          Default {subFeatureLabel.toLowerCase()} fill color
-                        </Label>
-                        <div className={cn(isChoroplethFillDisabled && "pointer-events-none opacity-50")}>
+                {/* Conditional State/Province/County Styling Panel */}
+                {showStateProvinceStyling &&
+                  renderSubPanel(
+                    "states",
+                    subFeatureLabel, // Sentence case
+                    <LandPlot className="w-4 h-4" />, // Changed icon
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="default-state-fill-color" className="text-sm">
+                            Default {subFeatureLabel.toLowerCase()} fill color
+                          </Label>
+                          <div className={cn(isChoroplethFillDisabled && "pointer-events-none opacity-50")}>
+                            <ColorInput
+                              id="default-state-fill-color"
+                              value={stylingSettings.base.defaultStateFillColor}
+                              onChange={(value) => updateSetting("base", "defaultStateFillColor", value)}
+                              disabled={isChoroplethFillDisabled}
+                            />
+                          </div>
+                          {isChoroplethFillDisabled && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              Inactive when Choropleth fill is mapped to data.
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="default-state-stroke-color" className="text-sm">
+                            Default {subFeatureLabel.toLowerCase()} stroke color
+                          </Label>
                           <ColorInput
-                            id="default-state-fill-color"
-                            value={stylingSettings.base.defaultStateFillColor}
-                            onChange={(value) => updateSetting("base", "defaultStateFillColor", value)}
-                            disabled={isChoroplethFillDisabled}
+                            id="default-state-stroke-color"
+                            value={stylingSettings.base.defaultStateStrokeColor}
+                            onChange={(value) => updateSetting("base", "defaultStateStrokeColor", value)}
                           />
                         </div>
-                        {isChoroplethFillDisabled && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            Inactive when Choropleth fill is mapped to data.
-                          </p>
-                        )}
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="default-state-stroke-color" className="text-sm">
-                          Default {subFeatureLabel.toLowerCase()} stroke color
+                        <Label htmlFor="default-state-stroke-width" className="text-sm">
+                          Default {subFeatureLabel.toLowerCase()} stroke width (
+                          {stylingSettings.base.defaultStateStrokeWidth}
+                          px)
                         </Label>
-                        <ColorInput
-                          id="default-state-stroke-color"
-                          value={stylingSettings.base.defaultStateStrokeColor}
-                          onChange={(value) => updateSetting("base", "defaultStateStrokeColor", value)}
+                        <Slider
+                          id="default-state-stroke-width"
+                          value={[stylingSettings.base.defaultStateStrokeWidth]}
+                          onValueChange={(value) => updateSetting("base", "defaultStateStrokeWidth", value[0])}
+                          min={0}
+                          max={5}
+                          step={0.5}
                         />
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="default-state-stroke-width" className="text-sm">
-                        Default {subFeatureLabel.toLowerCase()} stroke width (
-                        {stylingSettings.base.defaultStateStrokeWidth}
-                        px)
-                      </Label>
-                      <Slider
-                        id="default-state-stroke-width"
-                        value={[stylingSettings.base.defaultStateStrokeWidth]}
-                        onValueChange={(value) => updateSetting("base", "defaultStateStrokeWidth", value[0])}
-                        min={0}
-                        max={5}
-                        step={0.5}
-                      />
-                    </div>
-                  </div>,
-                )}
+                    </div>,
+                  )}
               </div>
             )}
 

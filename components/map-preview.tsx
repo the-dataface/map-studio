@@ -1,12 +1,54 @@
 "use client"
 
-import { useRef, useEffect, useState } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import * as d3 from "d3"
 import * as topojson from "topojson-client"
-import type { DataRow as DataRowType, GeocodedRow } from "@/app/page"
+import type { DataRow, GeocodedRow } from "@/app/page"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { ChevronDown, ChevronUp, Download, Copy } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 
-// Define interfaces for props
+interface MapPreviewProps {
+  symbolData: (DataRow | GeocodedRow)[]
+  choroplethData: (DataRow | GeocodedRow)[]
+  symbolColumns: string[]
+  choroplethColumns: string[]
+  mapType: "symbol" | "choropleth" | "custom"
+  dimensionSettings: any
+  stylingSettings: StylingSettings
+  symbolDataExists: boolean
+  choroplethDataExists: boolean
+  columnTypes: ColumnType
+  columnFormats: ColumnFormat
+  customMapData: string
+  selectedGeography: "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world" // New prop
+  selectedProjection: "albersUsa" | "mercator" | "equalEarth" | "albers" // Added "albers"
+  clipToCountry: boolean // New prop
+}
+
+interface TopoJSONData {
+  type: string
+  objects: {
+    nation?: any
+    states?: any // states is optional for world map
+    countries?: any // countries is optional for US map
+    counties?: any // Add this
+    provinces?: any // Add this
+    land?: any // Added for world map fallback
+  }
+  arcs: any[]
+}
+
+interface ColumnType {
+  [key: string]: "text" | "number" | "date" | "coordinate" | "state"
+}
+
+interface ColumnFormat {
+  [key: string]: string
+}
+
 interface StylingSettings {
   activeTab: "base" | "symbol" | "choropleth"
   base: {
@@ -15,7 +57,7 @@ interface StylingSettings {
     nationStrokeColor: string
     nationStrokeWidth: number
     defaultStateFillColor: string
-    defaultStateStrokeColor: string
+    defaultStateStrokeColor: string // Corrected type to string
     defaultStateStrokeWidth: number
     savedStyles: Array<{
       id: string
@@ -81,61 +123,6 @@ interface StylingSettings {
     labelFontSize: number
     labelOutlineThickness: number
   }
-}
-
-interface DimensionSettings {
-  symbol: {
-    latitude: string
-    longitude: string
-    sizeBy: string
-    sizeMin: number
-    sizeMax: number
-    sizeMinValue: number
-    sizeMaxValue: number
-    colorBy: string
-    colorScale: "linear" | "categorical"
-    colorPalette: string
-    colorMinValue: number
-    colorMidValue: number
-    colorMaxValue: number
-    colorMinColor: string
-    colorMidColor: string
-    colorMaxColor: string
-    categoricalColors: { value: string; color: string }[]
-    labelTemplate: string
-  }
-  choropleth: {
-    stateColumn: string
-    colorBy: string
-    colorScale: "linear" | "categorical"
-    colorPalette: string
-    colorMinValue: number
-    colorMidValue: number
-    colorMaxValue: number
-    colorMinColor: string
-    colorMidColor: string
-    colorMaxColor: string
-    categoricalColors: { value: string; color: string }[]
-    labelTemplate: string
-  }
-}
-
-interface MapPreviewProps {
-  symbolData: DataRowType[]
-  choroplethData: DataRowType[]
-  symbolColumns: string[]
-  choroplethColumns: string[]
-  mapType: "symbol" | "choropleth" | "custom"
-  dimensionSettings: DimensionSettings
-  stylingSettings: StylingSettings
-  symbolDataExists: boolean
-  choroplethDataExists: boolean
-  columnTypes: { [key: string]: "text" | "number" | "date" | "coordinate" | "state" }
-  columnFormats: { [key: string]: string }
-  customMapData: string
-  selectedGeography: "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world"
-  selectedProjection: "albersUsa" | "mercator" | "equalEarth" | "albers"
-  clipToCountry: boolean
 }
 
 const stateMap: Record<string, string> = {
@@ -376,7 +363,7 @@ const parseCompactNumber = (value: string): number | null => {
   return num
 }
 
-const getNumericValue = (row: DataRowType | GeocodedRow, column: string): number | null => {
+const getNumericValue = (row: DataRow | GeocodedRow, column: string): number | null => {
   const rawValue = String(row[column] || "").trim()
   let parsedNum: number | null = parseCompactNumber(rawValue)
 
@@ -387,7 +374,7 @@ const getNumericValue = (row: DataRowType | GeocodedRow, column: string): number
   return isNaN(parsedNum) ? null : parsedNum
 }
 
-const getUniqueValues = (column: string, data: (DataRowType | GeocodedRow)[]): any[] => {
+const getUniqueValues = (column: string, data: (DataRow | GeocodedRow)[]): any[] => {
   const uniqueValues = new Set()
   data.forEach((row) => {
     const value = row[column]
@@ -645,7 +632,7 @@ const formatLegendValue = (
 // Helper function to render the label preview with HTML tag support
 const renderLabelPreview = (
   template: string,
-  dataRow: DataRowType | GeocodedRow,
+  dataRow: DataRow | GeocodedRow,
   columnTypes: { [key: string]: "text" | "number" | "date" | "coordinate" | "state" },
   columnFormats: { [key: string]: string },
   geoType: string,
@@ -1092,8 +1079,8 @@ export function MapPreview({
     const width = 975
 
     // Create scales that will be used by both symbols and legends
-    const sizeScale: any = null
-    const symbolColorScale: any = null
+    let sizeScale: any = null
+    let symbolColorScale: any = null
     let choroplethColorScale: any = null
 
     // Determine what should be rendered
@@ -1563,7 +1550,7 @@ export function MapPreview({
       const mapGroup = svg.select("#Map")
       if (!mapGroup.empty()) {
         console.log("Found map group, applying choropleth colors...")
-        const featuresColored = 0
+        let featuresColored = 0
 
         mapGroup.selectAll("path, g").each(function (this: SVGElement) {
           const element = d3.select(this)
@@ -1587,3 +1574,1233 @@ export function MapPreview({
                 featureKey = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null // Use d.id for TopoJSON US states
               } else if (selectedGeography.startsWith("usa-counties")) {
                 featureKey = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null // Use d.id (FIPS) for US counties
+              } else if (selectedGeography.startsWith("canada-provinces")) {
+                featureKey = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null // Use d.id (abbr) for Canadian provinces
+              } else if (
+                selectedGeography === "world" ||
+                selectedGeography === "usa-nation" ||
+                selectedGeography === "canada-nation"
+              ) {
+                featureKey = d?.properties?.name || String(d?.id) || effectiveId // For world maps, use name or ID directly
+              }
+            }
+          }
+
+          if (!featureKey) {
+            element.attr("fill", stylingSettings.base.defaultStateFillColor)
+            return
+          }
+
+          const value = geoDataMap.get(featureKey)
+          if (value !== undefined) {
+            const color = choroplethColorScale(value)
+            element.attr("fill", color)
+            featuresColored++
+            console.log(`✅ Applied color ${color} to feature ${featureKey} (value: ${value})`)
+          } else {
+            element.attr("fill", stylingSettings.base.defaultStateFillColor)
+            console.log(`No data found for feature: ${featureKey}, applying default fill.`)
+          }
+        })
+        console.log("Features actually colored:", featuresColored)
+      } else {
+        console.log("❌ No map group found for choropleth rendering")
+      }
+    }
+
+    // Render symbol data if available, and only if not using a custom map
+
+    console.log("=== SYMBOL RENDERING DEBUG ===")
+    console.log("Should render symbols:", shouldRenderSymbols)
+    console.log("Symbol data exists:", symbolDataExists)
+    console.log("Latitude column:", dimensionSettings?.symbol?.latitude)
+    console.log("Longitude column:", dimensionSettings?.symbol?.longitude)
+    console.log("Symbol data length:", symbolData.length)
+    console.log("Custom map data present (for symbol check):", !!customMapData)
+
+    if (shouldRenderSymbols) {
+      console.log("=== Rendering symbol data ===")
+      console.log("Symbol data before filter:", symbolData.length)
+      console.log("Dimension settings for symbols:", dimensionSettings.symbol)
+
+      // Create symbol group
+      const symbolGroup = svg.append("g").attr("id", "Symbols")
+      const symbolLabelGroup = svg.append("g").attr("id", "SymbolLabels")
+
+      // Filter data with valid coordinates
+      const validSymbolData = symbolData.filter((d) => {
+        const lat = Number(d[dimensionSettings.symbol.latitude])
+        const lng = Number(d[dimensionSettings.symbol.longitude])
+        const isValid = !isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
+        if (!isValid) {
+          console.log(`Invalid coordinates for row:`, { lat, lng, row: d })
+        }
+        return isValid
+      })
+
+      console.log("Valid symbol data points after filter:", validSymbolData.length)
+      console.log("Sample valid data:", validSymbolData.slice(0, 3))
+
+      if (validSymbolData.length > 0) {
+        // Create size scale if size mapping exists
+        if (dimensionSettings.symbol.sizeBy) {
+          sizeScale = d3
+            .scaleLinear()
+            .domain([dimensionSettings.symbol.sizeMinValue, dimensionSettings.symbol.sizeMaxValue])
+            .range([dimensionSettings.symbol.sizeMin, dimensionSettings.symbol.sizeMax])
+          console.log("Created size scale:", {
+            domain: [dimensionSettings.symbol.sizeMinValue, dimensionSettings.symbol.sizeMaxValue],
+            range: [dimensionSettings.symbol.sizeMin, dimensionSettings.symbol.sizeMax],
+          })
+        }
+
+        // Create color scale if color mapping exists
+        if (dimensionSettings.symbol.colorBy) {
+          if (dimensionSettings.symbol.colorScale === "linear") {
+            const domain = [dimensionSettings.symbol.colorMinValue, dimensionSettings.symbol.colorMaxValue]
+            const rangeColors = [
+              dimensionSettings.symbol.colorMinColor || stylingSettings.symbol.symbolFillColor,
+              stylingSettings.symbol.colorMaxColor || stylingSettings.symbol.symbolFillColor,
+            ]
+
+            if (dimensionSettings.symbol.colorMidColor) {
+              domain.splice(1, 0, dimensionSettings.symbol.colorMidValue)
+              rangeColors.splice(1, 0, dimensionSettings.symbol.colorMidColor)
+            }
+            symbolColorScale = d3.scaleLinear().domain(domain).range(rangeColors)
+            console.log("Created symbol linear color scale:", { domain, rangeColors })
+          } else {
+            const uniqueDataCategories = getUniqueValues(dimensionSettings.symbol.colorBy, symbolData)
+            const colorMap = new Map()
+            dimensionSettings?.symbol?.categoricalColors?.forEach((item: any, index: number) => {
+              const dataCategory = uniqueDataCategories[index]
+              if (dataCategory !== undefined) {
+                colorMap.set(String(dataCategory), item.color)
+              }
+            })
+            symbolColorScale = (value: any) => colorMap.get(String(value)) || stylingSettings.symbol.symbolFillColor
+            console.log("Created symbol categorical color scale:", Array.from(colorMap.entries()))
+          }
+        }
+
+        // Render symbols
+        const symbols = symbolGroup
+          .selectAll("path")
+          .data(validSymbolData)
+          .join("path")
+          .attr("transform", (d) => {
+            const lat = Number(d[dimensionSettings.symbol.latitude])
+            const lng = Number(d[dimensionSettings.symbol.longitude])
+            const projected = projection([lng, lat])
+
+            if (!projected) return "translate(0, 0)"
+
+            const size = sizeScale
+              ? sizeScale(getNumericValue(d, dimensionSettings.symbol.sizeBy) || 0)
+              : stylingSettings.symbol.symbolSize
+
+            const { transform: symbolTransform } = getSymbolPathData(
+              stylingSettings.symbol.symbolType,
+              stylingSettings.symbol.symbolShape,
+              size,
+              stylingSettings.symbol.customSvgPath,
+            )
+
+            // Combine the coordinate projection with the symbol-specific transform
+            const baseTransform = `translate(${projected[0]}, ${projected[1]})`
+            return symbolTransform ? `${baseTransform} ${symbolTransform}` : baseTransform
+          })
+          .attr("d", (d) => {
+            const size = sizeScale
+              ? sizeScale(getNumericValue(d, dimensionSettings.symbol.sizeBy) || 0)
+              : stylingSettings.symbol.symbolSize
+
+            const { pathData } = getSymbolPathData(
+              stylingSettings.symbol.symbolType,
+              stylingSettings.symbol.symbolShape,
+              size,
+              stylingSettings.symbol.customSvgPath,
+            )
+            return pathData
+          })
+          .attr("fill", (d) => {
+            if (symbolColorScale && dimensionSettings.symbol.colorBy) {
+              const value =
+                dimensionSettings.symbol.colorScale === "linear"
+                  ? getNumericValue(d, dimensionSettings.symbol.colorBy)
+                  : String(d[dimensionSettings.symbol.colorBy])
+              return symbolColorScale(value)
+            }
+            return stylingSettings.symbol.symbolFillColor
+          })
+          .attr("stroke", stylingSettings.symbol.symbolStrokeColor)
+          .attr("stroke-width", stylingSettings.symbol.symbolStrokeWidth)
+          .attr("fill-opacity", (stylingSettings.symbol.symbolFillTransparency || 80) / 100)
+          .attr("stroke-opacity", (stylingSettings.symbol.symbolStrokeTransparency || 100) / 100)
+
+        console.log("Rendered", symbols.size(), "symbols")
+
+        // Render Symbol Labels with improved positioning and HTML tag support
+        if (dimensionSettings.symbol.labelTemplate) {
+          const symbolLabels = symbolLabelGroup
+            .selectAll("text")
+            .data(validSymbolData)
+            .join("text")
+            .each(function (d) {
+              const textElement = d3.select(this)
+              const lat = Number(d[dimensionSettings.symbol.latitude])
+              const lng = Number(d[dimensionSettings.symbol.longitude])
+              const projected = projection([lng, lat])
+
+              if (!projected) return
+
+              const labelText = renderLabelPreview(
+                dimensionSettings.symbol.labelTemplate,
+                d,
+                columnTypes,
+                columnFormats,
+                selectedGeography,
+              )
+
+              if (!labelText) return
+
+              const symbolSize = sizeScale
+                ? sizeScale(getNumericValue(d, dimensionSettings.symbol.sizeBy) || 0)
+                : stylingSettings.symbol.symbolSize
+
+              // Create base styles object
+              const baseStyles = {
+                fontWeight: stylingSettings.symbol.labelBold ? "bold" : "normal",
+                fontStyle: stylingSettings.symbol.labelItalic ? "italic" : "normal",
+                textDecoration: (() => {
+                  let decoration = ""
+                  if (stylingSettings.symbol.labelUnderline) decoration += "underline "
+                  if (stylingSettings.symbol.labelStrikethrough) decoration += "line-through"
+                  return decoration.trim()
+                })(),
+              }
+
+              // Set basic text properties
+              textElement
+                .attr("font-family", stylingSettings.symbol.labelFontFamily)
+                .attr("font-size", `${stylingSettings.symbol.labelFontSize}px`)
+                .attr("fill", stylingSettings.symbol.labelColor)
+                .attr("stroke", stylingSettings.symbol.labelOutlineColor)
+                .attr("stroke-width", stylingSettings.symbol.labelOutlineThickness)
+                .style("paint-order", "stroke fill")
+                .style("pointer-events", "none")
+
+              // Create formatted text with HTML support
+              createFormattedText(textElement, labelText, baseStyles)
+
+              // Position the label based on alignment setting
+              let position
+              if (stylingSettings.symbol.labelAlignment === "auto") {
+                // For auto positioning, estimate label dimensions
+                const estimatedWidth = labelText.length * (stylingSettings.symbol.labelFontSize * 0.6)
+                const estimatedHeight = stylingSettings.symbol.labelFontSize * 1.2
+                position = getAutoPosition(
+                  projected[0],
+                  projected[1],
+                  symbolSize,
+                  estimatedWidth,
+                  estimatedHeight,
+                  width,
+                  height,
+                )
+              } else {
+                // Manual positioning based on symbol size
+                const offset = symbolSize / 2 + Math.max(8, symbolSize * 0.3) // Increased scaling factor
+                switch (stylingSettings.symbol.labelAlignment) {
+                  case "top-left":
+                    position = { dx: -offset, dy: -offset, anchor: "end", baseline: "baseline" }
+                    break
+                  case "top-center":
+                    position = { dx: 0, dy: -offset, anchor: "middle", baseline: "baseline" }
+                    break
+                  case "top-right":
+                    position = { dx: offset, dy: -offset, anchor: "start", baseline: "baseline" }
+                    break
+                  case "middle-left":
+                    position = { dx: -offset, dy: 0, anchor: "end", baseline: "middle" }
+                    break
+                  case "center":
+                    position = { dx: 0, dy: 0, anchor: "middle", baseline: "middle" }
+                    break
+                  case "middle-right":
+                    position = { dx: offset, dy: 0, anchor: "start", baseline: "middle" }
+                    break
+                  case "bottom-left":
+                    position = { dx: -offset, dy: offset, anchor: "end", baseline: "hanging" }
+                    break
+                  case "bottom-center":
+                    position = { dx: 0, dy: offset, anchor: "middle", baseline: "hanging" }
+                    break
+                  case "bottom-right":
+                    position = { dx: offset, dy: offset, anchor: "start", baseline: "hanging" }
+                    break
+                  default:
+                    position = { dx: offset, dy: 0, anchor: "start", baseline: "middle" }
+                    break
+                }
+              }
+
+              textElement
+                .attr("x", projected[0] + position.dx)
+                .attr("y", projected[1] + position.dy)
+                .attr("text-anchor", position.anchor)
+                .attr("dominant-baseline", position.baseline)
+
+              // Fix tspan positioning to maintain proper text anchor
+              textElement.selectAll("tspan").each(function (d, i) {
+                const tspan = d3.select(this)
+                // Only set x position for non-first tspans to maintain text anchor
+                if (i > 0 || tspan.attr("x") === "0") {
+                  tspan.attr("x", projected[0] + position.dx)
+                }
+              })
+            })
+
+          console.log("Rendered", symbolLabels.size(), "symbol labels")
+        }
+      }
+    }
+
+    // Render Choropleth Labels
+    const shouldRenderChoroplethLabels =
+      choroplethDataExists &&
+      dimensionSettings?.choropleth?.stateColumn &&
+      dimensionSettings?.choropleth?.labelTemplate &&
+      choroplethData.length > 0
+
+    console.log("=== CHOROPLETH LABELS DEBUG ===")
+    console.log("Should render choropleth labels:", shouldRenderChoroplethLabels)
+    console.log("Choropleth data exists:", choroplethDataExists)
+    console.log("State column:", dimensionSettings?.choropleth?.stateColumn)
+    console.log("Label template:", dimensionSettings?.choropleth?.labelTemplate)
+    console.log("Choropleth data length:", choroplethData.length)
+
+    if (shouldRenderChoroplethLabels) {
+      console.log("=== Rendering choropleth labels ===")
+      const choroplethLabelGroup = svg.append("g").attr("id", "ChoroplethLabels")
+
+      // Create a single map for geo data, using normalized identifiers
+      const geoDataMap = new Map<string, DataRow | GeocodedRow>()
+
+      console.log("Sample choropleth data:", choroplethData.slice(0, 3))
+
+      choroplethData.forEach((d) => {
+        const rawGeoValue = String(d[dimensionSettings.choropleth.stateColumn] || "")
+        if (!rawGeoValue.trim()) return
+
+        const normalizedKey = normalizeGeoIdentifier(rawGeoValue, selectedGeography)
+        geoDataMap.set(normalizedKey, d)
+      })
+
+      console.log("Geo data map size:", geoDataMap.size)
+
+      // Get state/country/county/province features from geoAtlasData or custom map paths
+      let featuresForLabels: any[] = []
+      if (geoAtlasData && mapType !== "custom") {
+        if (selectedGeography === "usa-states" && geoAtlasData.objects.states) {
+          featuresForLabels = topojson.feature(geoAtlasData, geoAtlasData.objects.states).features
+        } else if (selectedGeography === "usa-counties" && geoAtlasData.objects.counties) {
+          featuresForLabels = topojson.feature(geoAtlasData, geoAtlasData.objects.counties).features
+        } else if (selectedGeography === "canada-provinces" && geoAtlasData.objects.provinces) {
+          featuresForLabels = topojson.feature(geoAtlasData, geoAtlasData.objects.provinces).features
+        } else if (selectedGeography === "world" && geoAtlasData.objects.countries) {
+          featuresForLabels = topojson.feature(geoAtlasData, geoAtlasData.objects.countries).features
+        } else if (selectedGeography === "usa-nation" || selectedGeography === "canada-nation") {
+          // For single nation views, we need to get the specific country feature from the world atlas
+          const primaryFeatureSource = geoAtlasData.objects.countries || geoAtlasData.objects.nation
+          if (primaryFeatureSource) {
+            const allFeatures = topojson.feature(geoAtlasData, primaryFeatureSource).features
+            const targetCountryName = selectedGeography === "usa-nation" ? "United States" : "Canada"
+            const specificCountryFeature = findCountryFeature(allFeatures, [
+              targetCountryName,
+              targetCountryName === "United States" ? "USA" : "CAN",
+              targetCountryName === "United States" ? 840 : 124,
+            ])
+            if (specificCountryFeature) {
+              featuresForLabels = [specificCountryFeature] // Only this one feature for labels
+            }
+          }
+        }
+        console.log("Using geoAtlasData for labels, features count:", featuresForLabels.length)
+      } else if (customMapData) {
+        // For custom maps, iterate through all relevant elements (paths and groups)
+        // within the main #Map group that was imported/created.
+        const elementsToProcess: SVGElement[] = []
+        const mapGroup = svg.select("#Map") // This is the group where custom SVG content is imported
+
+        if (!mapGroup.empty()) {
+          mapGroup.selectAll("path, g").each(function (this: SVGElement) {
+            const element = d3.select(this)
+            const id = element.attr("id")
+            // Exclude the main container groups themselves if they are selected as 'g'
+            // We want the individual paths/sub-groups that represent regions.
+            if (
+              id !== "Nations" &&
+              id !== "States" &&
+              id !== "Counties" &&
+              id !== "Provinces" &&
+              id !== "Regions" &&
+              id !== "Countries"
+            ) {
+              elementsToProcess.push(this)
+            }
+          })
+        }
+
+        // The existing logic for nationsOrCountriesGroup for world maps in custom SVG is still relevant
+        // if the custom SVG explicitly separates nations.
+        const nationsOrCountriesGroup = svg.select("#Nations") || svg.select("#Countries")
+        if (!nationsOrCountriesGroup.empty() && selectedGeography === "world") {
+          nationsOrCountriesGroup.selectAll("path, g").each(function (this: SVGElement) {
+            const element = d3.select(this)
+            const id = element.attr("id")
+            if (id !== "Nations" && id !== "Countries") {
+              // Avoid adding the group itself again
+              elementsToProcess.push(this)
+            }
+          })
+        }
+
+        // Ensure uniqueness in elementsToProcess if there's overlap
+        const uniqueElements = Array.from(new Set(elementsToProcess))
+
+        uniqueElements.forEach((el) => {
+          const element = d3.select(el)
+          const id = element.attr("id")
+          let effectiveId = id
+
+          // This part is still relevant for paths without direct IDs but within a named group
+          if (el.tagName === "path" && !effectiveId && el.parentElement && el.parentElement.tagName === "g") {
+            effectiveId = d3.select(el.parentElement).attr("id")
+          }
+
+          let featureIdCandidate = null
+          if (effectiveId) {
+            featureIdCandidate = extractCandidateFromSVGId(effectiveId)
+          }
+
+          let normalizedFeatureId = null
+          if (featureIdCandidate) {
+            normalizedFeatureId = normalizeGeoIdentifier(featureIdCandidate, selectedGeography)
+          } else {
+            normalizedFeatureId = normalizeGeoIdentifier(effectiveId, selectedGeography)
+          }
+
+          if (normalizedFeatureId && !featuresForLabels.some((f) => f.id === normalizedFeatureId)) {
+            featuresForLabels.push({
+              id: normalizedFeatureId,
+              properties: { postal: normalizedFeatureId, name: normalizedFeatureId }, // Mock properties for consistency
+              pathNode: el, // Store reference to the actual DOM node
+            })
+          }
+        })
+
+        console.log("Custom map features for labels count:", featuresForLabels.length)
+      }
+
+      const labelElements = choroplethLabelGroup
+        .selectAll("text")
+        .data(featuresForLabels)
+        .join("text")
+        .each(function (d) {
+          // Determine the identifier for lookup in geoDataMap
+          let featureIdentifier: string | null = null
+          if (customMapData) {
+            featureIdentifier = d.id
+          } else {
+            // For TopoJSON data, normalize based on selectedGeography
+            if (selectedGeography.startsWith("usa-states")) {
+              featureIdentifier = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null
+            } else if (selectedGeography.startsWith("usa-counties")) {
+              featureIdentifier = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null
+            } else if (selectedGeography.startsWith("canada-provinces")) {
+              featureIdentifier = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null
+            } else if (
+              selectedGeography === "world" ||
+              selectedGeography === "usa-nation" ||
+              selectedGeography === "canada-nation"
+            ) {
+              featureIdentifier = d?.properties?.name || String(d?.id) || null
+            }
+          }
+
+          const dataRow = featureIdentifier ? geoDataMap.get(featureIdentifier) : undefined
+
+          console.log(`Processing label for feature ID: ${featureIdentifier}, has data: ${!!dataRow}`)
+
+          const labelText = dataRow
+            ? renderLabelPreview(
+                dimensionSettings.choropleth.labelTemplate,
+                dataRow,
+                columnTypes,
+                columnFormats,
+                selectedGeography,
+              )
+            : ""
+
+          if (labelText) {
+            let centroid
+            if (d.pathNode) {
+              // For custom maps, calculate centroid from the actual path or group element
+              const bbox = d.pathNode.getBBox()
+              centroid = [bbox.x + bbox.width / 2, bbox.y + bbox.height / 2]
+            } else {
+              // For TopoJSON data, use d3 path centroid
+              centroid = path.centroid(d)
+            }
+
+            if (centroid && !isNaN(centroid[0]) && !isNaN(centroid[1])) {
+              const textElement = d3.select(this)
+
+              // Create base styles object for choropleth labels
+              const baseStyles = {
+                fontWeight: stylingSettings.choropleth.labelBold ? "bold" : "normal",
+                fontStyle: stylingSettings.choropleth.labelItalic ? "italic" : "normal",
+                textDecoration: (() => {
+                  let decoration = ""
+                  if (stylingSettings.choropleth.labelUnderline) decoration += "underline "
+                  if (stylingSettings.choropleth.labelStrikethrough) decoration += "line-through"
+                  return decoration.trim()
+                })(),
+              }
+
+              textElement
+                .attr("x", centroid[0])
+                .attr("y", centroid[1])
+                .attr("text-anchor", "middle")
+                .attr("dominant-baseline", "middle")
+                .attr("font-family", stylingSettings.choropleth.labelFontFamily)
+                .attr("font-size", `${stylingSettings.choropleth.labelFontSize}px`)
+                .attr("fill", stylingSettings.choropleth.labelColor)
+                .attr("stroke", stylingSettings.choropleth.labelOutlineColor)
+                .attr("stroke-width", stylingSettings.choropleth.labelOutlineThickness)
+                .style("paint-order", "stroke fill")
+                .style("pointer-events", "none")
+
+              // Create formatted text with HTML support
+              createFormattedText(textElement, labelText, baseStyles)
+
+              // Fix tspan positioning for choropleth labels to maintain center alignment
+              textElement.selectAll("tspan").each(function (d, i) {
+                const tspan = d3.select(this)
+                if (i > 0 || tspan.attr("x") === "0") {
+                  tspan.attr("x", centroid[0])
+                }
+              })
+
+              console.log(`✅ Rendered label for feature ID: ${featureIdentifier} at position:`, centroid)
+            } else {
+              console.log(`❌ Invalid centroid for feature ID: ${featureIdentifier}:`, centroid)
+              d3.select(this).remove()
+            }
+          } else {
+            console.log(`❌ No label text for feature ID: ${featureIdentifier}`)
+            d3.select(this).remove()
+          }
+        })
+
+      console.log("Total choropleth labels rendered:", labelElements.size())
+    }
+
+    // Add Legends - positioned below the map
+    const legendGroup = svg.append("g").attr("id", "Legends")
+    let currentLegendY = mapHeight + 20
+
+    // Symbol Size Legend
+    if (shouldShowSymbolSizeLegend) {
+      console.log("=== Rendering Symbol Size Legend ===")
+
+      const sizeLegendGroup = legendGroup.append("g").attr("id", "SizeLegend")
+
+      // More compact legend background
+      const legendWidth = 400
+      const legendX = (width - legendWidth) / 2
+
+      const legendBg = sizeLegendGroup
+        .append("rect")
+        .attr("x", legendX)
+        .attr("y", currentLegendY - 10)
+        .attr("width", legendWidth)
+        .attr("height", 60)
+        .attr("fill", "rgba(255, 255, 255, 0.95)")
+        .attr("stroke", "#ddd")
+        .attr("stroke-width", 1)
+        .attr("rx", 6)
+
+      // Legend title
+      sizeLegendGroup
+        .append("text")
+        .attr("x", legendX + 15)
+        .attr("y", currentLegendY + 8)
+        .attr("font-family", "Arial, sans-serif")
+        .attr("font-size", "14px")
+        .attr("font-weight", "600")
+        .attr("fill", "#333")
+        .text(`Size: ${dimensionSettings.symbol.sizeBy}`)
+
+      // Create size legend with two symbols and arrow - tighter spacing
+      // Use fixed sizes for legend display instead of data-driven sizes
+      const minLegendSize = 8 // Fixed small size for min symbol
+      const maxLegendSize = 20 // Fixed large size for max symbol
+
+      // Determine symbol color - use default if no color mapping, otherwise use nation colors
+      const symbolColor = dimensionSettings.symbol.colorBy
+        ? stylingSettings.base.nationFillColor
+        : stylingSettings.symbol.symbolFillColor
+      const symbolStroke = dimensionSettings.symbol.colorBy
+        ? stylingSettings.base.nationStrokeColor
+        : stylingSettings.symbol.symbolStrokeColor
+
+      const legendCenterX = width / 2
+      const symbolY = currentLegendY + 35
+
+      // Min value label (left) - moved much closer to symbol
+      sizeLegendGroup
+        .append("text")
+        .attr("x", legendCenterX - 45) // Moved closer (was -60)
+        .attr("y", symbolY + 5)
+        .attr("font-family", "Arial, sans-serif")
+        .attr("font-size", "11px")
+        .attr("fill", "#666")
+        .attr("text-anchor", "middle")
+        .text(
+          formatLegendValue(
+            dimensionSettings.symbol.sizeMinValue,
+            dimensionSettings.symbol.sizeBy,
+            columnTypes,
+            columnFormats,
+            selectedGeography,
+          ),
+        )
+
+      // Min symbol - moved closer to center
+      const { pathData: minPathData } = getSymbolPathData(
+        stylingSettings.symbol.symbolType,
+        stylingSettings.symbol.symbolShape,
+        minLegendSize,
+        stylingSettings.symbol.customSvgPath,
+      )
+
+      sizeLegendGroup
+        .append("path")
+        .attr("d", minPathData)
+        .attr("transform", `translate(${legendCenterX - 20}, ${symbolY})`) // Moved closer (was -25)
+        .attr("fill", symbolColor)
+        .attr("stroke", symbolStroke)
+        .attr("stroke-width", 1)
+
+      // Arrow - moved closer to min symbol
+      sizeLegendGroup
+        .append("path")
+        .attr("d", "M-6,0 L6,0 M3,-2 L6,0 L3,2") // Shorter and moved closer
+        .attr("transform", `translate(${legendCenterX - 5}, ${symbolY})`) // Moved closer (was 0)
+        .attr("fill", "none")
+        .attr("stroke", "#666")
+        .attr("stroke-width", 1.5)
+
+      // Max symbol - closer to center, using fixed large size
+      const { pathData: maxPathData } = getSymbolPathData(
+        stylingSettings.symbol.symbolType,
+        stylingSettings.symbol.symbolShape,
+        maxLegendSize, // Use fixed size instead of sizeScale(dimensionSettings.symbol.sizeMaxValue)
+        stylingSettings.symbol.customSvgPath,
+      )
+
+      sizeLegendGroup
+        .append("path")
+        .attr("d", maxPathData)
+        .attr("transform", `translate(${legendCenterX + 25}, ${symbolY})`) // Moved closer (was +40)
+        .attr("fill", symbolColor)
+        .attr("stroke", symbolStroke)
+        .attr("stroke-width", 1)
+
+      // Max value label (right) - closer to symbol
+      sizeLegendGroup
+        .append("text")
+        .attr("x", legendCenterX + 60) // Moved closer (was +80)
+        .attr("y", symbolY + 5)
+        .attr("font-family", "Arial, sans-serif")
+        .attr("font-size", "11px")
+        .attr("fill", "#666")
+        .attr("text-anchor", "middle")
+        .text(
+          formatLegendValue(
+            dimensionSettings.symbol.sizeMaxValue,
+            dimensionSettings.symbol.sizeBy,
+            columnTypes,
+            columnFormats,
+            selectedGeography,
+          ),
+        )
+
+      currentLegendY += 80
+    }
+
+    // Symbol Color Legend
+    if (shouldShowSymbolColorLegend) {
+      console.log("=== Rendering Symbol Color Legend ===")
+
+      const colorLegendGroup = legendGroup.append("g").attr("id", "SymbolColorLegend")
+
+      if (dimensionSettings.symbol.colorScale === "linear") {
+        // Linear color legend with wide gradient
+        const legendBg = colorLegendGroup
+          .append("rect")
+          .attr("x", 20)
+          .attr("y", currentLegendY - 10)
+          .attr("width", width - 40)
+          .attr("height", 60)
+          .attr("fill", "rgba(255, 255, 255, 0.95)")
+          .attr("stroke", "#ddd")
+          .attr("stroke-width", 1)
+          .attr("rx", 6)
+
+        // Legend title
+        colorLegendGroup
+          .append("text")
+          .attr("x", 35)
+          .attr("y", currentLegendY + 8)
+          .attr("font-family", "Arial, sans-serif")
+          .attr("font-size", "14px")
+          .attr("font-weight", "600")
+          .attr("fill", "#333")
+          .text(`Color: ${dimensionSettings.symbol.colorBy}`)
+
+        // Create gradient
+        const gradient = svg
+          .append("defs")
+          .append("linearGradient")
+          .attr("id", "symbolColorGradient")
+          .attr("x1", "0%")
+          .attr("x2", "100%")
+          .attr("y1", "0%")
+          .attr("y2", "0%")
+
+        const domain = [dimensionSettings.symbol.colorMinValue, dimensionSettings.symbol.colorMaxValue]
+        const rangeColors = [
+          dimensionSettings.symbol.colorMinColor || stylingSettings.symbol.symbolFillColor,
+          stylingSettings.symbol.colorMaxColor || stylingSettings.symbol.symbolFillColor,
+        ]
+
+        if (dimensionSettings.symbol.colorMidColor) {
+          domain.splice(1, 0, dimensionSettings.symbol.colorMidValue)
+          rangeColors.splice(1, 0, dimensionSettings.symbol.colorMidColor)
+        }
+
+        rangeColors.forEach((color, index) => {
+          gradient
+            .append("stop")
+            .attr("offset", `${(index / (rangeColors.length - 1)) * 100}%`)
+            .attr("stop-color", color)
+        })
+
+        // Wide gradient bar
+        const gradientWidth = width - 200
+        const gradientX = (width - gradientWidth) / 2
+
+        colorLegendGroup
+          .append("rect")
+          .attr("x", gradientX)
+          .attr("y", currentLegendY + 25)
+          .attr("width", gradientWidth)
+          .attr("height", 12)
+          .attr("fill", "url(#symbolColorGradient)")
+          .attr("stroke", "#ccc")
+          .attr("stroke-width", 1)
+          .attr("rx", 2)
+
+        // Min label (left)
+        colorLegendGroup
+          .append("text")
+          .attr("x", gradientX - 10)
+          .attr("y", currentLegendY + 33)
+          .attr("font-family", "Arial, sans-serif")
+          .attr("font-size", "11px")
+          .attr("fill", "#666")
+          .attr("text-anchor", "end")
+          .text(
+            formatLegendValue(
+              domain[0],
+              dimensionSettings.symbol.colorBy,
+              columnTypes,
+              columnFormats,
+              selectedGeography,
+            ),
+          )
+
+        // Max label (right)
+        colorLegendGroup
+          .append("text")
+          .attr("x", gradientX + gradientWidth + 10)
+          .attr("y", currentLegendY + 33)
+          .attr("font-family", "Arial, sans-serif")
+          .attr("font-size", "11px")
+          .attr("fill", "#666")
+          .attr("text-anchor", "start")
+          .text(
+            formatLegendValue(
+              domain[domain.length - 1],
+              dimensionSettings.symbol.colorBy,
+              columnTypes,
+              columnFormats,
+              selectedGeography,
+            ),
+          )
+      } else {
+        // Categorical color legend with horizontal swatches
+        const uniqueValues = getUniqueValues(dimensionSettings.symbol.colorBy, symbolData)
+        const maxItems = Math.min(uniqueValues.length, 10)
+
+        // Calculate legend width based on content
+        const estimatedLegendWidth = Math.min(700, maxItems * 90 + 100)
+        const legendX = (width - estimatedLegendWidth) / 2
+
+        const legendBg = colorLegendGroup
+          .append("rect")
+          .attr("x", legendX)
+          .attr("y", currentLegendY - 10)
+          .attr("width", estimatedLegendWidth)
+          .attr("height", 60)
+          .attr("fill", "rgba(255, 255, 255, 0.95)")
+          .attr("stroke", "#ddd")
+          .attr("stroke-width", 1)
+          .attr("rx", 6)
+
+        // Legend title
+        colorLegendGroup
+          .append("text")
+          .attr("x", legendX + 15)
+          .attr("y", currentLegendY + 8)
+          .attr("font-family", "Arial, sans-serif")
+          .attr("font-size", "14px")
+          .attr("font-weight", "600")
+          .attr("fill", "#333")
+          .text(`Color: ${dimensionSettings.symbol.colorBy}`)
+
+        // Calculate spacing for horizontal layout
+        let currentX = legendX + 25
+        const swatchY = currentLegendY + 30
+
+        uniqueValues.slice(0, maxItems).forEach((value, index) => {
+          const color = symbolColorScale(value)
+          const labelText = formatLegendValue(
+            value,
+            dimensionSettings.symbol.colorBy,
+            columnTypes,
+            columnFormats,
+            selectedGeography,
+          )
+
+          // Create smaller fixed-size symbol swatch for categorical legend
+          const fixedLegendSize = 12 // Smaller size for better proportion
+          const { pathData } = getSymbolPathData(
+            stylingSettings.symbol.symbolType,
+            stylingSettings.symbol.symbolShape,
+            fixedLegendSize,
+            stylingSettings.symbol.customSvgPath,
+          )
+
+          colorLegendGroup
+            .append("path")
+            .attr("d", pathData)
+            .attr("transform", `translate(${currentX}, ${swatchY})`)
+            .attr("fill", color)
+            .attr("stroke", "#666")
+            .append("path")
+            .attr("d", pathData)
+            .attr("transform", `translate(${currentX}, ${swatchY})`)
+            .attr("fill", color)
+            .attr("stroke", "#666")
+            .attr("stroke-width", 1)
+
+          // Label positioned to the right of swatch, vertically centered
+          colorLegendGroup
+            .append("text")
+            .attr("x", currentX + 15) // Position to the right of swatch
+            .attr("y", swatchY + 3) // Vertically centered with swatch
+            .attr("font-family", "Arial, sans-serif")
+            .attr("font-size", "10px")
+            .attr("fill", "#666")
+            .attr("text-anchor", "start") // Left-aligned text
+            .text(labelText)
+
+          // Calculate next position based on label width with tighter spacing
+          const labelWidth = Math.max(60, labelText.length * 6 + 35) // Account for swatch + spacing
+          currentX += labelWidth
+        })
+      }
+
+      currentLegendY += 80
+    }
+
+    // Choropleth Color Legend
+    if (shouldShowChoroplethColorLegend) {
+      console.log("=== Rendering Choropleth Color Legend ===")
+
+      const choroplethColorLegendGroup = legendGroup.append("g").attr("id", "ChoroplethColorLegend")
+
+      if (dimensionSettings.choropleth.colorScale === "linear") {
+        // Linear color legend with wide gradient
+        const legendBg = choroplethColorLegendGroup
+          .append("rect")
+          .attr("x", 20)
+          .attr("y", currentLegendY - 10)
+          .attr("width", width - 40)
+          .attr("height", 60)
+          .attr("fill", "rgba(255, 255, 255, 0.95)")
+          .attr("stroke", "#ddd")
+          .attr("stroke-width", 1)
+          .attr("rx", 6)
+
+        // Legend title
+        choroplethColorLegendGroup
+          .append("text")
+          .attr("x", 35)
+          .attr("y", currentLegendY + 8)
+          .attr("font-family", "Arial, sans-serif")
+          .attr("font-size", "14px")
+          .attr("font-weight", "600")
+          .attr("fill", "#333")
+          .text(`Color: ${dimensionSettings.choropleth.colorBy}`)
+
+        // Create gradient
+        const gradient = svg
+          .append("defs")
+          .append("linearGradient")
+          .attr("id", "choroplethColorGradient")
+          .attr("x1", "0%")
+          .attr("x2", "100%")
+          .attr("y1", "0%")
+          .attr("y2", "0%")
+
+        const domain = [dimensionSettings.choropleth.colorMinValue, dimensionSettings.choropleth.colorMaxValue]
+        const rangeColors = [
+          dimensionSettings.choropleth.colorMinColor || stylingSettings.base.defaultStateFillColor,
+          dimensionSettings.choropleth.colorMaxColor || stylingSettings.base.defaultStateFillColor,
+        ]
+
+        if (dimensionSettings.choropleth.colorMidColor) {
+          domain.splice(1, 0, dimensionSettings.choropleth.colorMidValue)
+          rangeColors.splice(1, 0, dimensionSettings.choropleth.colorMidColor)
+        }
+
+        rangeColors.forEach((color, index) => {
+          gradient
+            .append("stop")
+            .attr("offset", `${(index / (rangeColors.length - 1)) * 100}%`)
+            .attr("stop-color", color)
+        })
+
+        // Wide gradient bar
+        const gradientWidth = width - 200
+        const gradientX = (width - gradientWidth) / 2
+
+        choroplethColorLegendGroup
+          .append("rect")
+          .attr("x", gradientX)
+          .attr("y", currentLegendY + 25)
+          .attr("width", gradientWidth)
+          .attr("height", 12)
+          .attr("fill", "url(#choroplethColorGradient)")
+          .attr("stroke", "#ccc")
+          .attr("stroke-width", 1)
+          .attr("rx", 2)
+
+        // Min label (left)
+        choroplethColorLegendGroup
+          .append("text")
+          .attr("x", gradientX - 10)
+          .attr("y", currentLegendY + 33)
+          .attr("font-family", "Arial, sans-serif")
+          .attr("font-size", "11px")
+          .attr("fill", "#666")
+          .attr("text-anchor", "end")
+          .text(
+            formatLegendValue(
+              domain[0],
+              dimensionSettings.choropleth.colorBy,
+              columnTypes,
+              columnFormats,
+              selectedGeography,
+            ),
+          )
+
+        // Max label (right)
+        choroplethColorLegendGroup
+          .append("text")
+          .attr("x", gradientX + gradientWidth + 10)
+          .attr("y", currentLegendY + 33)
+          .attr("font-family", "Arial, sans-serif")
+          .attr("font-size", "11px")
+          .attr("fill", "#666")
+          .attr("text-anchor", "start")
+          .text(
+            formatLegendValue(
+              domain[domain.length - 1],
+              dimensionSettings.choropleth.colorBy,
+              columnTypes,
+              columnFormats,
+              selectedGeography,
+            ),
+          )
+      } else {
+        // Categorical color legend with horizontal square swatches
+        const uniqueValues = getUniqueValues(dimensionSettings.choropleth.colorBy, choroplethData)
+        const maxItems = Math.min(uniqueValues.length, 10)
+
+        // Calculate legend width based on content
+        const estimatedLegendWidth = Math.min(700, maxItems * 90 + 100)
+        const legendX = (width - estimatedLegendWidth) / 2
+
+        const legendBg = choroplethColorLegendGroup
+          .append("rect")
+          .attr("x", legendX)
+          .attr("y", currentLegendY - 10)
+          .attr("width", estimatedLegendWidth)
+          .attr("height", 60)
+          .attr("fill", "rgba(255, 255, 255, 0.95)")
+          .attr("stroke", "#ddd")
+          .attr("stroke-width", 1)
+          .attr("rx", 6)
+
+        // Legend title
+        choroplethColorLegendGroup
+          .append("text")
+          .attr("x", legendX + 15)
+          .attr("y", currentLegendY + 8)
+          .attr("font-family", "Arial, sans-serif")
+          .attr("font-size", "14px")
+          .attr("font-weight", "600")
+          .attr("fill", "#333")
+          .text(`Color: ${dimensionSettings.choropleth.colorBy}`)
+
+        // Calculate spacing for horizontal layout
+        let currentX = legendX + 25
+        const swatchY = currentLegendY + 25
+
+        uniqueValues.slice(0, maxItems).forEach((value, index) => {
+          const color = choroplethColorScale(value)
+          const labelText = formatLegendValue(
+            value,
+            dimensionSettings.choropleth.colorBy,
+            columnTypes,
+            columnFormats,
+            selectedGeography,
+          )
+
+          // Smaller square swatch for choropleth categorical
+          choroplethColorLegendGroup
+            .append("rect")
+            .attr("x", currentX - 6) // Smaller 12x12 square
+            .attr("y", swatchY - 6)
+            .attr("width", 12)
+            .attr("height", 12)
+            .attr("fill", color)
+            .attr("stroke", "#666")
+            .attr("stroke-width", 1)
+            .attr("rx", 2)
+
+          // Label positioned to the right of swatch, vertically centered
+          choroplethColorLegendGroup
+            .append("text")
+            .attr("x", currentX + 15) // Position to the right of swatch
+            .attr("y", swatchY + 3) // Vertically centered with swatch
+            .attr("font-family", "Arial, sans-serif")
+            .attr("font-size", "10px")
+            .attr("fill", "#666")
+            .attr("text-anchor", "start") // Left-aligned text
+            .text(labelText)
+
+          // Calculate next position based on label width with tighter spacing
+          const labelWidth = Math.max(60, labelText.length * 6 + 35) // Account for swatch + spacing
+          currentX += labelWidth
+        })
+      }
+
+      currentLegendY += 80
+    }
+
+    console.log("=== MAP PREVIEW RENDER COMPLETE ===")
+  }, [
+    geoAtlasData,
+    symbolData,
+    choroplethData,
+    mapType,
+    dimensionSettings,
+    stylingSettings,
+    symbolDataExists,
+    choroplethDataExists,
+    columnTypes,
+    columnFormats,
+    customMapData,
+    selectedGeography,
+    selectedProjection,
+    clipToCountry, // Added to dependencies
+    toast,
+  ])
+
+  const renderMap = useCallback(() => {
+    console.log("renderMap useCallback triggered")
+  }, [
+    geoAtlasData,
+    symbolData,
+    choroplethData,
+    mapType,
+    dimensionSettings,
+    stylingSettings,
+    symbolDataExists,
+    choroplethDataExists,
+    columnTypes,
+    columnFormats,
+    selectedGeography,
+    selectedProjection,
+    clipToCountry, // Added to dependencies
+    toast,
+  ])
+
+  useEffect(() => {
+    renderMap()
+  }, [renderMap])
+
+  const handleDownloadSVG = () => {
+    if (!svgRef.current) return
+
+    try {
+      const svgElement = svgRef.current
+      const serializer = new XMLSerializer()
+      const svgString = serializer.serializeToString(svgElement)
+
+      const blob = new Blob([svgString], { type: "image/svg+xml" })
+      const url = URL.createObjectURL(blob)
+
+      const link = document.createElement("a")
+      link.href = url
+      link.download = "map.svg"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      URL.revokeObjectURL(url)
+
+      toast({
+        icon: <Download className="h-4 w-4" />,
+        description: "SVG downloaded successfully.",
+        duration: 3000,
+      })
+    } catch (error) {
+      console.error("Error downloading SVG:", error)
+      toast({
+        title: "Download failed",
+        description: "Failed to download SVG file",
+        variant: "destructive",
+        duration: 3000,
+      })
+    }
+  }
+
+  const handleCopySVG = async () => {
+    if (!svgRef.current) return
+
+    try {
+      const svgElement = svgRef.current
+      const serializer = new XMLSerializer()
+      const svgString = serializer.serializeToString(svgElement)
+
+      await navigator.clipboard.writeText(svgString)
+
+      toast({
+        icon: <Copy className="h-4 w-4" />,
+        description: "SVG copied to clipboard.",
+        duration: 3000,
+      })
+    } catch (error) {
+      console.error("Error copying SVG:", error)
+      toast({
+        title: "Copy failed",
+        description: "Failed to copy SVG to clipboard",
+        variant: "destructive",
+        duration: 3000,
+      })
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Map Preview</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center h-64">
+            <div className="text-muted-foreground">Loading map data...</div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
+      <CardHeader
+        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-4 px-6 rounded-t-xl relative"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">Map preview</CardTitle>
+          </div>
+          {/* Right side: Download and Copy buttons (with stopPropagation) */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "flex items-center gap-2 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700",
+                "group",
+              )}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleCopySVG()
+              }}
+            >
+              <Copy className="h-3 w-3 transition-transform duration-300 group-hover:translate-x-1" />
+              Copy to Figma
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "flex items-center gap-2 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700",
+                "group",
+              )}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleDownloadSVG()
+              }}
+            >
+              <Download className="h-3 w-3 transition-transform duration-300 group-hover:translate-y-1" />
+              Download SVG
+            </Button>
+            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className={cn("transition-all duration-200", isExpanded ? "pb-6 pt-2" : "pb-0 h-0 overflow-hidden")}>
+        <div
+          ref={mapContainerRef}
+          className="w-full border rounded-lg overflow-hidden"
+          style={{
+            backgroundColor: stylingSettings.base.mapBackgroundColor,
+          }}
+        >
+          <svg ref={svgRef} className="w-full h-full" />
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
