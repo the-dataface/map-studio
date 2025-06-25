@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { TabsContent } from "@/components/ui/tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import { ColorInput } from "@/components/color-input"
 import { FormattedNumberInput } from "@/components/formatted-number-input"
@@ -15,7 +15,7 @@ interface MapStylingProps {
 
 const MapStyling: React.FC<MapStylingProps> = ({ stylingSettings, onUpdateStylingSettings, selectedGeography }) => {
   return (
-    <>
+    <Tabs defaultValue="base">
       <TabsContent value="base">
         {/* Nation Styling (always visible as part of the base map) */}
         <div className="space-y-2">
@@ -116,8 +116,11 @@ const MapStyling: React.FC<MapStylingProps> = ({ stylingSettings, onUpdateStylin
       <TabsContent value="data">
         <div>Data Styling</div>
       </TabsContent>
-    </>
+    </Tabs>
   )
 }
 
 export default MapStyling
+
+// Provide a named export for consumers expecting `MapStyling`
+export { MapStyling }
