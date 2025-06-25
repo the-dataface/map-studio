@@ -80,3 +80,4 @@ const DataPreview: React.FC<DataPreviewProps> = ({ data, selectedGeography }) =>
 }
 
 export default DataPreview
+export { DataPreview }
