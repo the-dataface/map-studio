@@ -1,5 +1,19 @@
 "use client"
 
+import { DialogFooter } from "@/components/ui/dialog"
+
+import { Input } from "@/components/ui/input"
+
+import { DialogDescription } from "@/components/ui/dialog"
+
+import { DialogTitle } from "@/components/ui/dialog"
+
+import { DialogHeader } from "@/components/ui/dialog"
+
+import { DialogContent } from "@/components/ui/dialog"
+
+import { Dialog } from "@/components/ui/dialog"
+
 import type React from "react"
 import { useState, useEffect, useRef } from "react" // Import useRef
 
@@ -8,9 +22,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group" // Import ToggleGroup and ToggleGroupItem
-import { ChevronDown, ChevronUp, MapPin, Palette, Hash, Calendar, Flag, Type, BarChart3, Save } from "lucide-react"
+import {
+  ChevronDown,
+  ChevronUp,
+  MapPin,
+  Palette,
+  Hash,
+  Calendar,
+  Flag,
+  Type,
+  BarChart3,
+  Save,
+  Trash2,
+} from "lucide-react"
 import type { DataRow, GeocodedRow } from "@/app/page"
 import { cn } from "@/lib/utils"
+
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
 import { TooltipProvider } from "@/components/ui/tooltip"
 import * as d3 from "d3"
@@ -31,7 +59,7 @@ interface DimensionMappingProps {
   choroplethGeocodedData: GeocodedRow[]
   symbolColumns: string[]
   choroplethColumns: string[]
-  selectedGeography: string // NEW: Add selectedGeography prop
+  selectedGeography?: string
 }
 
 interface DimensionSettings {
@@ -366,6 +394,26 @@ const getDefaultFormat = (type: "number" | "date" | "state" | "coordinate"): str
   }
 }
 
+// Helper function to format state values based on the selected format (replicated from data-preview)
+const formatState = (value: any, format: string): string => {
+  if (value === null || value === undefined || value === "") return ""
+
+  const strValue = String(value).trim().toLowerCase()
+
+  switch (format) {
+    case "abbreviated": {
+      if (strValue.length === 2) return strValue.toUpperCase() // Already abbreviated
+      return reverseStateMap[strValue] || value // Try reverse mapping, fallback to original
+    }
+    case "full": {
+      if (strValue.length === 2) return stateMap[strValue.toUpperCase()] || value // Try direct mapping, fallback
+      return stateMap[reverseStateMap[strValue] || ""] || value // Try reverse then direct, fallback
+    }
+    default:
+      return String(value)
+  }
+}
+
 // Helper function to format legend values based on column type and format
 export const formatLegendValue = (value: any, column: string, columnTypes: any, columnFormats: any): string => {
   const type = columnTypes[column] || "text"
@@ -497,10 +545,12 @@ export function DimensionMapping({
   choroplethGeocodedData,
   symbolColumns,
   choroplethColumns,
-  selectedGeography, // NEW: Add selectedGeography prop
+  selectedGeography,
 }: DimensionMappingProps) {
   // Add this log at the beginning of the function
   console.log("Current symbol size range:", dimensionSettings.symbol.sizeMin, "-", dimensionSettings.symbol.sizeMax)
+
+  const geography = selectedGeography ?? "usa-states"
 
   const [isExpanded, setIsExpanded] = useState(true)
   const [expandedPanels, setExpandedPanels] = useState<{ [key: string]: boolean }>({
@@ -582,7 +632,7 @@ export function DimensionMapping({
   // Ref to store the values that were last auto-populated by this effect
   const lastAutoPopulatedValues = useRef<{
     symbol: { min: number | null; mid: number | null; max: number | null }
-    choropleth: { min: null; mid: null; max: number | null }
+    choropleth: { min: number | null; mid: number | null; max: number | null }
   }>({
     symbol: { min: null, mid: null, max: null },
     choropleth: { min: null, mid: null, max: null },
@@ -1329,12 +1379,9 @@ export function DimensionMapping({
   }, [dimensionSettings, internalActiveTab])
 
   // Determine the label for the "State" dimension setting based on selectedGeography
-  let subFeatureDimensionLabel = "State"
-  if (selectedGeography === "usa-counties") {
-    subFeatureDimensionLabel = "County"
-  } else if (selectedGeography === "canada-provinces") {
-    subFeatureDimensionLabel = "Province"
-  }
+  let subFeatureDimensionLabel: "State" | "Province" | "County" = "State"
+  if (geography === "usa-counties") subFeatureDimensionLabel = "County"
+  else if (geography === "canada-provinces") subFeatureDimensionLabel = "Province"
 
   // Update the renderDropdown function to show correct icons and ensure proper filtering
   const renderDropdown = (
@@ -1375,6 +1422,50 @@ export function DimensionMapping({
       </div>
     )
   }
+
+  // --- tab helpers ----------------------------------------------------------
+  const hasDataForTab = (tab: "symbol" | "choropleth") =>
+    tab === "symbol" ? symbolDataExists : choroplethDataExists || customDataExists
+
+  const isTabDisabled = (tab: "symbol" | "choropleth") => !hasDataForTab(tab)
+
+  const getTabTooltip = (tab: "symbol" | "choropleth") =>
+    tab === "symbol"
+      ? "Add symbol map data to configure dimensions."
+      : "Add choropleth or custom map data to configure dimensions."
+
+  const renderTabButton = (tab: "symbol" | "choropleth", icon: React.ReactNode, label: string, isActive: boolean) => {
+    const disabled = isTabDisabled(tab)
+
+    if (disabled) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-normal opacity-50 text-gray-500 dark:text-gray-400">
+              {icon}
+              {label}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="bg-black text-white border-black px-3 py-2 rounded-md text-xs">
+            {getTabTooltip(tab)}
+          </TooltipContent>
+        </Tooltip>
+      )
+    }
+
+    return (
+      <Button
+        variant={isActive ? "secondary" : "ghost"}
+        size="sm"
+        className="px-3 py-1.5 text-xs font-normal"
+        onClick={() => setInternalActiveTab(tab)}
+      >
+        {icon}
+        {label}
+      </Button>
+    )
+  }
+  // --------------------------------------------------------------------------
 
   return (
     <TooltipProvider>
@@ -1701,4 +1792,1070 @@ export function DimensionMapping({
                                             >
                                               <div className="flex items-center gap-3 w-full">
                                                 <span className="text-sm font-medium min-w-[80px] text-gray-900 dark:text-gray-100">
-                               \
+                                                  {scheme.name}
+                                                </span>
+                                                <div className="flex-1 min-w-[120px]">
+                                                  {renderColorSchemePreview(scheme.colors, "categorical", scheme.name)}
+                                                </div>
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                  {scheme.colors.length} colors
+                                                </span>
+                                              </div>
+                                            </SelectItem>
+                                          ),
+                                        )}
+                                    </>
+                                  )}
+                                </>
+                              )}
+                            </SelectContent>
+                          </Select>
+                          {/* Delete Custom Scheme Button */}
+                          {selectedChoroplethColorScheme.startsWith("custom-") && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteCustomScheme(selectedChoroplethColorScheme, "choropleth")}
+                              className="h-7 w-7"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Linear Color Scale Settings */}
+                    {dimensionSettings[internalActiveTab].colorScale === "linear" && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">Color range</Label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddMidpoint(internalActiveTab)}
+                            disabled={showMidpointChoropleth}
+                            className="h-7 text-xs px-2"
+                          >
+                            Add midpoint
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="space-y-1">
+                            <Label htmlFor="colorMinValue" className="text-xs">
+                              Min value
+                            </Label>
+                            <input
+                              type="number"
+                              id="colorMinValue"
+                              className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].colorMinValue}
+                              onChange={(e) =>
+                                handleDimensionSettingChange(
+                                  internalActiveTab,
+                                  "colorMinValue",
+                                  Number.parseFloat(e.target.value),
+                                )
+                              }
+                            />
+                          </div>
+
+                          {/* Midpoint Value Input (Conditionally Rendered) */}
+                          {showMidpointChoropleth && (
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <Label htmlFor="colorMidValue" className="text-xs">
+                                  Mid value
+                                </Label>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleRemoveMidpoint(internalActiveTab)}
+                                  className="h-7 w-7"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                              <input
+                                type="number"
+                                id="colorMidValue"
+                                className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                                value={dimensionSettings[internalActiveTab].colorMidValue}
+                                onChange={(e) =>
+                                  handleDimensionSettingChange(
+                                    internalActiveTab,
+                                    "colorMidValue",
+                                    Number.parseFloat(e.target.value),
+                                  )
+                                }
+                              />
+                            </div>
+                          )}
+
+                          <div className="space-y-1">
+                            <Label htmlFor="colorMaxValue" className="text-xs">
+                              Max value
+                            </Label>
+                            <input
+                              type="number"
+                              id="colorMaxValue"
+                              className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].colorMaxValue}
+                              onChange={(e) =>
+                                handleDimensionSettingChange(
+                                  internalActiveTab,
+                                  "colorMaxValue",
+                                  Number.parseFloat(e.target.value),
+                                )
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="space-y-1">
+                            <Label htmlFor="colorMinColor" className="text-xs">
+                              Min color
+                            </Label>
+                            <input
+                              type="color"
+                              id="colorMinColor"
+                              className="w-full h-10 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].colorMinColor}
+                              onChange={(e) =>
+                                handleColorValueChange(internalActiveTab, "colorMinColor", e.target.value)
+                              }
+                            />
+                          </div>
+
+                          {/* Midpoint Color Input (Conditionally Rendered) */}
+                          {showMidpointChoropleth && (
+                            <div className="space-y-1">
+                              <Label htmlFor="colorMidColor" className="text-xs">
+                                Mid color
+                              </Label>
+                              <input
+                                type="color"
+                                id="colorMidColor"
+                                className="w-full h-10 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200"
+                                value={dimensionSettings[internalActiveTab].colorMidColor}
+                                onChange={(e) =>
+                                  handleColorValueChange(internalActiveTab, "colorMidColor", e.target.value)
+                                }
+                              />
+                            </div>
+                          )}
+
+                          <div className="space-y-1">
+                            <Label htmlFor="colorMaxColor" className="text-xs">
+                              Max color
+                            </Label>
+                            <input
+                              type="color"
+                              id="colorMaxColor"
+                              className="w-full h-10 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].colorMaxColor}
+                              onChange={(e) =>
+                                handleColorValueChange(internalActiveTab, "colorMaxColor", e.target.value)
+                              }
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Categorical Color Scale Settings */}
+                    {dimensionSettings[internalActiveTab].colorScale === "categorical" && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">Categories</Label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddColor(internalActiveTab)}
+                            className="h-7 text-xs px-2"
+                          >
+                            Add color +
+                          </Button>
+                        </div>
+                        <div className="space-y-1">
+                          {dimensionSettings[internalActiveTab].categoricalColors.length === 0 ? (
+                            <div className="text-sm text-gray-500 dark:text-gray-400">No categories defined.</div>
+                          ) : (
+                            dimensionSettings[internalActiveTab].categoricalColors.map((item, index) => (
+                              <div
+                                key={item.value}
+                                draggable="true"
+                                onDragStart={(e) => handleDragStart(e, index)}
+                                onDragOver={(e) => handleDragOver(e, index)}
+                                onDragLeave={handleDragLeave}
+                                onDrop={(e) => handleDrop(e, index, internalActiveTab)}
+                                onDragEnd={handleDragEnd}
+                                className={cn(
+                                  "flex items-center gap-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200",
+                                  draggedIndex === index ? "opacity-50" : "",
+                                  dragOverIndex === index ? "border-primary-500 dark:border-primary-400" : "",
+                                )}
+                              >
+                                <div className="w-2 h-10 bg-gray-200 dark:bg-gray-700 cursor-grab rounded-l-md" />
+                                <input
+                                  type="color"
+                                  className="h-10 w-10 rounded-md border-none bg-transparent"
+                                  value={item.color}
+                                  onChange={(e) =>
+                                    handleCategoricalColorChange(internalActiveTab, index, e.target.value)
+                                  }
+                                />
+                                <div className="flex-1 truncate text-sm text-gray-900 dark:text-gray-100 px-2">
+                                  {getUniqueValues(dimensionSettings[internalActiveTab].colorBy)[index]}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>,
+                )}
+
+                {/* Labels Panel */}
+                {renderSubPanel(
+                  "labels",
+                  "Labels",
+                  <Type className="w-4 h-4" />,
+                  dimensionSettings[internalActiveTab].labelTemplate ? "Custom template" : "No template defined",
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="labelTemplate" className="text-sm font-medium">
+                        Label template
+                      </Label>
+                      <textarea
+                        id="labelTemplate"
+                        className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                        placeholder="Enter label template (e.g., {name}, {value})"
+                        value={dimensionSettings[internalActiveTab].labelTemplate}
+                        onChange={(e) =>
+                          handleDimensionSettingChange(internalActiveTab, "labelTemplate", e.target.value)
+                        }
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Use &#123;columnName&#125; to insert column values into the label.
+                      </p>
+                    </div>
+
+                    {/* Label Preview */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Label preview</Label>
+                      <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 text-sm text-gray-900 dark:text-gray-100">
+                        <div
+                          className="break-words"
+                          dangerouslySetInnerHTML={{
+                            __html: renderLabelPreview(
+                              dimensionSettings[internalActiveTab].labelTemplate,
+                              getDisplayDataForTab(internalActiveTab)[0],
+                              columnTypes,
+                              columnFormats,
+                            ),
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>,
+                )}
+              </div>
+            )}
+
+            {internalActiveTab === "symbol" && ( // Use internal state
+              <div className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                {/* Coordinates Panel */}
+                {renderSubPanel(
+                  "coordinates",
+                  "Coordinates",
+                  <MapPin className="w-4 h-4" />,
+                  dimensionSettings[internalActiveTab].latitude && dimensionSettings[internalActiveTab].longitude
+                    ? `${toSentenceCase(dimensionSettings[internalActiveTab].latitude)}, ${toSentenceCase(
+                        dimensionSettings[internalActiveTab].longitude,
+                      )}`
+                    : "Not mapped",
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {renderDropdown(
+                      "Latitude column",
+                      dimensionSettings[internalActiveTab].latitude,
+                      (value) => handleDimensionSettingChange(internalActiveTab, "latitude", value), // Use new handler
+                      ["coordinate"],
+                    )}
+                    {renderDropdown(
+                      "Longitude column",
+                      dimensionSettings[internalActiveTab].longitude,
+                      (value) => handleDimensionSettingChange(internalActiveTab, "longitude", value), // Use new handler
+                      ["coordinate"],
+                    )}
+                  </div>,
+                )}
+
+                {/* Size Panel */}
+                {renderSubPanel(
+                  "size",
+                  "Size",
+                  <Hash className="w-4 h-4" />,
+                  dimensionSettings[internalActiveTab].sizeBy
+                    ? toSentenceCase(dimensionSettings[internalActiveTab].sizeBy)
+                    : "Not mapped",
+                  <div className="space-y-4">
+                    {renderDropdown(
+                      "Size by",
+                      dimensionSettings[internalActiveTab].sizeBy,
+                      (value) => handleDimensionSettingChange(internalActiveTab, "sizeBy", value), // Use new handler
+                      ["number"],
+                    )}
+
+                    {dimensionSettings[internalActiveTab].sizeBy && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Size range</Label>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <Label htmlFor="sizeMin" className="text-xs">
+                              Min size
+                            </Label>
+                            <input
+                              type="number"
+                              id="sizeMin"
+                              className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].sizeMin}
+                              onChange={(e) =>
+                                handleDimensionSettingChange(
+                                  internalActiveTab,
+                                  "sizeMin",
+                                  Number.parseFloat(e.target.value),
+                                )
+                              }
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="sizeMax" className="text-xs">
+                              Max size
+                            </Label>
+                            <input
+                              type="number"
+                              id="sizeMax"
+                              className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].sizeMax}
+                              onChange={(e) =>
+                                handleDimensionSettingChange(
+                                  internalActiveTab,
+                                  "sizeMax",
+                                  Number.parseFloat(e.target.value),
+                                )
+                              }
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>,
+                )}
+
+                {/* Color Panel */}
+                {renderSubPanel(
+                  "color",
+                  "Color",
+                  <Palette className="w-4 h-4" />,
+                  dimensionSettings[internalActiveTab].colorBy
+                    ? toSentenceCase(dimensionSettings[internalActiveTab].colorBy)
+                    : "Not mapped",
+                  <div className="space-y-4">
+                    <div className="flex items-end justify-between gap-2">
+                      {" "}
+                      {/* Flex container for alignment */}
+                      {renderDropdown(
+                        "Color by",
+                        dimensionSettings[internalActiveTab].colorBy,
+                        (value) => handleDimensionSettingChange(internalActiveTab, "colorBy", value), // Use new handler
+                        ["number", "text", "date"],
+                      )}
+                      {dimensionSettings[internalActiveTab].colorBy && (
+                        <ToggleGroup
+                          type="single"
+                          value={dimensionSettings[internalActiveTab].colorScale}
+                          onValueChange={
+                            (value: "linear" | "categorical") =>
+                              value && handleDimensionSettingChange(internalActiveTab, "colorScale", value) // Use new handler
+                          }
+                          className="flex flex-shrink-0 h-auto rounded-md border bg-muted p-1 text-muted-foreground"
+                          aria-label="Color scale type"
+                        >
+                          <ToggleGroupItem
+                            value="linear"
+                            aria-label="Linear scale"
+                            className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
+                          >
+                            Linear scale
+                          </ToggleGroupItem>
+                          <ToggleGroupItem
+                            value="categorical"
+                            aria-label="Categorical scale"
+                            className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
+                          >
+                            Categorical scale
+                          </ToggleGroupItem>
+                        </ToggleGroup>
+                      )}
+                    </div>
+
+                    {/* Color Scheme Preset Dropdown for Symbol */}
+                    {dimensionSettings[internalActiveTab].colorBy && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">Color scheme presets</Label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleSaveScheme(internalActiveTab)}
+                            className="h-7 text-xs px-2"
+                          >
+                            <Save className="w-3 h-3 mr-1" /> Save scheme
+                          </Button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={selectedSymbolColorScheme}
+                            onValueChange={(schemeName) => {
+                              setSelectedSymbolColorScheme(schemeName)
+                              if (schemeName) {
+                                const updatedSettings = applyColorSchemePreset(
+                                  schemeName,
+                                  internalActiveTab,
+                                  dimensionSettings[internalActiveTab].colorScale,
+                                  dimensionSettings[internalActiveTab].colorBy, // Pass colorByColumn
+                                  dimensionSettings,
+                                  getUniqueValues, // Use the local getUniqueValues
+                                  customSchemes,
+                                  showMidpointSymbol,
+                                )
+                                onUpdateSettings(updatedSettings)
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Choose a color scheme..." />
+                            </SelectTrigger>
+
+                            <SelectContent className="max-h-80">
+                              {/* Conditional rendering based on colorScale */}
+                              {dimensionSettings[internalActiveTab].colorScale === "linear" && (
+                                <>
+                                  {/* Sequential Schemes */}
+                                  <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b bg-gray-50 dark:bg-gray-800">
+                                    Sequential (Single Hue)
+                                  </div>
+                                  {colorSchemeCategories.sequential["Single Hue"].map((scheme) => (
+                                    <SelectItem
+                                      key={scheme}
+                                      value={scheme}
+                                      className="p-3 pl-8 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                                    >
+                                      <div className="flex items-center gap-3 w-full">
+                                        <span className="text-sm font-medium min-w-[80px] text-gray-900 dark:text-gray-100">
+                                          {scheme}
+                                        </span>
+                                        <div className="flex-1 min-w-[120px]">
+                                          {renderColorSchemePreview(
+                                            d3ColorSchemes[scheme as keyof typeof d3ColorSchemes],
+                                            "linear",
+                                            scheme,
+                                          )}
+                                        </div>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          {d3ColorSchemes[scheme as keyof typeof d3ColorSchemes].length} colors
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+
+                                  <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-t bg-gray-50 dark:bg-gray-800">
+                                    Sequential (Multi-Hue)
+                                  </div>
+                                  {colorSchemeCategories.sequential["Multi-Hue"].map((scheme) => (
+                                    <SelectItem
+                                      key={scheme}
+                                      value={scheme}
+                                      className="p-3 pl-8 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                                    >
+                                      <div className="flex items-center gap-3 w-full">
+                                        <span className="text-sm font-medium min-w-[80px] text-gray-900 dark:text-gray-100">
+                                          {scheme}
+                                        </span>
+                                        <div className="flex-1 min-w-[120px]">
+                                          {renderColorSchemePreview(
+                                            d3ColorSchemes[scheme as keyof typeof d3ColorSchemes],
+                                            "linear",
+                                            scheme,
+                                          )}
+                                        </div>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          {d3ColorSchemes[scheme as keyof typeof d3ColorSchemes].length} colors
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+
+                                  {/* Diverging Schemes */}
+                                  <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-t bg-gray-50 dark:bg-gray-800">
+                                    Diverging
+                                  </div>
+                                  {colorSchemeCategories.diverging.map((scheme) => (
+                                    <SelectItem
+                                      key={`${scheme}`}
+                                      value={scheme}
+                                      className="p-3 pl-8 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                                    >
+                                      <div className="flex items-center gap-3 w-full">
+                                        <span className="text-sm font-medium min-w-[80px] text-gray-900 dark:text-gray-100">
+                                          {scheme}
+                                        </span>
+                                        <div className="flex-1 min-w-[120px]">
+                                          {renderColorSchemePreview(
+                                            d3ColorSchemes[scheme as keyof typeof d3ColorSchemes],
+                                            "linear",
+                                            scheme,
+                                          )}
+                                        </div>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          {d3ColorSchemes[scheme as keyof typeof d3ColorSchemes].length} colors
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                  {customSchemes.filter((s) => s.type === "linear").length > 0 && (
+                                    <>
+                                      <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-t bg-gray-50 dark:bg-gray-800">
+                                        Custom Linear
+                                      </div>
+                                      {customSchemes
+                                        .filter((s) => s.type === "linear")
+                                        .map((scheme) => (
+                                          <SelectItem
+                                            key={`custom-linear-${scheme.name}`}
+                                            value={`custom-linear-${scheme.name}`} // Prefix to distinguish
+                                            className="p-3 pl-8 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                                          >
+                                            <div className="flex items-center gap-3 w-full">
+                                              <span className="text-sm font-medium min-w-[80px] text-gray-900 dark:text-gray-100">
+                                                {scheme.name}
+                                              </span>
+                                              <div className="flex-1 min-w-[120px]">
+                                                {/* Render preview using the 3 colors */}
+                                                {renderColorSchemePreview(
+                                                  [
+                                                    scheme.colors[0],
+                                                    scheme.colors[1] || scheme.colors[0],
+                                                    scheme.colors[2] || scheme.colors[0],
+                                                  ],
+                                                  "linear",
+                                                  scheme.name,
+                                                )}
+                                              </div>
+                                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                {scheme.hasMidpoint ? "3 colors" : "2 colors"}
+                                              </span>
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                    </>
+                                  )}
+                                </>
+                              )}
+
+                              {dimensionSettings[internalActiveTab].colorScale === "categorical" && (
+                                <>
+                                  {/* Categorical Schemes */}
+                                  <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-t bg-gray-50 dark:bg-gray-800">
+                                    Categorical
+                                  </div>
+                                  {colorSchemeCategories.categorical.map((scheme) => (
+                                    <SelectItem
+                                      key={`${scheme}`}
+                                      value={scheme}
+                                      className="p-3 pl-8 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                                    >
+                                      <div className="flex items-center gap-3 w-full">
+                                        <span className="text-sm font-medium min-w-[80px] text-gray-900 dark:text-gray-100">
+                                          {scheme}
+                                        </span>
+                                        <div className="flex-1 min-w-[120px]">
+                                          {renderColorSchemePreview(
+                                            d3ColorSchemes[scheme as keyof typeof d3ColorSchemes],
+                                            "categorical",
+                                            scheme,
+                                          )}
+                                        </div>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          {d3ColorSchemes[scheme as keyof typeof d3ColorSchemes].length} colors
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                  {/* Custom Schemes */}
+                                  {customSchemes.filter((s) => s.type === "categorical").length > 0 && ( // Filter by type
+                                    <>
+                                      <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-t bg-gray-50 dark:bg-gray-800">
+                                        Custom Categorical
+                                      </div>
+                                      {customSchemes
+                                        .filter((s) => s.type === "categorical")
+                                        .map(
+                                          (
+                                            scheme, // Filter by type
+                                          ) => (
+                                            <SelectItem
+                                              key={`custom-${scheme.name}`}
+                                              value={`custom-${scheme.name}`} // Prefix to distinguish from D3 schemes
+                                              className="p-3 pl-8 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                                            >
+                                              <div className="flex items-center gap-3 w-full">
+                                                <span className="text-sm font-medium min-w-[80px] text-gray-900 dark:text-gray-100">
+                                                  {scheme.name}
+                                                </span>
+                                                <div className="flex-1 min-w-[120px]">
+                                                  {renderColorSchemePreview(scheme.colors, "categorical", scheme.name)}
+                                                </div>
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                  {scheme.colors.length} colors
+                                                </span>
+                                              </div>
+                                            </SelectItem>
+                                          ),
+                                        )}
+                                    </>
+                                  )}
+                                </>
+                              )}
+                            </SelectContent>
+                          </Select>
+                          {/* Delete Custom Scheme Button */}
+                          {selectedSymbolColorScheme.startsWith("custom-") && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteCustomScheme(selectedSymbolColorScheme, "symbol")}
+                              className="h-7 w-7"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Linear Color Scale Settings */}
+                    {dimensionSettings[internalActiveTab].colorScale === "linear" && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">Color range</Label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddMidpoint(internalActiveTab)}
+                            disabled={showMidpointSymbol}
+                            className="h-7 text-xs px-2"
+                          >
+                            Add midpoint
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="space-y-1">
+                            <Label htmlFor="colorMinValue" className="text-xs">
+                              Min value
+                            </Label>
+                            <input
+                              type="number"
+                              id="colorMinValue"
+                              className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].colorMinValue}
+                              onChange={(e) =>
+                                handleDimensionSettingChange(
+                                  internalActiveTab,
+                                  "colorMinValue",
+                                  Number.parseFloat(e.target.value),
+                                )
+                              }
+                            />
+                          </div>
+
+                          {/* Midpoint Value Input (Conditionally Rendered) */}
+                          {showMidpointSymbol && (
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <Label htmlFor="colorMidValue" className="text-xs">
+                                  Mid value
+                                </Label>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleRemoveMidpoint(internalActiveTab)}
+                                  className="h-7 w-7"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                              <input
+                                type="number"
+                                id="colorMidValue"
+                                className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                                value={dimensionSettings[internalActiveTab].colorMidValue}
+                                onChange={(e) =>
+                                  handleDimensionSettingChange(
+                                    internalActiveTab,
+                                    "colorMidValue",
+                                    Number.parseFloat(e.target.value),
+                                  )
+                                }
+                              />
+                            </div>
+                          )}
+
+                          <div className="space-y-1">
+                            <Label htmlFor="colorMaxValue" className="text-xs">
+                              Max value
+                            </Label>
+                            <input
+                              type="number"
+                              id="colorMaxValue"
+                              className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].colorMaxValue}
+                              onChange={(e) =>
+                                handleDimensionSettingChange(
+                                  internalActiveTab,
+                                  "colorMaxValue",
+                                  Number.parseFloat(e.target.value),
+                                )
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="space-y-1">
+                            <Label htmlFor="colorMinColor" className="text-xs">
+                              Min color
+                            </Label>
+                            <input
+                              type="color"
+                              id="colorMinColor"
+                              className="w-full h-10 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].colorMinColor}
+                              onChange={(e) =>
+                                handleColorValueChange(internalActiveTab, "colorMinColor", e.target.value)
+                              }
+                            />
+                          </div>
+
+                          {/* Midpoint Color Input (Conditionally Rendered) */}
+                          {showMidpointSymbol && (
+                            <div className="space-y-1">
+                              <Label htmlFor="colorMidColor" className="text-xs">
+                                Mid color
+                              </Label>
+                              <input
+                                type="color"
+                                id="colorMidColor"
+                                className="w-full h-10 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200"
+                                value={dimensionSettings[internalActiveTab].colorMidColor}
+                                onChange={(e) =>
+                                  handleColorValueChange(internalActiveTab, "colorMidColor", e.target.value)
+                                }
+                              />
+                            </div>
+                          )}
+
+                          <div className="space-y-1">
+                            <Label htmlFor="colorMaxColor" className="text-xs">
+                              Max color
+                            </Label>
+                            <input
+                              type="color"
+                              id="colorMaxColor"
+                              className="w-full h-10 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].colorMaxColor}
+                              onChange={(e) =>
+                                handleColorValueChange(internalActiveTab, "colorMaxColor", e.target.value)
+                              }
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Categorical Color Scale Settings */}
+                    {dimensionSettings[internalActiveTab].colorScale === "categorical" && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">Categories</Label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddColor(internalActiveTab)}
+                            className="h-7 text-xs px-2"
+                          >
+                            Add color +
+                          </Button>
+                        </div>
+                        <div className="space-y-1">
+                          {dimensionSettings[internalActiveTab].categoricalColors.length === 0 ? (
+                            <div className="text-sm text-gray-500 dark:text-gray-400">No categories defined.</div>
+                          ) : (
+                            dimensionSettings[internalActiveTab].categoricalColors.map((item, index) => (
+                              <div
+                                key={item.value}
+                                draggable="true"
+                                onDragStart={(e) => handleDragStart(e, index)}
+                                onDragOver={(e) => handleDragOver(e, index)}
+                                onDragLeave={handleDragLeave}
+                                onDrop={(e) => handleDrop(e, index, internalActiveTab)}
+                                onDragEnd={handleDragEnd}
+                                className={cn(
+                                  "flex items-center gap-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200",
+                                  draggedIndex === index ? "opacity-50" : "",
+                                  dragOverIndex === index ? "border-primary-500 dark:border-primary-400" : "",
+                                )}
+                              >
+                                <div className="w-2 h-10 bg-gray-200 dark:bg-gray-700 cursor-grab rounded-l-md" />
+                                <input
+                                  type="color"
+                                  className="h-10 w-10 rounded-md border-none bg-transparent"
+                                  value={item.color}
+                                  onChange={(e) =>
+                                    handleCategoricalColorChange(internalActiveTab, index, e.target.value)
+                                  }
+                                />
+                                <div className="flex-1 truncate text-sm text-gray-900 dark:text-gray-100 px-2">
+                                  {getUniqueValues(dimensionSettings[internalActiveTab].colorBy)[index]}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>,
+                )}
+
+                {/* Labels Panel */}
+                {renderSubPanel(
+                  "labels",
+                  "Labels",
+                  <Type className="w-4 h-4" />,
+                  dimensionSettings[internalActiveTab].labelTemplate ? "Custom template" : "No template defined",
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="labelTemplate" className="text-sm font-medium">
+                        Label template
+                      </Label>
+                      <textarea
+                        id="labelTemplate"
+                        className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                        placeholder="Enter label template (e.g., {name}, {value})"
+                        value={dimensionSettings[internalActiveTab].labelTemplate}
+                        onChange={(e) =>
+                          handleDimensionSettingChange(internalActiveTab, "labelTemplate", e.target.value)
+                        }
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Use &#123;columnName&#125; to insert column values into the label.
+                      </p>
+                    </div>
+
+                    {/* Label Preview */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Label preview</Label>
+                      <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 text-sm text-gray-900 dark:text-gray-100">
+                        <div
+                          className="break-words"
+                          dangerouslySetInnerHTML={{
+                            __html: renderLabelPreview(
+                              dimensionSettings[internalActiveTab].labelTemplate,
+                              getDisplayDataForTab(internalActiveTab)[0],
+                              columnTypes,
+                              columnFormats,
+                            ),
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>,
+                )}
+              </div>
+            )}
+          </CardContent>
+        </div>
+
+        {/* Save Scheme Modal */}
+        <SaveSchemeModal
+          open={showSaveSchemeModal}
+          onOpenChange={setShowSaveSchemeModal}
+          colors={schemeColorsToSave}
+          type={schemeTypeToSave}
+          hasMidpoint={schemeHasMidpointToSave}
+          onConfirm={handleSaveSchemeConfirm}
+        />
+      </Card>
+    </TooltipProvider>
+  )
+
+  // --- sub panel helpers ----------------------------------------------------
+  function renderSubPanel(
+    panelKey: string,
+    title: string,
+    icon: React.ReactNode,
+    description: string,
+    content: React.ReactNode,
+  ) {
+    const isPanelExpanded = expandedPanels[panelKey]
+
+    return (
+      <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
+        <div
+          className="flex items-center justify-between gap-2 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
+          onClick={() => togglePanel(panelKey)}
+        >
+          <div className="flex items-center gap-2">
+            {icon}
+            <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">{title}</h4>
+          </div>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>
+            {isPanelExpanded ? (
+              <ChevronUp className="h-4 w-4 text-gray-600 dark:text-gray-400 transition-colors duration-200" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400 transition-colors duration-200" />
+            )}
+          </div>
+        </div>
+        <div
+          className={`transition-all duration-300 ease-in-out ${
+            isPanelExpanded ? "max-h-[9999px] opacity-100" : "max-h-0 opacity-0"
+          } overflow-hidden`}
+        >
+          <div className="px-4 pb-4 pt-2">{content}</div>
+        </div>
+      </div>
+    )
+  }
+
+  // --- color scheme helpers -------------------------------------------------
+  function renderColorSchemePreview(colors: string[], type: string, schemeName: string) {
+    if (type === "linear") {
+      return (
+        <div className="flex h-4 w-full">
+          {colors.map((color, index) => (
+            <div key={`${schemeName}-${index}`} className="flex-1" style={{ backgroundColor: color }} />
+          ))}
+        </div>
+      )
+    } else {
+      return (
+        <div className="flex h-4 w-full">
+          {colors.slice(0, 8).map((color, index) => (
+            <div key={`${schemeName}-${index}`} className="flex-1" style={{ backgroundColor: color }} />
+          ))}
+        </div>
+      )
+    }
+  }
+}
+
+// --- components -------------------------------------------------------------
+interface SaveSchemeModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  colors: string[]
+  type: "linear" | "categorical" | null
+  hasMidpoint?: boolean
+  onConfirm: (schemeName: string, colors: string[], type: "linear" | "categorical", hasMidpoint?: boolean) => void
+}
+
+function SaveSchemeModal({ open, onOpenChange, colors, type, hasMidpoint, onConfirm }: SaveSchemeModalProps) {
+  const [schemeName, setSchemeName] = useState("")
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Save color scheme</DialogTitle>
+          <DialogDescription>Give your custom color scheme a name so you can reuse it later.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="name" className="text-right">
+              Name
+            </Label>
+            <Input
+              id="name"
+              value={schemeName}
+              onChange={(e) => setSchemeName(e.target.value)}
+              className="col-span-3"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="colors" className="text-right">
+              Colors
+            </Label>
+            <div className="col-span-3 flex gap-2">
+              {colors.map((color, index) => (
+                <div key={index} className="w-6 h-6 rounded-md" style={{ backgroundColor: color }} />
+              ))}
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            onClick={() => {
+              if (schemeName && type) {
+                onConfirm(schemeName, colors, type, hasMidpoint)
+                onOpenChange(false)
+                setSchemeName("")
+              }
+            }}
+          >
+            Save scheme
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// --- data -------------------------------------------------------------------
+const d3ColorSchemes: { [key: string]: string[] } = {
+  ...colorSchemes,
+  Category10: categoricalPalettes[0].colors,
+  Set3: categoricalPalettes[1].colors,
+  Pastel1: categoricalPalettes[2].colors,
+}
+
+const colorSchemeCategories: {
+  sequential: { "Single Hue": string[]; "Multi-Hue": string[] }
+  diverging: string[]
+  categorical: string[]
+} = {
+  sequential: {
+    "Single Hue": ["Blues", "Greens", "Oranges", "Purples", "Reds"],
+    "Multi-Hue": [
+      "BuGn",
+      "BuPu",
+      "GnBu",
+      "OrRd",
+      "PuBu",
+      "PuBuGn",
+      "PuRd",
+      "RdPu",
+      "YlGn",
+      "YlGnBu",
+      "YlOrBr",
+      "YlOrRd",
+    ],
+  },
+  diverging: ["BrBG", "PiYG", "PRGn", "PuOr", "RdBu", "RdGy", "RdYlGn", "RdYlBu", "Spectral"],
+  categorical: ["Category10", "Accent", "Dark2", "Paired", "Pastel1", "Pastel2", "Set1", "Set2", "Set3"],
+}
