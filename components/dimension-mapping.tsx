@@ -2531,7 +2531,7 @@ export function DimensionMapping({
                         className="min-h-[80px] resize-none"
                       />
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Use {"{column_name}"} to insert data values. Click column tags below to add them.
+                        Use {"{column_name}"} to insert data values. Click column tags above to add them.
                       </p>
                     </div>
 
