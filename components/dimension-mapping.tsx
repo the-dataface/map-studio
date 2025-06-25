@@ -126,14 +126,38 @@ export function DimensionMapping({
 
         {(activeMapType === "choropleth" || activeMapType === "custom") && (
           <div className="mb-4">
-            {columnSelect(
-              "stateColumn",
-              selectedGeography === "usa-counties"
-                ? "County Column"
-                : selectedGeography.startsWith("canada")
-                  ? "Province Column"
-                  : "State/Province Column",
-            )}
+            <FormField
+              control={form.control}
+              name="stateColumn"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    {selectedGeography === "usa-counties"
+                      ? "County Column"
+                      : selectedGeography.startsWith("canada")
+                        ? "Province Column"
+                        : "State/Province Column"}
+                  </FormLabel>
+                  <Select onValueChange={(val) => form.setValue("stateColumn", val)} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue
+                          placeholder={
+                            selectedGeography === "usa-counties"
+                              ? "Select county column"
+                              : selectedGeography.startsWith("canada")
+                                ? "Select province column"
+                                : "Select state/province column"
+                          }
+                        />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>{colItems(safeArray(columns))}</SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
         )}
 
