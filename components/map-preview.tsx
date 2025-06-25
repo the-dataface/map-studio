@@ -110,7 +110,7 @@ interface StylingSettings {
       | "bottom-left"
       | "bottom-center"
       | "bottom-right"
-    customSvgPath?: string
+    customSvgPath?: string // NEW: Add customSvgPath
   }
   choropleth: {
     labelFontFamily: string

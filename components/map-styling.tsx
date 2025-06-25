@@ -16,6 +16,7 @@ import { toast } from "@/components/ui/use-toast" // Import toast
 import {
   ChevronDown,
   ChevronUp,
+  Palette,
   Map,
   Type,
   Trash2,
@@ -56,7 +57,7 @@ interface StylingSettings {
     nationStrokeColor: string
     nationStrokeWidth: number
     defaultStateFillColor: string
-    defaultStateStrokeColor: string // Corrected type to string
+    defaultStateStrokeColor: string
     defaultStateStrokeWidth: number
     savedStyles: Array<{
       id: string
@@ -68,8 +69,7 @@ interface StylingSettings {
         nationStrokeColor: string
         nationStrokeWidth: number
         defaultStateFillColor: string
-        defaultStateStrokeColor: string // Corrected type to string
-        defaultStateStrokeWidth: number
+        defaultStateStrokeColor: string
       }
     }>
   }
@@ -142,7 +142,7 @@ interface MapStylingProps {
   symbolDataExists: boolean
   choroplethDataExists: boolean
   customDataExists: boolean // NEW
-  selectedGeography: "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world" // NEW: Add selectedGeography prop
+  selectedGeography: string // NEW: Add selectedGeography prop
 }
 
 const googleFontFamilies = [
@@ -165,7 +165,7 @@ export function MapStyling({
   dimensionSettings,
   symbolDataExists,
   choroplethDataExists,
-  customDataExists, // NEW
+  customDataExists,
   selectedGeography, // NEW: Destructure selectedGeography
 }: MapStylingProps) {
   const [isExpanded, setIsExpanded] = useState(true)
@@ -296,7 +296,7 @@ export function MapStyling({
         </div>
         <div
           className={`transition-all duration-300 ease-in-out overflow-hidden ${
-            isPanelExpanded ? "max-h-[9999px] opacity-100" : "max-h-0 opacity-0" // Ensure full height
+            isPanelExpanded ? "max-h-[9999px] opacity-100" : "max-h-0 opacity-0"
           }`}
         >
           <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-600">{children}</div>
@@ -502,166 +502,116 @@ export function MapStyling({
                   </div>,
                 )}
 
-                {/* Inlined Nation/Country Styling Panel */}
-                <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
-                  <div
-                    className="bg-gray-100 dark:bg-gray-700 px-4 py-3 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-650 transition-colors duration-200"
-                    onClick={() => togglePanel("nation")}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="text-black dark:text-white transform scale-75">
-                          <Map className="w-4 h-4" />
-                        </div>
-                        <span className="font-medium text-gray-900 dark:text-white">Nation/Country Styles</span>
+                {renderSubPanel(
+                  "background",
+                  "Background", // Sentence case
+                  <Palette className="w-4 h-4" />,
+                  <div className="space-y-2">
+                    <Label htmlFor="map-background-color" className="text-sm">
+                      Map background color
+                    </Label>
+                    <ColorInput
+                      id="map-background-color"
+                      value={stylingSettings.base.mapBackgroundColor}
+                      onChange={(value) => updateSetting("base", "mapBackgroundColor", value)}
+                    />
+                  </div>,
+                )}
+
+                {renderSubPanel(
+                  "nation",
+                  "Nation", // Sentence case
+                  <Map className="w-4 h-4" />,
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="nation-fill-color" className="text-sm">
+                          Nation fill color
+                        </Label>
+                        <ColorInput
+                          id="nation-fill-color"
+                          value={stylingSettings.base.nationFillColor}
+                          onChange={(value) => updateSetting("base", "nationFillColor", value)}
+                        />
                       </div>
-                      <div className="transition-transform duration-200">
-                        {expandedPanels["nation"] ? (
-                          <ChevronUp className="w-4 h-4 text-gray-500" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 text-gray-500" />
+                      <div className="space-y-2">
+                        <Label htmlFor="nation-stroke-color" className="text-sm">
+                          Nation stroke color
+                        </Label>
+                        <ColorInput
+                          id="nation-stroke-color"
+                          value={stylingSettings.base.nationStrokeColor}
+                          onChange={(value) => updateSetting("base", "nationStrokeColor", value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="nation-stroke-width" className="text-sm">
+                        Nation stroke width ({stylingSettings.base.nationStrokeWidth}px)
+                      </Label>
+                      <Slider
+                        id="nation-stroke-width"
+                        value={[stylingSettings.base.nationStrokeWidth]}
+                        onValueChange={(value) => updateSetting("base", "nationStrokeWidth", value[0])}
+                        min={0}
+                        max={5}
+                        step={0.5}
+                      />
+                    </div>
+                  </div>,
+                )}
+
+                {renderSubPanel(
+                  "states",
+                  subFeatureLabel, // Sentence case
+                  <LandPlot className="w-4 h-4" />, // Changed icon
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="default-state-fill-color" className="text-sm">
+                          Default {subFeatureLabel.toLowerCase()} fill color
+                        </Label>
+                        <div className={cn(isChoroplethFillDisabled && "pointer-events-none opacity-50")}>
+                          <ColorInput
+                            id="default-state-fill-color"
+                            value={stylingSettings.base.defaultStateFillColor}
+                            onChange={(value) => updateSetting("base", "defaultStateFillColor", value)}
+                            disabled={isChoroplethFillDisabled}
+                          />
+                        </div>
+                        {isChoroplethFillDisabled && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Inactive when Choropleth fill is mapped to data.
+                          </p>
                         )}
                       </div>
-                    </div>
-                  </div>
-                  <div
-                    className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                      expandedPanels["nation"] ? "max-h-[9999px] opacity-100" : "max-h-0 opacity-0"
-                    }`}
-                  >
-                    <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-600">
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="map-background-color" className="text-sm">
-                              Map background color
-                            </Label>
-                            <ColorInput
-                              id="map-background-color"
-                              value={stylingSettings.base.mapBackgroundColor}
-                              onChange={(value) => updateSetting("base", "mapBackgroundColor", value)}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="nation-fill-color" className="text-sm">
-                              Nation fill color
-                            </Label>
-                            <ColorInput
-                              id="nation-fill-color"
-                              value={stylingSettings.base.nationFillColor}
-                              onChange={(value) => updateSetting("base", "nationFillColor", value)}
-                            />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="nation-stroke-color" className="text-sm">
-                              Nation stroke color
-                            </Label>
-                            <ColorInput
-                              id="nation-stroke-color"
-                              value={stylingSettings.base.nationStrokeColor}
-                              onChange={(value) => updateSetting("base", "nationStrokeColor", value)}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="nation-stroke-width" className="text-sm">
-                              Nation stroke width ({stylingSettings.base.nationStrokeWidth}px)
-                            </Label>
-                            <Slider
-                              id="nation-stroke-width"
-                              value={[stylingSettings.base.nationStrokeWidth]}
-                              onValueChange={(value) => updateSetting("base", "nationStrokeWidth", value[0])}
-                              min={0}
-                              max={5}
-                              step={0.5}
-                            />
-                          </div>
-                        </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="default-state-stroke-color" className="text-sm">
+                          Default {subFeatureLabel.toLowerCase()} stroke color
+                        </Label>
+                        <ColorInput
+                          id="default-state-stroke-color"
+                          value={stylingSettings.base.defaultStateStrokeColor}
+                          onChange={(value) => updateSetting("base", "defaultStateStrokeColor", value)}
+                        />
                       </div>
                     </div>
-                  </div>
-                </div>
-
-                {/* Inlined State/Province/County Styling Panel - Conditionally rendered */}
-                {showStateProvinceStyling && (
-                  <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
-                    <div
-                      className="bg-gray-100 dark:bg-gray-700 px-4 py-3 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-650 transition-colors duration-200"
-                      onClick={() => togglePanel("states")}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="text-black dark:text-white transform scale-75">
-                            <LandPlot className="w-4 h-4" />
-                          </div>
-                          <span className="font-medium text-gray-900 dark:text-white">{subFeatureLabel} Styles</span>
-                        </div>
-                        <div className="transition-transform duration-200">
-                          {expandedPanels["states"] ? (
-                            <ChevronUp className="w-4 h-4 text-gray-500" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-gray-500" />
-                          )}
-                        </div>
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="default-state-stroke-width" className="text-sm">
+                        Default {subFeatureLabel.toLowerCase()} stroke width (
+                        {stylingSettings.base.defaultStateStrokeWidth}
+                        px)
+                      </Label>
+                      <Slider
+                        id="default-state-stroke-width"
+                        value={[stylingSettings.base.defaultStateStrokeWidth]}
+                        onValueChange={(value) => updateSetting("base", "defaultStateStrokeWidth", value[0])}
+                        min={0}
+                        max={5}
+                        step={0.5}
+                      />
                     </div>
-                    <div
-                      className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                        expandedPanels["states"] ? "max-h-[9999px] opacity-100" : "max-h-0 opacity-0"
-                      }`}
-                    >
-                      <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-600">
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="default-state-fill-color" className="text-sm">
-                                Default {subFeatureLabel.toLowerCase()} fill color
-                              </Label>
-                              <div className={cn(isChoroplethFillDisabled && "pointer-events-none opacity-50")}>
-                                <ColorInput
-                                  id="default-state-fill-color"
-                                  value={stylingSettings.base.defaultStateFillColor}
-                                  onChange={(value) => updateSetting("base", "defaultStateFillColor", value)}
-                                  disabled={isChoroplethFillDisabled}
-                                />
-                              </div>
-                              {isChoroplethFillDisabled && (
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                  Inactive when Choropleth fill is mapped to data.
-                                </p>
-                              )}
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="default-state-stroke-color" className="text-sm">
-                                Default {subFeatureLabel.toLowerCase()} stroke color
-                              </Label>
-                              <ColorInput
-                                id="default-state-stroke-color"
-                                value={stylingSettings.base.defaultStateStrokeColor}
-                                onChange={(value) => updateSetting("base", "defaultStateStrokeColor", value)}
-                              />
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="default-state-stroke-width" className="text-sm">
-                              Default {subFeatureLabel.toLowerCase()} stroke width (
-                              {stylingSettings.base.defaultStateStrokeWidth}
-                              px)
-                            </Label>
-                            <Slider
-                              id="default-state-stroke-width"
-                              value={[stylingSettings.base.defaultStateStrokeWidth]}
-                              onValueChange={(value) => updateSetting("base", "defaultStateStrokeWidth", value[0])}
-                              min={0}
-                              max={5}
-                              step={0.5}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  </div>,
                 )}
               </div>
             )}
@@ -1108,165 +1058,11 @@ export function MapStyling({
                               stylingSettings.symbol.labelAlignment === item.value
                                 ? "bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-white"
                                 : "bg-transparent text-muted-foreground",
-                              "hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-white",
+                            "hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-white",
                             )}
                             onClick={() => updateSetting("symbol", "labelAlignment", item.value)}
                           >
                             <item.icon className="h-4 w-4" />
                           </Button>
                         ))}
-                      </div>
-                    </div>
-                  </div>,
-                )}
-              </div>
-            )}
-
-            {activeTab === "choropleth" && (
-              <div className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
-                {renderSubPanel(
-                  "choroplethLabels",
-                  "Labels", // Sentence case
-                  <Type className="w-4 h-4" />,
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="space-y-4">
-                      <div className="flex items-end gap-4">
-                        <div className="space-y-2 flex-1">
-                          <Label htmlFor="choropleth-label-font-family" className="text-sm">
-                            Font family
-                          </Label>
-                          <Select
-                            value={stylingSettings.choropleth.labelFontFamily || "Inter"}
-                            onValueChange={(value) => updateSetting("choropleth", "labelFontFamily", value)}
-                          >
-                            <SelectTrigger id="choropleth-label-font-family">
-                              <SelectValue placeholder="Inter" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {googleFontFamilies.map((font) => (
-                                <SelectItem key={font} value={font} style={{ fontFamily: font }}>
-                                  {font}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <ToggleGroup
-                          type="multiple"
-                          value={
-                            [
-                              stylingSettings.choropleth.labelBold && "bold",
-                              stylingSettings.choropleth.labelItalic && "italic",
-                              stylingSettings.choropleth.labelUnderline && "underline",
-                              stylingSettings.choropleth.labelStrikethrough && "strikethrough",
-                            ].filter(Boolean) as string[]
-                          }
-                          onValueChange={(values) => {
-                            console.log("Choropleth Label ToggleGroup onValueChange - received values:", values)
-                            onUpdateStylingSettings({
-                              ...stylingSettings,
-                              choropleth: {
-                                ...stylingSettings.choropleth,
-                                labelBold: values.includes("bold"),
-                                labelItalic: values.includes("italic"),
-                                labelUnderline: values.includes("underline"),
-                                labelStrikethrough: values.includes("strikethrough"),
-                              },
-                            })
-                          }}
-                          className="inline-flex h-10 items-center justify-center rounded-md border border-gray-200 bg-white p-1 text-muted-foreground dark:border-gray-700 dark:bg-gray-800"
-                        >
-                          <ToggleGroupItem
-                            value="bold"
-                            aria-label="Toggle bold"
-                            className="p-2 rounded-md transition-all duration-200 data-[state=on]:bg-gray-100 data-[state=on]:text-gray-900 dark:data-[state=on]:bg-gray-700 dark:data-[state=on]:text-white hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-white h-full"
-                          >
-                            <Bold className="h-4 w-4" />
-                          </ToggleGroupItem>
-                          <ToggleGroupItem
-                            value="italic"
-                            aria-label="Toggle italic"
-                            className="p-2 rounded-md transition-all duration-200 data-[state=on]:bg-gray-100 data-[state=on]:text-gray-900 dark:data-[state=on]:bg-gray-700 dark:data-[state=on]:text-white hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-white leading-4 leading-3 leading-4 leading-3 h-full"
-                          >
-                            <Italic className="h-4 w-4" />
-                          </ToggleGroupItem>
-                          <ToggleGroupItem
-                            value="underline"
-                            aria-label="Toggle underline"
-                            className="p-2 rounded-md transition-all duration-200 data-[state=on]:bg-gray-100 data-[state=on]:text-gray-900 dark:data-[state=on]:bg-gray-700 dark:data-[state=on]:text-white hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-white h-full"
-                          >
-                            <Underline className="h-4 w-4" />
-                          </ToggleGroupItem>
-                          <ToggleGroupItem
-                            value="strikethrough"
-                            aria-label="Toggle strikethrough"
-                            className="p-2 rounded-md transition-all duration-200 data-[state=on]:bg-gray-100 data-[state=on]:text-gray-900 dark:data-[state=on]:bg-gray-700 dark:data-[state=on]:text-white hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-white h-full"
-                          >
-                            <Strikethrough className="h-4 w-4" />
-                          </ToggleGroupItem>
-                        </ToggleGroup>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="choropleth-label-color" className="text-sm">
-                            Label color
-                          </Label>
-                          <ColorInput
-                            id="choropleth-label-color"
-                            value={stylingSettings.choropleth.labelColor}
-                            onChange={(value) => updateSetting("choropleth", "labelColor", value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="choropleth-label-outline-color" className="text-sm">
-                            Label outline color
-                          </Label>
-                          <ColorInput
-                            id="choropleth-label-outline-color"
-                            value={stylingSettings.choropleth.labelOutlineColor}
-                            onChange={(value) => updateSetting("choropleth", "labelOutlineColor", value)}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="choropleth-label-font-size" className="text-sm">
-                            Font size ({stylingSettings.choropleth.labelFontSize}px)
-                          </Label>
-                          <Slider
-                            id="choropleth-label-font-size"
-                            value={[stylingSettings.choropleth.labelFontSize]}
-                            onValueChange={(value) => updateSetting("choropleth", "labelFontSize", value[0])}
-                            min={8}
-                            max={30}
-                            step={1}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="choropleth-label-outline-thickness" className="text-sm">
-                            Outline thickness ({stylingSettings.choropleth.labelOutlineThickness}px)
-                          </Label>
-                          <Slider
-                            id="choropleth-label-outline-thickness"
-                            value={[stylingSettings.choropleth.labelOutlineThickness]}
-                            onValueChange={(value) => updateSetting("choropleth", "labelOutlineThickness", value[0])}
-                            min={0}
-                            max={10}
-                            step={0.5}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>,
-                )}
-              </div>
-            )}
-          </CardContent>
-        </div>
-      </Card>
-    </TooltipProvider>
-  )
-}
+\
