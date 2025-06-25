@@ -672,15 +672,15 @@ const formatLegendValue = (
   geoType: string,
 ): string => {
   const type = columnTypes[column] || "text"
-  const format = columnFormats[column]
+  const format = columnFormats[column] || getDefaultFormat(type as "number" | "date" | "state" | "coordinate")
 
-  if (type === "number" && format) {
+  if (type === "number") {
     return formatNumber(value, format)
   }
-  if (type === "date" && format) {
+  if (type === "date") {
     return formatDate(value, format)
   }
-  if (type === "state" && format) {
+  if (type === "state") {
     return formatState(value, format, geoType)
   }
   return String(value)
@@ -872,7 +872,7 @@ const createFormattedText = (
         const textContent = text.substring(lastIndex)
         if (textContent) {
           const tspan = parentElement.append("tspan").text(textContent)
-          if (isFirstLine && lineIndex === 0 && !hasAddedContent) {
+          if (isFirstLine && lineIndex === 0) {
             tspan.attr("dy", `${verticalOffset}em`)
           } else if (lineIndex > 0) {
             tspan.attr("x", 0).attr("dy", `${lineHeight}em`)
@@ -1561,13 +1561,9 @@ export function MapPreview({
       if (dimensionSettings?.choropleth?.colorScale === "linear") {
         const domain = [dimensionSettings.choropleth.colorMinValue, dimensionSettings.choropleth.colorMaxValue]
         const rangeColors = [
-          stylingSettings.base.defaultStateFillColor, // Use default if not set
-          stylingSettings.base.defaultStateFillColor, // Use default if not set
+          dimensionSettings.choropleth.colorMinColor || stylingSettings.base.defaultStateFillColor,
+          dimensionSettings.choropleth.colorMaxColor || stylingSettings.base.defaultStateFillColor,
         ]
-
-        // Ensure min/max colors are set, fallback to default state fill
-        rangeColors[0] = dimensionSettings.choropleth.colorMinColor || stylingSettings.base.defaultStateFillColor
-        rangeColors[1] = dimensionSettings.choropleth.colorMaxColor || stylingSettings.base.defaultStateFillColor
 
         if (dimensionSettings.choropleth.colorMidColor) {
           domain.splice(1, 0, dimensionSettings.choropleth.colorMidValue)
@@ -1584,8 +1580,7 @@ export function MapPreview({
             colorMap.set(String(dataCategory), item.color)
           }
         })
-        choroplethColorScale = (value: any) =>
-          geoDataMap.get(String(value)) || stylingSettings.base.defaultStateFillColor
+        choroplethColorScale = (value: any) => colorMap.get(String(value)) || stylingSettings.base.defaultStateFillColor
         console.log("Created categorical color scale with map:", Array.from(colorMap.entries()))
       }
 
@@ -2185,8 +2180,8 @@ export function MapPreview({
           formatLegendValue(
             dimensionSettings.symbol.sizeMinValue,
             dimensionSettings.symbol.sizeBy,
-            columnTypes, // Pass columnTypes
-            columnFormats, // Pass columnFormats
+            columnTypes,
+            columnFormats,
             selectedGeography,
           ),
         )
@@ -2245,8 +2240,8 @@ export function MapPreview({
           formatLegendValue(
             dimensionSettings.symbol.sizeMaxValue,
             dimensionSettings.symbol.sizeBy,
-            columnTypes, // Pass columnTypes
-            columnFormats, // Pass columnFormats
+            columnTypes,
+            columnFormats,
             selectedGeography,
           ),
         )
@@ -2340,8 +2335,8 @@ export function MapPreview({
             formatLegendValue(
               domain[0],
               dimensionSettings.symbol.colorBy,
-              columnTypes, // Pass columnTypes
-              columnFormats, // Pass columnFormats
+              columnTypes,
+              columnFormats,
               selectedGeography,
             ),
           )
@@ -2359,8 +2354,8 @@ export function MapPreview({
             formatLegendValue(
               domain[domain.length - 1],
               dimensionSettings.symbol.colorBy,
-              columnTypes, // Pass columnTypes
-              columnFormats, // Pass columnFormats
+              columnTypes,
+              columnFormats,
               selectedGeography,
             ),
           )
@@ -2665,7 +2660,6 @@ export function MapPreview({
     choroplethDataExists,
     columnTypes,
     columnFormats,
-    customMapData,
     selectedGeography,
     selectedProjection,
     clipToCountry, // Added to dependencies
