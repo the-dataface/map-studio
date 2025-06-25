@@ -1,75 +1,86 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
+import { type ColumnDef, flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useMemo } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface DataPreviewProps {
   data: any[]
+  columnTypes: Record<string, string>
+  setColumnTypes: (columnTypes: Record<string, string>) => void
   selectedGeography: string | null
 }
 
-const DataPreview: React.FC<DataPreviewProps> = ({ data, selectedGeography }) => {
-  const [columnTypes, setColumnTypes] = useState<{ [key: string]: string }>({})
+const DataPreview: React.FC<DataPreviewProps> = ({ data, columnTypes, setColumnTypes, selectedGeography }) => {
+  const columns = useMemo<ColumnDef<any>[]>(
+    () =>
+      Object.keys(data[0] || {}).map((column) => ({
+        accessorKey: column,
+        header: column,
+      })),
+    [data],
+  )
 
-  useEffect(() => {
-    if (data && data.length > 0) {
-      const initialColumnTypes: { [key: string]: string } = {}
-      Object.keys(data[0]).forEach((key) => {
-        initialColumnTypes[key] = "" // Initialize with empty string
-      })
-      setColumnTypes(initialColumnTypes)
-    }
-  }, [data])
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  })
 
   const handleColumnTypeChange = (column: string, type: string) => {
     setColumnTypes((prev) => ({ ...prev, [column]: type }))
   }
 
-  if (!data || data.length === 0) {
-    return <div>No data to display.</div>
-  }
-
-  const columns = Object.keys(data[0])
+  const columnTypeOptions = ["string", "number", "state", "date"]
 
   return (
     <div className="rounded-md border">
       <Table>
-        <TableCaption>A preview of the data.</TableCaption>
         <TableHeader>
-          <TableRow>
-            {columns.map((column) => (
-              <TableHead key={column}>
-                {column}
-                <Select onValueChange={(value) => handleColumnTypeChange(column, value)}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Select Type">
-                      {columnTypes[column] === "state"
-                        ? selectedGeography === "canada-provinces"
-                          ? "Province"
-                          : selectedGeography === "usa-counties"
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id}>
+              {headerGroup.headers.map((header) => {
+                const column = header.column.id
+                return (
+                  <TableHead key={header.id}>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-semibold">
+                        {columnTypes[column] === "state"
+                          ? selectedGeography === "usa-counties"
                             ? "County"
-                            : "State" // Default for usa-states
-                        : columnTypes[column] || "Text"}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="text">Text</SelectItem>
-                    <SelectItem value="number">Number</SelectItem>
-                    <SelectItem value="date">Date</SelectItem>
-                    <SelectItem value="state">State/Province/County</SelectItem>
-                  </SelectContent>
-                </Select>
-              </TableHead>
-            ))}
-          </TableRow>
+                            : selectedGeography === "canada-provinces" || selectedGeography === "canada-nation" // Even for nation, if a state-like column is inferred, label as Province
+                              ? "Province"
+                              : "State/Province" // Default for generic state or USA states
+                          : column}
+                      </span>
+                      {/* Add type dropdown for columns */}
+                      <Select onValueChange={(type) => handleColumnTypeChange(column, type)}>
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Column Type" defaultValue={columnTypes[column]} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {columnTypeOptions.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </TableHead>
+                )
+              })}
+            </TableRow>
+          ))}
         </TableHeader>
         <TableBody>
-          {data.map((row, index) => (
-            <TableRow key={index}>
-              {columns.map((column) => (
-                <TableCell key={column}>{row[column]}</TableCell>
+          {table.getRowModel().rows.map((row) => (
+            <TableRow key={row.id}>
+              {row.getVisibleCells().map((cell) => (
+                <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
               ))}
             </TableRow>
           ))}
@@ -80,4 +91,3 @@ const DataPreview: React.FC<DataPreviewProps> = ({ data, selectedGeography }) =>
 }
 
 export default DataPreview
-export { DataPreview }
