@@ -70,7 +70,6 @@ interface StylingSettings {
         nationStrokeWidth: number
         defaultStateFillColor: string
         defaultStateStrokeColor: string
-        defaultStateStrokeWidth: number
       }
     }>
   }
@@ -143,7 +142,7 @@ interface MapStylingProps {
   symbolDataExists: boolean
   choroplethDataExists: boolean
   customDataExists: boolean // NEW
-  selectedGeography: string // NEW: Add selectedGeography prop
+  selectedGeography: "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world" // Correct type for selectedGeography prop
 }
 
 const googleFontFamilies = [
@@ -290,14 +289,14 @@ export function MapStyling({
               {isPanelExpanded ? (
                 <ChevronUp className="w-4 h-4 text-gray-500" />
               ) : (
-                <ChevronDown className="h-4 w-4 text-gray-500" />
+                <ChevronDown className="w-4 h-4 text-gray-500" />
               )}
             </div>
           </div>
         </div>
         <div
           className={`transition-all duration-300 ease-in-out overflow-hidden ${
-            isPanelExpanded ? "max-h-[9999px] opacity-100" : "max-h-0 opacity-0" // Ensure full height
+            isPanelExpanded ? "max-h-[9999px] opacity-100" : "max-h-0 opacity-0"
           }`}
         >
           <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-600">{children}</div>
@@ -506,7 +505,7 @@ export function MapStyling({
                 {renderSubPanel(
                   "background",
                   "Background", // Sentence case
-                  <Palette className="w-4 h-4" />, // Changed icon to Palette for background
+                  <Palette className="w-4 h-4" />,
                   <div className="space-y-2">
                     <Label htmlFor="map-background-color" className="text-sm">
                       Map background color
@@ -521,7 +520,7 @@ export function MapStyling({
 
                 {renderSubPanel(
                   "nation",
-                  "Nation/Country", // Updated title
+                  "Nation", // Sentence case
                   <Map className="w-4 h-4" />,
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -562,7 +561,6 @@ export function MapStyling({
                   </div>,
                 )}
 
-                {/* Conditional State/Province/County Styling Panel */}
                 {showStateProvinceStyling &&
                   renderSubPanel(
                     "states",
