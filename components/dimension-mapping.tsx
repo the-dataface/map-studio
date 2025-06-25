@@ -27,6 +27,8 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
   setDimensionSettings,
   selectedGeography,
 }) => {
+  // Safe reference to the settings object for the current tab
+  const currentSettings = dimensionSettings?.[activeMapType] ?? {}
   const { toast } = useToast()
 
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false)
@@ -48,34 +50,34 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      latitudeColumn: dimensionSettings[activeMapType]?.latitudeColumn || "",
-      longitudeColumn: dimensionSettings[activeMapType]?.longitudeColumn || "",
-      stateColumn: dimensionSettings[activeMapType]?.stateColumn || "",
-      valueColumn: dimensionSettings[activeMapType]?.valueColumn || "",
-      labelColumn: dimensionSettings[activeMapType]?.labelColumn || "",
-      tooltipColumn: dimensionSettings[activeMapType]?.tooltipColumn || "",
-      clusterRadius: dimensionSettings[activeMapType]?.clusterRadius || "120",
-      clusterMaxZoom: dimensionSettings[activeMapType]?.clusterMaxZoom || "14",
-      clusterTextColor: dimensionSettings[activeMapType]?.clusterTextColor || "#FFFFFF",
-      clusterTextSize: dimensionSettings[activeMapType]?.clusterTextSize || "16",
-      clusterColor: dimensionSettings[activeMapType]?.clusterColor || "#000000",
+      latitudeColumn: currentSettings.latitudeColumn || "",
+      longitudeColumn: currentSettings.longitudeColumn || "",
+      stateColumn: currentSettings.stateColumn || "",
+      valueColumn: currentSettings.valueColumn || "",
+      labelColumn: currentSettings.labelColumn || "",
+      tooltipColumn: currentSettings.tooltipColumn || "",
+      clusterRadius: currentSettings.clusterRadius || "120",
+      clusterMaxZoom: currentSettings.clusterMaxZoom || "14",
+      clusterTextColor: currentSettings.clusterTextColor || "#FFFFFF",
+      clusterTextSize: currentSettings.clusterTextSize || "16",
+      clusterColor: currentSettings.clusterColor || "#000000",
     },
     mode: "onChange",
   })
 
   useEffect(() => {
     form.reset({
-      latitudeColumn: dimensionSettings[activeMapType]?.latitudeColumn || "",
-      longitudeColumn: dimensionSettings[activeMapType]?.longitudeColumn || "",
-      stateColumn: dimensionSettings[activeMapType]?.stateColumn || "",
-      valueColumn: dimensionSettings[activeMapType]?.valueColumn || "",
-      labelColumn: dimensionSettings[activeMapType]?.labelColumn || "",
-      tooltipColumn: dimensionSettings[activeMapType]?.tooltipColumn || "",
-      clusterRadius: dimensionSettings[activeMapType]?.clusterRadius || "120",
-      clusterMaxZoom: dimensionSettings[activeMapType]?.clusterMaxZoom || "14",
-      clusterTextColor: dimensionSettings[activeMapType]?.clusterTextColor || "#FFFFFF",
-      clusterTextSize: dimensionSettings[activeMapType]?.clusterTextSize || "16",
-      clusterColor: dimensionSettings[activeMapType]?.clusterColor || "#000000",
+      latitudeColumn: currentSettings.latitudeColumn || "",
+      longitudeColumn: currentSettings.longitudeColumn || "",
+      stateColumn: currentSettings.stateColumn || "",
+      valueColumn: currentSettings.valueColumn || "",
+      labelColumn: currentSettings.labelColumn || "",
+      tooltipColumn: currentSettings.tooltipColumn || "",
+      clusterRadius: currentSettings.clusterRadius || "120",
+      clusterMaxZoom: currentSettings.clusterMaxZoom || "14",
+      clusterTextColor: currentSettings.clusterTextColor || "#FFFFFF",
+      clusterTextSize: currentSettings.clusterTextSize || "16",
+      clusterColor: currentSettings.clusterColor || "#000000",
     })
   }, [activeMapType, dimensionSettings])
 
@@ -100,7 +102,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-        {activeMapType === "scatter" && (
+        {activeMapType === "symbol" && (
           <div className="grid grid-cols-2 gap-4">
             <div>
               <FormItem>
@@ -108,9 +110,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
                 <Select onValueChange={form.setValue("latitudeColumn")}>
                   <FormControl>
                     <SelectTrigger className="w-full">
-                      <SelectValue
-                        placeholder={dimensionSettings[activeMapType].latitudeColumn || "Select latitude column"}
-                      />
+                      <SelectValue placeholder={currentSettings.latitudeColumn || "Select latitude column"} />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -131,9 +131,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
                 <Select onValueChange={form.setValue("longitudeColumn")}>
                   <FormControl>
                     <SelectTrigger className="w-full">
-                      <SelectValue
-                        placeholder={dimensionSettings[activeMapType].longitudeColumn || "Select longitude column"}
-                      />
+                      <SelectValue placeholder={currentSettings.longitudeColumn || "Select longitude column"} />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -161,7 +159,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
                     <SelectValue
                       placeholder={
                         activeMapType === "choropleth" || activeMapType === "custom"
-                          ? dimensionSettings[activeMapType].stateColumn
+                          ? currentSettings.stateColumn
                           : selectedGeography === "usa-counties"
                             ? "Select county column"
                             : selectedGeography === "canada-provinces" || selectedGeography === "canada-nation"
@@ -191,7 +189,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
             <Select onValueChange={form.setValue("valueColumn")}>
               <FormControl>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder={dimensionSettings[activeMapType].valueColumn || "Select value column"} />
+                  <SelectValue placeholder={currentSettings.valueColumn || "Select value column"} />
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
@@ -215,7 +213,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
             <Select onValueChange={form.setValue("labelColumn")}>
               <FormControl>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder={dimensionSettings[activeMapType].labelColumn || "Select label column"} />
+                  <SelectValue placeholder={currentSettings.labelColumn || "Select label column"} />
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
@@ -237,9 +235,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
             <Select onValueChange={form.setValue("tooltipColumn")}>
               <FormControl>
                 <SelectTrigger className="w-full">
-                  <SelectValue
-                    placeholder={dimensionSettings[activeMapType].tooltipColumn || "Select tooltip column"}
-                  />
+                  <SelectValue placeholder={currentSettings.tooltipColumn || "Select tooltip column"} />
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
@@ -259,7 +255,7 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
           <AccordionItem value="advanced">
             <AccordionTrigger>Advanced Settings</AccordionTrigger>
             <AccordionContent>
-              {activeMapType === "scatter" && (
+              {activeMapType === "symbol" && (
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
