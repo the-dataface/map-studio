@@ -823,7 +823,6 @@ export default function MapStudio() {
                   choroplethParsedData={choroplethData.parsedData}
                   choroplethGeocodedData={choroplethData.geocodedData}
                   choroplethColumns={choroplethData.columns}
-                  selectedGeography={selectedGeography} // Add this line
                 />
               </>
             )}
@@ -834,7 +833,7 @@ export default function MapStudio() {
               symbolDataExists={hasDataForType("symbol")}
               choroplethDataExists={hasDataForType("choropleth")}
               customDataExists={hasDataForType("custom")}
-              selectedGeography={selectedGeography} // Add this line
+              selectedGeography={selectedGeography} // Pass selectedGeography to MapStyling
             />
 
             <MapPreview

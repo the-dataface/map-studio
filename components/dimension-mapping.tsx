@@ -1,985 +1,2861 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
+import { DialogFooter } from "@/components/ui/dialog"
+
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { ColorInput } from "@/components/color-input"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { Toggle } from "@/components/ui/toggle"
+
+import { DialogDescription } from "@/components/ui/dialog"
+
+import { DialogTitle } from "@/components/ui/dialog"
+
+import { DialogHeader } from "@/components/ui/dialog"
+
+import { DialogContent } from "@/components/ui/dialog"
+
+import { Dialog } from "@/components/ui/dialog"
+
+import type React from "react"
+import { useState, useEffect, useRef } from "react" // Import useRef
+
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group" // Import ToggleGroup and ToggleGroupItem
 import {
-  Bold,
-  Italic,
-  Underline,
-  Strikethrough,
-  ArrowUpLeft,
-  ArrowUp,
-  ArrowUpRight,
-  ArrowLeft,
-  AlignCenter,
-  ArrowRight,
-  ArrowDownLeft,
-  ArrowDown,
-  ArrowDownRight,
+  ChevronDown,
+  ChevronUp,
+  MapPin,
+  Palette,
+  Hash,
+  Calendar,
+  Flag,
+  Type,
+  BarChart3,
+  Save,
+  Trash2,
 } from "lucide-react"
-import { useEffect, useState, useMemo } from "react"
-import { Textarea } from "./ui/textarea"
-import { FormattedNumberInput } from "./formatted-number-input"
+import type { DataRow, GeocodedRow } from "@/app/page"
+import { cn } from "@/lib/utils"
 
-interface DataRow {
-  [key: string]: string | number
-}
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
-interface ColumnType {
-  [key: string]: "text" | "number" | "date" | "coordinate" | "state"
-}
+import { TooltipProvider } from "@/components/ui/tooltip"
+import * as d3 from "d3"
 
-interface ColumnFormat {
-  [key: string]: string
-}
-
+// Update the component props to include dimensionSettings and onUpdateSettings
 interface DimensionMappingProps {
-  mapType: "symbol" | "choropleth" | "custom"
+  mapType: "symbol" | "choropleth" | "custom" // Still receive mapType for initial sync
   symbolDataExists: boolean
   choroplethDataExists: boolean
-  customDataExists: boolean
-  columnTypes: ColumnType
-  dimensionSettings: any
-  onUpdateSettings: (newSettings: any) => void
-  columnFormats: ColumnFormat
+  customDataExists: boolean // Still need this to determine if custom map is active
+  columnTypes: { [key: string]: "text" | "number" | "date" | "coordinate" | "state" }
+  dimensionSettings: DimensionSettings // Use the defined interface
+  onUpdateSettings: (settings: DimensionSettings) => void // Use the defined interface
+  columnFormats: { [key: string]: string } // Add columnFormats prop
   symbolParsedData: DataRow[]
-  symbolGeocodedData: DataRow[]
-  symbolColumns: string[]
+  symbolGeocodedData: GeocodedRow[]
   choroplethParsedData: DataRow[]
-  choroplethGeocodedData: DataRow[]
+  choroplethGeocodedData: GeocodedRow[]
+  symbolColumns: string[]
   choroplethColumns: string[]
-  selectedGeography: "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world"
+  selectedGeography?: string
+}
+
+interface DimensionSettings {
+  symbol: {
+    latitude: string
+    longitude: string
+    sizeBy: string
+    sizeMin: number
+    sizeMax: number
+    sizeMinValue: number
+    sizeMaxValue: number
+    colorBy: string
+    colorScale: "linear" | "categorical"
+    colorPalette: string
+    colorMinValue: number
+    colorMidValue: number
+    colorMaxValue: number
+    colorMinColor: string
+    colorMidColor: string
+    colorMaxColor: string
+    categoricalColors: { value: string; color: string }[]
+    labelTemplate: string // NEW: Add labelTemplate
+  }
+  choropleth: {
+    stateColumn: string
+    colorBy: string
+    colorScale: "linear" | "categorical"
+    colorPalette: string
+    colorMinValue: number
+    colorMidValue: number
+    colorMaxValue: number
+    colorMinColor: string
+    colorMidColor: string
+    colorMaxColor: string
+    categoricalColors: { value: string; color: string }[]
+    labelTemplate: string // NEW: Add labelTemplate
+  }
+  // REMOVED: custom: { ... } // Custom map settings are now handled by choropleth
+}
+
+// Update the initialDimensionSettings constant to reflect the new default for sizeMin
+const initialDimensionSettings: DimensionSettings = {
+  symbol: {
+    latitude: "",
+    longitude: "",
+    sizeBy: "",
+    sizeMin: 1, // Update this line
+    sizeMax: 100,
+    sizeMinValue: 0,
+    sizeMaxValue: 0,
+    colorBy: "",
+    colorScale: "linear",
+    colorPalette: "",
+    colorMinValue: 0,
+    colorMidValue: 0,
+    colorMaxValue: 0,
+    colorMinColor: "",
+    colorMidColor: "",
+    colorMaxColor: "",
+    categoricalColors: [],
+    labelTemplate: "",
+  },
+  choropleth: {
+    stateColumn: "",
+    colorBy: "",
+    colorScale: "linear",
+    colorPalette: "",
+    colorMinValue: 0,
+    colorMidValue: 0,
+    colorMaxValue: 0,
+    colorMinColor: "",
+    colorMidColor: "",
+    colorMaxColor: "",
+    categoricalColors: [],
+    labelTemplate: "",
+  },
+}
+
+const sequentialPalettes = [
+  { name: "Blues", colors: ["#f7fbff", "#08519c"] },
+  { name: "Greens", colors: ["#f7fcf5", "#00441b"] },
+  { name: "Oranges", colors: ["#fff5eb", "#cc4c02"] },
+  { name: "Purples", colors: ["#fcfbfd", "#3f007d"] },
+  { name: "Reds", colors: ["#fff5f0", "#a50f15"] },
+]
+
+const divergingPalettes = [
+  { name: "RdYlBu", colors: ["#a50026", "#ffffbf", "#313695"] },
+  { name: "RdBu", colors: ["#67001f", "#f7f7f7", "#053061"] },
+  { name: "PiYG", colors: ["#8e0152", "#f7f7f7", "#276419"] },
+  { name: "BrBG", colors: ["#543005", "#f5f5f5", "#003c30"] },
+]
+
+const categoricalPalettes = [
+  { name: "Category10", colors: ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"] },
+  { name: "Set3", colors: ["#8dd3c7", "#ffffb3", "#bebada", "#fb8072", "#80b1d3"] },
+  { name: "Pastel1", colors: ["#fbb4ae", "#b3cde3", "#ccebc5", "#decbe4", "#fed9a6"] },
+]
+
+const colorSchemes = {
+  Blues: ["#f7fbff", "#deebf7", "#c6dbef", "#9ecae1", "#6baed6", "#4292c6", "#2171b5", "#08519c", "#08306b"],
+  Greens: ["#f7fcf5", "#e0f3db", "#ccebc5", "#a8ddb5", "#7bccc4", "#4eb3d3", "#2b8cbe", "#0868ac", "#084081"],
+  Reds: ["#fff5f0", "#fee0d2", "#fcbba1", "#fc9272", "#fb6a4a", "#ef3b2c", "#cb181d", "#a50f15", "#67000d"],
+  Purples: ["#fcfbfd", "#efedf5", "#dadaeb", "#bcbddc", "#9e9ac8", "#807dba", "#6a51a3", "#54278f", "#3f007d"],
+  Oranges: ["#fff5eb", "#fee6ce", "#fdd0a2", "#fdae6b", "#fd8d3c", "#f16913", "#d94801", "#a63603", "#7f2704"],
+  Grays: ["#ffffff", "#f0f0f0", "#d9d9d9", "#bdbdbd", "#969696", "#737373", "#525252", "#252525", "#000000"],
+}
+
+// Helper function to return a gray icon (used for panel titles)
+const getGrayTypeIcon = (type: string) => {
+  switch (type) {
+    case "coordinate":
+      return <MapPin className="w-3 h-3 text-gray-500 dark:text-gray-400" />
+    case "number":
+      return <Hash className="w-3 h-3 text-gray-500 dark:text-gray-400" />
+    case "date":
+      return <Calendar className="w-3 h-3 text-gray-500 dark:text-gray-400" />
+    case "state":
+      return <Flag className="w-3 h-3 text-gray-500 dark:text-gray-400" />
+    default:
+      return <Type className="w-3 h-3 text-gray-500 dark:text-gray-400" />
+  }
+}
+
+// Helper function to return a colored icon (used for dropdown items)
+const getColoredTypeIcon = (type: string) => {
+  let IconComponent: React.ElementType
+  let colorClasses: string
+
+  switch (type) {
+    case "coordinate":
+      IconComponent = MapPin
+      colorClasses = "text-purple-600 dark:text-purple-400"
+      break
+    case "number":
+      IconComponent = Hash
+      colorClasses = "text-green-600 dark:text-green-400"
+      break
+    case "date":
+      IconComponent = Calendar
+      colorClasses = "text-blue-600 dark:text-blue-400"
+      break
+    case "state":
+      IconComponent = Flag
+      colorClasses = "text-orange-600 dark:text-orange-400"
+      break
+    case "text":
+    default:
+      IconComponent = Type
+      colorClasses = "text-gray-600 dark:text-gray-400"
+      break
+  }
+  return <IconComponent className={cn("w-3 h-3", colorClasses)} />
+}
+
+// Helper function to parse compact numbers (e.g., "45M")
+const parseCompactNumber = (value: string): number | null => {
+  const match = value.match(/^(\d+(\.\d+)?)([KMB])$/i)
+  if (!match) return null
+
+  let num = Number.parseFloat(match[1])
+  const suffix = match[3].toUpperCase()
+
+  switch (suffix) {
+    case "K":
+      num *= 1_000
+      break
+    case "M":
+      num *= 1_000_000
+      break
+    case "B":
+      num *= 1_000_000_000
+      break
+  }
+  return num
+}
+
+// Format a number value based on the selected format (replicated from data-preview)
+const formatNumber = (value: any, format: string): string => {
+  if (value === null || value === undefined || value === "") return ""
+
+  let num: number
+  const strValue = String(value).trim()
+
+  const compactNum = parseCompactNumber(strValue)
+  if (compactNum !== null) {
+    num = compactNum
+  } else {
+    const cleanedValue = strValue.replace(/[,$%]/g, "")
+    num = Number.parseFloat(cleanedValue)
+  }
+
+  if (isNaN(num)) {
+    return strValue
+  }
+
+  switch (format) {
+    case "raw":
+      return num.toString()
+    case "comma":
+      return num.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 20 })
+    case "compact":
+      if (Math.abs(num) >= 1e9) return (num / 1e9).toFixed(1) + "B"
+      if (Math.abs(num) >= 1e6) return (num / 1e6).toFixed(1) + "M"
+      if (Math.abs(num) >= 1e3) return (num / 1e3).toFixed(1) + "K"
+      return num.toString()
+    case "currency":
+      return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(num)
+    case "percent":
+      return (num * 100).toFixed(0) + "%"
+    case "0-decimals":
+      return Math.round(num).toLocaleString("en-US")
+    case "1-decimal":
+      return num.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+    case "2-decimals":
+      return num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    default:
+      return num.toString()
+  }
+}
+
+// Format a date value based on the selected format (replicated from data-preview)
+const formatDate = (value: any, format: string): string => {
+  if (value === null || value === undefined || value === "") return ""
+
+  let date: Date
+  if (value instanceof Date) {
+    date = value
+  } else {
+    date = new Date(String(value))
+    if (isNaN(date.getTime())) return String(value)
+  }
+
+  switch (format) {
+    case "yyyy-mm-dd":
+      return date.toISOString().split("T")[0]
+    case "mm/dd/yyyy":
+      return date.toLocaleDateString("en-US")
+    case "dd/mm/yyyy":
+      return date.toLocaleDateString("en-GB")
+    case "mmm-dd-yyyy":
+      return date.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })
+    case "mmmm-dd-yyyy":
+      return date.toLocaleDateString("en-US", { month: "long", day: "2-digit", year: "numeric" })
+    case "dd-mmm-yyyy":
+      return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+    case "yyyy":
+      return date.getFullYear().toString()
+    case "mmm-yyyy":
+      return date.toLocaleDateString("en-US", { month: "short", year: "numeric" })
+    case "mm/dd/yy":
+      return date.toLocaleDateString("en-US", { year: "2-digit" })
+    case "dd/mm/yy":
+      return date.toLocaleDateString("en-GB", { year: "2-digit" })
+    default:
+      return String(value)
+  }
+}
+
+// State abbreviation to full name mapping (re-declared for this component's scope)
+const stateMap: Record<string, string> = {
+  AL: "Alabama",
+  AK: "Alaska",
+  AZ: "Arizona",
+  AR: "Arkansas",
+  CA: "California",
+  CO: "Colorado",
+  CT: "Connecticut",
+  DE: "Delaware",
+  FL: "Florida",
+  GA: "Georgia",
+  HI: "Hawaii",
+  ID: "Idaho",
+  IL: "Illinois",
+  IN: "Indiana",
+  IA: "Iowa",
+  KS: "Kansas",
+  KY: "Kentucky",
+  LA: "Louisiana",
+  ME: "Maine",
+  MD: "Maryland",
+  MA: "Massachusetts",
+  MI: "Michigan",
+  MN: "Minnesota",
+  MS: "Mississippi",
+  MO: "Missouri",
+  MT: "Montana",
+  NE: "Nebraska",
+  NV: "Nevada",
+  NH: "New Hampshire",
+  NJ: "New Jersey",
+  NM: "New Mexico",
+  NY: "New York",
+  NC: "North Carolina",
+  ND: "North Dakota",
+  OH: "Ohio",
+  OK: "Oklahoma",
+  OR: "Oregon",
+  PA: "Pennsylvania",
+  RI: "Rhode Island",
+  SC: "South Carolina",
+  SD: "South Dakota",
+  TN: "Tennessee",
+  TX: "Texas",
+  UT: "Utah",
+  VT: "Vermont",
+  VA: "Virginia",
+  WA: "Washington",
+  WV: "West Virginia",
+  WI: "Wisconsin",
+  WY: "Wyoming",
+}
+
+// Reverse mapping for full name to abbreviation (re-declared for this component's scope)
+const reverseStateMap: Record<string, string> = Object.fromEntries(
+  Object.entries(stateMap).map(([abbr, full]) => [full.toLowerCase(), abbr]),
+)
+
+// Helper to get default format for a type (replicated from data-preview)
+const getDefaultFormat = (type: "number" | "date" | "state" | "coordinate"): string => {
+  switch (type) {
+    case "number":
+      return "raw"
+    case "date":
+      return "yyyy-mm-dd"
+    case "state":
+      return "abbreviated"
+    case "coordinate":
+      return "raw" // Coordinates typically don't have specific formats beyond raw numbers
+    default:
+      return "raw"
+  }
+}
+
+// Helper function to format state values based on the selected format (replicated from data-preview)
+const formatState = (value: any, format: string): string => {
+  if (value === null || value === undefined || value === "") return ""
+
+  const strValue = String(value).trim().toLowerCase()
+
+  switch (format) {
+    case "abbreviated": {
+      if (strValue.length === 2) return strValue.toUpperCase() // Already abbreviated
+      return reverseStateMap[strValue] || value // Try reverse mapping, fallback to original
+    }
+    case "full": {
+      if (strValue.length === 2) return stateMap[strValue.toUpperCase()] || value // Try direct mapping, fallback
+      return stateMap[reverseStateMap[strValue] || ""] || value // Try reverse then direct, fallback
+    }
+    default:
+      return String(value)
+  }
+}
+
+// Helper function to format legend values based on column type and format
+export const formatLegendValue = (value: any, column: string, columnTypes: any, columnFormats: any): string => {
+  const type = columnTypes[column] || "text"
+  // FIX: Add fallback to getDefaultFormat if columnFormats[column] is not set
+  const format = columnFormats[column] || getDefaultFormat(type as "number" | "date" | "state" | "coordinate")
+
+  if (type === "number") {
+    return formatNumber(value, format)
+  }
+  if (type === "date") {
+    return formatDate(value, format)
+  }
+  if (type === "state") {
+    return formatState(value, format)
+  }
+  return String(value)
+}
+
+// NEW: Helper function to render the label preview
+const renderLabelPreview = (
+  template: string,
+  firstRow: DataRow | GeocodedRow | undefined,
+  columnTypes: { [key: string]: "text" | "number" | "date" | "coordinate" | "state" },
+  columnFormats: { [key: string]: string },
+): string => {
+  if (!template || !firstRow) {
+    return "No data or template to preview."
+  }
+
+  let previewHtml = template.replace(/{([^}]+)}/g, (match, columnName) => {
+    const value = firstRow[columnName]
+    if (value === undefined || value === null) {
+      return "" // Or a placeholder like "[N/A]"
+    }
+    const type = columnTypes[columnName] || "text"
+    const format = columnFormats[columnName] || getDefaultFormat(type as "number" | "date" | "state" | "coordinate")
+    return formatLegendValue(value, columnName, columnTypes, columnFormats)
+  })
+
+  // Replace line breaks with <br> for HTML rendering
+  previewHtml = previewHtml.replace(/\n/g, "<br/>") // Handle actual newlines for line breaks
+
+  return previewHtml
+}
+
+// Refactored applyColorSchemePreset to return new settings (NO onUpdateSettings call inside)
+const applyColorSchemePreset = (
+  schemeName: string,
+  section: "symbol" | "choropleth", // REMOVED: custom
+  colorScale: "linear" | "categorical",
+  colorByColumn: string,
+  currentDimensionSettings: DimensionSettings, // Pass current settings
+  getUniqueValuesFunc: (column: string) => string[], // Renamed to avoid conflict
+  customSchemes: { name: string; type: "linear" | "categorical"; colors: string[]; hasMidpoint?: boolean }[], // Pass custom schemes
+  currentShowMidpoint: boolean, // Pass the current state of showMidpointSymbol/Choropleth
+): DimensionSettings => {
+  let colors: string[] | undefined
+
+  if (schemeName.startsWith("custom-linear-")) {
+    const customName = schemeName.replace("custom-linear-", "")
+    const customLinearScheme = customSchemes.find((s) => s.name === customName && s.type === "linear")
+    if (customLinearScheme) {
+      colors = customLinearScheme.colors
+    }
+  } else {
+    colors = d3ColorSchemes[schemeName as keyof typeof d3ColorSchemes]
+  }
+
+  if (!colors) {
+    console.warn(`Color scheme "${schemeName}" not found`)
+    return currentDimensionSettings
+  }
+
+  const newSectionSettings = { ...currentDimensionSettings[section] }
+
+  if (colorScale === "linear") {
+    newSectionSettings.colorMinColor = colors[0]
+    newSectionSettings.colorMaxColor = colors[colors.length - 1]
+
+    // Only set midpoint color if the midpoint is currently shown/active
+    if (currentShowMidpoint) {
+      if (colors.length >= 3) {
+        newSectionSettings.colorMidColor = colors[Math.floor(colors.length / 2)] // Use existing mid color if available
+      } else {
+        // Interpolate for 2-color schemes and convert to hex
+        const d3Scale = d3
+          .scaleLinear()
+          .domain([0, 1])
+          .range([colors[0], colors[colors.length - 1]])
+        newSectionSettings.colorMidColor = d3.color(d3Scale(0.5))?.hex() || "#808080"
+      }
+    } else {
+      // If midpoint is not meant to be shown, explicitly clear its color.
+      // This handles cases where a preset with a midpoint was previously applied,
+      // then user removed midpoint, and then applies another preset.
+      newSectionSettings.colorMidColor = ""
+    }
+
+    newSectionSettings.colorPalette = schemeName
+  } else if (colorScale === "categorical" && colorByColumn) {
+    const uniqueValues = getUniqueValuesFunc(colorByColumn) // Use the passed function
+    const categoricalColors = uniqueValues.map((_, index) => ({
+      value: `color-${index}`,
+      color: colors[index % colors.length], // Cycle through colors
+    }))
+
+    newSectionSettings.categoricalColors = categoricalColors
+    newSectionSettings.colorPalette = schemeName
+  }
+
+  return {
+    ...currentDimensionSettings,
+    [section]: newSectionSettings,
+  }
 }
 
 export function DimensionMapping({
   mapType,
   symbolDataExists,
   choroplethDataExists,
-  customDataExists,
+  customDataExists, // Still needed to determine if custom map is active
   columnTypes,
   dimensionSettings,
   onUpdateSettings,
-  columnFormats,
+  columnFormats, // Receive columnFormats prop
   symbolParsedData,
   symbolGeocodedData,
-  symbolColumns,
   choroplethParsedData,
   choroplethGeocodedData,
+  symbolColumns,
   choroplethColumns,
-  selectedGeography, // New prop
+  selectedGeography,
 }: DimensionMappingProps) {
-  const [activeTab, setActiveTab] = useState<"symbol" | "choropleth" | "custom">(mapType)
+  // Add this log at the beginning of the function
+  console.log("Current symbol size range:", dimensionSettings.symbol.sizeMin, "-", dimensionSettings.symbol.sizeMax)
 
+  const geography = selectedGeography ?? "usa-states"
+
+  const [isExpanded, setIsExpanded] = useState(true)
+  const [expandedPanels, setExpandedPanels] = useState<{ [key: string]: boolean }>({
+    coordinates: true,
+    size: false,
+    color: false,
+    state: true,
+    fill: false,
+    labels: false, // NEW: Add labels panel state
+  })
+
+  // Internal state for active tab, synchronized with mapType prop on initial load/change
+  // If mapType is "custom", we treat it as "choropleth" for dimension mapping UI purposes
+  const [internalActiveTab, setInternalActiveTab] = useState<"symbol" | "choropleth">(
+    mapType === "custom" ? "choropleth" : mapType,
+  )
+
+  // State for selected color scheme preset
+  const [selectedSymbolColorScheme, setSelectedSymbolColorScheme] = useState<string>("")
+  const [selectedChoroplethColorScheme, setSelectedChoroplethColorScheme] = useState<string>("")
+  // REMOVED: selectedCustomColorScheme
+
+  // State for custom categorical schemes loaded from local storage
+  const [customSchemes, setCustomSchemes] = useState<
+    { name: string; type: "linear" | "categorical"; colors: string[]; hasMidpoint?: boolean }[]
+  >([])
+
+  // State for Save Scheme Modal
+  const [showSaveSchemeModal, setShowSaveSchemeModal] = useState(false)
+  const [schemeColorsToSave, setSchemeColorsToSave] = useState<string[]>([])
+  const [schemeSectionToSave, setSchemeSectionToSave] = useState<"symbol" | "choropleth" | null>(null) // REMOVED: custom
+  const [schemeTypeToSave, setSchemeTypeToSave] = useState<"linear" | "categorical" | null>(null) // NEW
+  const [schemeHasMidpointToSave, setSchemeHasMidpointToSave] = useState(false) // NEW
+
+  // NEW: State to control visibility of midpoint inputs
+  const [showMidpointSymbol, setShowMidpointSymbol] = useState(false)
+  const [showMidpointChoropleth, setShowMidpointChoropleth] = useState(false)
+  // REMOVED: showMidpointCustom
+
+  // Load custom schemes from local storage on mount
   useEffect(() => {
-    setActiveTab(mapType)
-  }, [mapType])
+    try {
+      const storedSchemes = localStorage.getItem("v0_custom_color_schemes")
+      if (storedSchemes) {
+        setCustomSchemes(JSON.parse(storedSchemes))
+      }
+    } catch (error) {
+      console.error("Failed to load custom color schemes from local storage:", error)
+    }
+  }, [])
 
-  const currentSettings = dimensionSettings[activeTab] || {}
-  const currentData =
-    activeTab === "symbol"
-      ? symbolGeocodedData.length > 0
-        ? symbolGeocodedData
-        : symbolParsedData
-      : choroplethGeocodedData.length > 0
-        ? choroplethGeocodedData
-        : choroplethParsedData
-  const currentColumns = activeTab === "symbol" ? symbolColumns : choroplethColumns
-
-  const getFilteredColumns = (type: "text" | "number" | "date" | "coordinate" | "state") => {
-    return currentColumns.filter((col) => columnTypes[col] === type)
+  const saveCustomScheme = (name: string, type: "linear" | "categorical", colors: string[], hasMidpoint?: boolean) => {
+    const newScheme = { name, type, colors, hasMidpoint }
+    const updatedSchemes = [...customSchemes.filter((s) => s.name !== name || s.type !== type), newScheme] // Filter by name AND type
+    setCustomSchemes(updatedSchemes)
+    try {
+      localStorage.setItem("v0_custom_color_schemes", JSON.stringify(updatedSchemes))
+      console.log(`Saved custom ${type} scheme "${name}"`)
+    } catch (error) {
+      console.error("Failed to save custom color scheme to local storage:", error)
+    }
   }
 
-  const numericColumns = getFilteredColumns("number")
-  const textColumns = getFilteredColumns("text")
-  const coordinateColumns = getFilteredColumns("coordinate")
-  const stateColumns = getFilteredColumns("state")
+  // Ref to store the latest dimensionSettings to avoid it being a dependency of the main effect
+  const latestDimensionSettings = useRef(dimensionSettings)
+  useEffect(() => {
+    latestDimensionSettings.current = dimensionSettings
+  }, [dimensionSettings])
 
-  const updateSetting = (key: string, value: any) => {
-    onUpdateSettings({
+  // Ref to store the initial data-derived min/mid/max values for color scales
+  const initialColorValues = useRef<{
+    symbol: { min: number | null; mid: number | null; max: number | null }
+    choropleth: { min: number | null; mid: number | null; max: number | null }
+  }>({
+    symbol: { min: null, mid: null, max: null },
+    choropleth: { min: null, mid: null, max: null },
+  })
+
+  // Ref to store the values that were last auto-populated by this effect
+  const lastAutoPopulatedValues = useRef<{
+    symbol: { min: number | null; mid: number | null; max: number | null }
+    choropleth: { min: number | null; mid: number | null; max: number | null }
+  }>({
+    symbol: { min: null, mid: null, max: null },
+    choropleth: { min: null, mid: null, max: null },
+  })
+
+  // Ref to store the previous colorBy and colorScale values for the active tab
+  // This helps detect changes in these specific settings without making dimensionSettings a direct dependency
+  const prevActiveTabColorSettings = useRef<{
+    colorBy: string | null
+    colorScale: string | null
+  }>({
+    colorBy: null,
+    colorScale: null,
+  })
+
+  // Synchronize internalActiveTab with mapType prop
+  useEffect(() => {
+    setInternalActiveTab(mapType === "custom" ? "choropleth" : mapType)
+  }, [mapType])
+
+  // Drag and drop state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+
+  const toSentenceCase = (str: string) => {
+    if (!str) return ""
+    return str.charAt(0).toUpperCase() + str.slice(1)
+  }
+
+  // Helper to get the display data for the currently active internal tab
+  const getDisplayDataForTab = (tab: "symbol" | "choropleth") => {
+    if (tab === "symbol") {
+      return symbolGeocodedData.length > 0 ? symbolGeocodedData : symbolParsedData
+    } else if (tab === "choropleth") {
+      // Choropleth and custom maps use choropleth data for dimension mapping
+      return choroplethGeocodedData.length > 0 ? choroplethGeocodedData : choroplethParsedData
+    }
+    return []
+  }
+
+  // Helper to get the columns for the currently active internal tab
+  const getColumnsForTab = (tab: "symbol" | "choropleth") => {
+    if (tab === "symbol") {
+      return symbolColumns
+    } else if (tab === "choropleth") {
+      // Choropleth and custom maps use choropleth columns for dimension mapping
+      return choroplethColumns
+    }
+    return []
+  }
+
+  // Calculate min/max values for numeric columns
+  const getColumnStats = (column: string, tab: "symbol" | "choropleth") => {
+    const currentDisplayData = getDisplayDataForTab(tab)
+    if (!column || !currentDisplayData.length) return { min: 0, max: 100 }
+
+    const values = currentDisplayData
+      .map((row) => {
+        const rawValue = String(row[column] || "").trim()
+        let parsedNum: number | null = parseCompactNumber(rawValue)
+
+        if (parsedNum === null) {
+          // Fallback for regular numbers (e.g., "1,234.56", "$100")
+          const cleanedValue = rawValue.replace(/[,$%]/g, "")
+          parsedNum = Number.parseFloat(cleanedValue)
+        }
+        return parsedNum
+      })
+      .filter((val) => !isNaN(val))
+
+    if (values.length === 0) return { min: 0, max: 100 }
+
+    return {
+      min: Math.min(...values),
+      max: Math.max(...values),
+    }
+  }
+
+  // Get unique values for categorical columns
+  const getUniqueValues = (column: string) => {
+    const currentDisplayData = getDisplayDataForTab(internalActiveTab)
+    if (!column || !currentDisplayData.length) return []
+
+    return [...new Set(currentDisplayData.map((row) => String(row[column] || "")).filter(Boolean))].sort()
+  }
+
+  // Get the format for a specific column
+  const getColumnFormat = (column: string): string => {
+    return columnFormats[column] || "raw"
+  }
+
+  // Renamed updateSetting to handleDimensionSettingChange
+  const handleDimensionSettingChange = (section: "symbol" | "choropleth", key: string, value: any) => {
+    // Handle null values by converting to 0 for numeric settings
+    const processedValue =
+      value === null && (key.includes("Value") || key.includes("Min") || key.includes("Max")) ? 0 : value
+
+    const newSettings = {
       ...dimensionSettings,
-      [activeTab]: {
-        ...dimensionSettings[activeTab],
-        [key]: value,
+      [section]: {
+        ...dimensionSettings[section],
+        [key]: processedValue,
       },
+    }
+
+    if (key === "sizeBy" && processedValue) {
+      const stats = getColumnStats(processedValue, section)
+      onUpdateSettings({
+        ...newSettings,
+        [section]: {
+          ...newSettings[section],
+          sizeMinValue: stats.min,
+          sizeMaxValue: stats.max,
+        },
+      })
+    } else if (key === "colorBy" && processedValue) {
+      const columnType = columnTypes[processedValue]
+      const isNumericOrDate = columnType === "number" || columnType === "date"
+
+      if (isNumericOrDate) {
+        const stats = getColumnStats(processedValue, section)
+        initialColorValues.current = {
+          ...initialColorValues.current,
+          [section]: { min: stats.min, mid: (stats.min + stats.max) / 2, max: stats.max },
+        }
+        lastAutoPopulatedValues.current = {
+          ...lastAutoPopulatedValues.current,
+          [section]: { min: stats.min, mid: (stats.min + stats.max) / 2, max: stats.max },
+        }
+
+        // Determine default linear palette
+        const defaultLinearPaletteName = colorSchemeCategories.sequential["Single Hue"][0] // "Blues"
+        const defaultLinearColors = d3ColorSchemes[defaultLinearPaletteName as keyof typeof d3ColorSchemes]
+
+        // Apply default colors
+        const minColor = defaultLinearColors[0]
+        const maxColor = defaultLinearColors[defaultLinearColors.length - 1]
+        let midColor = ""
+        // If the default palette has 3+ colors, use its middle color, otherwise interpolate
+        if (defaultLinearColors.length >= 3) {
+          midColor = defaultLinearColors[Math.floor(defaultLinearColors.length / 2)]
+        } else {
+          const d3Scale = d3.scaleLinear().domain([0, 1]).range([minColor, maxColor])
+          midColor = d3.color(d3Scale(0.5))?.hex() || "#808080"
+        }
+
+        onUpdateSettings({
+          ...newSettings,
+          [section]: {
+            ...newSettings[section],
+            colorScale: "linear", // Force linear if numeric/date
+            colorMinValue: stats.min,
+            colorMidValue: (stats.min + stats.max) / 2,
+            colorPalette: defaultLinearPaletteName, // Set default palette
+            colorMinColor: minColor,
+            colorMidColor: midColor,
+            colorMaxColor: maxColor,
+          },
+        })
+      } else {
+        const uniqueValues = getUniqueValues(processedValue)
+        const defaultColors = categoricalPalettes[0].colors
+        initialColorValues.current = {
+          ...initialColorValues.current,
+          [section]: { min: null, mid: null, max: null },
+        }
+        lastAutoPopulatedValues.current = {
+          ...lastAutoPopulatedValues.current,
+          [section]: { min: null, mid: null, max: null },
+        }
+
+        // Initialize categoricalColors with stable IDs and default colors
+        const categoricalColors = uniqueValues.map((_, idx) => ({
+          value: `color-${idx}`, // Stable ID for the UI element
+          color: defaultColors[idx % defaultColors.length],
+        }))
+
+        onUpdateSettings({
+          ...newSettings,
+          [section]: {
+            ...newSettings[section],
+            colorScale: "categorical", // Force categorical if not numeric/date
+            categoricalColors,
+            colorPalette: "", // Clear palette when colorBy changes to categorical
+          },
+        })
+      }
+    } else {
+      onUpdateSettings(newSettings)
+    }
+  }
+
+  // New function to handle color input changes and clear the preset
+  const handleColorValueChange = (
+    section: "symbol" | "choropleth", // REMOVED: custom
+    colorKey: "colorMinColor" | "colorMidColor" | "colorMaxColor",
+    value: string,
+  ) => {
+    const newSectionSettings = { ...dimensionSettings[section] }
+    newSectionSettings[colorKey] = value
+    newSectionSettings.colorPalette = "" // Clear the preset
+
+    const newSettings = {
+      ...dimensionSettings,
+      [section]: newSectionSettings,
+    }
+    onUpdateSettings(newSettings)
+
+    // Also update the local state for the dropdown to reflect no preset selected
+    if (section === "symbol") {
+      setSelectedSymbolColorScheme("")
+    } else if (section === "choropleth") {
+      setSelectedChoroplethColorScheme("")
+    }
+  }
+
+  // New function to handle categorical color changes and clear the preset
+  const handleCategoricalColorChange = (
+    section: "symbol" | "choropleth", // REMOVED: custom
+    index: number,
+    newColor: string,
+  ) => {
+    const newSectionSettings = { ...dimensionSettings[section] }
+    const newCategoricalColors = [...newSectionSettings.categoricalColors]
+    newCategoricalColors[index] = { ...newCategoricalColors[index], color: newColor }
+    newSectionSettings.categoricalColors = newCategoricalColors
+    newSectionSettings.colorPalette = "" // Clear the preset
+
+    const newSettings = {
+      ...dimensionSettings,
+      [section]: newSectionSettings,
+    }
+    onUpdateSettings(newSettings)
+
+    // Also update the local state for the dropdown to reflect no preset selected
+    if (section === "symbol") {
+      setSelectedSymbolColorScheme("")
+    } else if (section === "choropleth") {
+      setSelectedChoroplethColorScheme("")
+    }
+  }
+
+  const togglePanel = (panelKey: string) => {
+    setExpandedPanels((prev) => ({
+      ...prev,
+      [panelKey]: !prev[panelKey],
+    }))
+  }
+
+  // Updated getColumnsByType to properly filter based on columnTypes from data preview
+  const getColumnsByType = (types: string[]) => {
+    const relevantColumns = getColumnsForTab(internalActiveTab)
+    const currentTabDisplayData = getDisplayDataForTab(internalActiveTab)
+
+    return relevantColumns.filter((col) => {
+      const columnType = columnTypes[col]
+
+      // Special handling for coordinate type - include geocoded columns
+      if (types.includes("coordinate")) {
+        const lowerCol = col.toLowerCase()
+        if (columnType === "coordinate") {
+          return true
+        }
+        if (
+          (lowerCol === "latitude" || lowerCol === "longitude") &&
+          currentTabDisplayData.some((row) => row.latitude !== undefined && row.latitude !== null)
+        ) {
+          return true
+        }
+      }
+
+      // For all other types, strictly use the columnTypes from data preview
+      return types.includes(columnType || "text")
     })
   }
 
-  const choroplethLabel = useMemo(() => {
-    if (selectedGeography === "usa-counties") {
-      return "County Column"
-    }
-    if (selectedGeography === "canada-provinces") {
-      return "Province Column"
-    }
-    return "State Column"
-  }, [selectedGeography])
+  // Updated getColumnIcon to use the correct column type from columnTypes prop
+  const getColumnIcon = (column: string) => {
+    const columnType = columnTypes[column]
+    const lowerCol = column.toLowerCase()
+    const currentTabDisplayData = getDisplayDataForTab(internalActiveTab)
 
-  // Get unique values for categorical color mapping
-  const getCategoricalValues = (column: string) => {
-    if (!column || !currentData.length) return []
-    const values = currentData.map((row) => row[column])
-    return Array.from(new Set(values)).filter((v) => typeof v === "string" || typeof v === "number")
+    // Special handling for geocoded columns that might not be typed yet
+    if (
+      (lowerCol === "latitude" || lowerCol === "longitude") &&
+      currentTabDisplayData.some((row) => row.latitude !== undefined && row.longitude !== null) &&
+      !columnType
+    ) {
+      return getColoredTypeIcon("coordinate")
+    }
+
+    // Use the column type from the data preview panel
+    return getColoredTypeIcon(columnType || "text")
   }
 
-  // Pre-define common color palettes
-  const colorPalettes = {
-    Blues: ["#f7fbff", "#deebf7", "#c6dbef", "#9ecae1", "#6baed6", "#4292c6", "#2171b5", "#08519c", "#08306b"],
-    Greens: ["#f7fcf5", "#e5f5e0", "#c7e9c0", "#a1d99b", "#74c476", "#41ab5d", "#238b45", "#006d2c", "#00441b"],
-    Reds: ["#fff5f0", "#fee0d2", "#fcbba1", "#fc9272", "#fb6a4a", "#ef3b2c", "#cb181d", "#a50f15", "#67000d"],
-    Purples: ["#fcfbfd", "#efedf5", "#dadaeb", "#bcbddc", "#9e9ac8", "#807dba", "#6a51a3", "#54278f", "#3f007d"],
-    Grays: ["#ffffff", "#f0f0f0", "#d9d9d9", "#bdbdbd", "#969696", "#737373", "#525252", "#252525", "#000000"],
-    Viridis: [
-      "#440154",
-      "#482878",
-      "#3e4989",
-      "#31688e",
-      "#26828e",
-      "#1f9e89",
-      "#35b779",
-      "#6ece58",
-      "#b5de2b",
-      "#fde725",
-    ],
-    Plasma: [
-      "#0d0887",
-      "#47039a",
-      "#7301a8",
-      "#9c179e",
-      "#bd3786",
-      "#d8576b",
-      "#ed7953",
-      "#fb9f3a",
-      "#fdc42e",
-      "#f0f624",
-    ],
-    Inferno: [
-      "#000004",
-      "#1b0c41",
-      "#4a0c6b",
-      "#7b0f7f",
-      "#af2b7e",
-      "#de4968",
-      "#f88b41",
-      "#ffc72c",
-      "#fcfea4",
-      "#fcfdbf",
-    ],
-    Magma: [
-      "#000004",
-      "#180c40",
-      "#45086b",
-      "#781c6d",
-      "#ae396a",
-      "#e05f63",
-      "#f89441",
-      "#fdc82e",
-      "#f0f921",
-      "#fcfdbf",
-    ],
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index)
+    e.dataTransfer.effectAllowed = "move"
   }
 
-  // Helper to get formatted value for legend/tooltip previews
-  const getFormattedValue = (columnName: string, value: any) => {
-    if (columnFormats[columnName]) {
-      try {
-        const formatFn = new Function(
-          "value",
-          `return \`${columnFormats[columnName].replace(/{value}/g, "${value}")}\`;`,
-        )
-        return formatFn(value)
-      } catch (e) {
-        console.error("Error applying format string:", e)
-        return value // Fallback to raw value
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = "move"
+    setDragOverIndex(index)
+  }
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null)
+  }
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number, section: "symbol" | "choropleth") => {
+    e.preventDefault()
+
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null)
+      setDragOverIndex(null)
+      return
+    }
+
+    const currentColors = [...dimensionSettings[section].categoricalColors] // Use dimensionSettings directly
+    const draggedItem = currentColors[draggedIndex]
+
+    // Remove the dragged item
+    currentColors.splice(draggedIndex, 1)
+
+    // Insert at the new position
+    const insertIndex = draggedIndex < dropIndex ? dropIndex - 1 : dropIndex
+    currentColors.splice(insertIndex, 0, draggedItem)
+
+    handleDimensionSettingChange(section, "categoricalColors", currentColors) // Use new handler
+
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+  }
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+  }
+
+  // Logic for "Add color +" button
+  const handleAddColor = (section: "symbol" | "choropleth") => {
+    const currentSettings = dimensionSettings[section]
+    const currentCategoricalColors = currentSettings.categoricalColors
+    const selectedSchemeName = currentSettings.colorPalette // This is the name of the last applied preset
+
+    let newColor = "#cccccc" // Default fallback color
+
+    if (selectedSchemeName) {
+      let sourceColors: string[] | undefined
+      if (selectedSchemeName.startsWith("custom-")) {
+        const customName = selectedSchemeName.replace("custom-", "")
+        sourceColors = customSchemes.find((s) => s.name === customName && s.type === "categorical")?.colors
+      } else {
+        sourceColors = d3ColorSchemes[selectedSchemeName as keyof typeof d3ColorSchemes]
+      }
+
+      if (sourceColors && sourceColors.length > 0) {
+        const usedColors = new Set(currentCategoricalColors.map((item) => item.color))
+        let foundNewColor = false
+        for (const color of sourceColors) {
+          if (!usedColors.has(color)) {
+            newColor = color
+            foundNewColor = true
+            break
+          }
+        }
+        // If all sourceColors are already used, cycle through them based on current length
+        if (!foundNewColor) {
+          newColor = sourceColors[currentCategoricalColors.length % sourceColors.length]
+        }
       }
     }
-    return value
+
+    const newCategoricalColors = [
+      ...currentCategoricalColors,
+      { value: `color-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`, color: newColor }, // Unique dummy key
+    ]
+    handleDimensionSettingChange(section, "categoricalColors", newCategoricalColors)
   }
 
-  const currentActiveTabHasData =
-    (activeTab === "symbol" && symbolDataExists) ||
-    (activeTab === "choropleth" && choroplethDataExists) ||
-    (activeTab === "custom" && customDataExists && choroplethDataExists) // Custom uses choropleth data for dimensions
+  // Logic for "Add midpoint" button
+  const handleAddMidpoint = (section: "symbol" | "choropleth") => {
+    const currentSettings = dimensionSettings[section]
+    const stats = getColumnStats(currentSettings.colorBy, section)
+
+    // Get the current selected palette's colors to find a mid-color
+    let paletteColors: string[] | undefined
+    const selectedSchemeName = currentSettings.colorPalette
+
+    if (selectedSchemeName.startsWith("custom-linear-")) {
+      const customName = selectedSchemeName.replace("custom-linear-", "")
+      paletteColors = customSchemes.find((s) => s.name === customName && s.type === "linear")?.colors
+    } else if (d3ColorSchemes[selectedSchemeName as keyof typeof d3ColorSchemes]) {
+      paletteColors = d3ColorSchemes[selectedSchemeName as keyof typeof d3ColorSchemes]
+    }
+
+    let newMidColor = "#808080" // Default grey fallback for interpolation
+
+    // Ensure min/max colors are available for interpolation if no palette is selected
+    const minColorForInterpolation = currentSettings.colorMinColor || "#000000" // Default black
+    const maxColorForInterpolation = currentSettings.colorMaxColor || "#FFFFFF" // Default white
+
+    if (paletteColors && paletteColors.length >= 3) {
+      newMidColor = paletteColors[Math.floor(paletteColors.length / 2)] // Use the actual middle color from a 3+ color scheme
+    } else if (minColorForInterpolation && maxColorForInterpolation) {
+      // Use the ensured colors
+      // Interpolate if only two colors are present and convert to hex
+      const d3Scale = d3.scaleLinear().domain([0, 1]).range([minColorForInterpolation, maxColorForInterpolation])
+      newMidColor = d3.color(d3Scale(0.5))?.hex() || "#808080"
+    }
+
+    const newMidValue = (stats.min + stats.max) / 2
+
+    const updates: Partial<typeof currentSettings> = {}
+    updates.colorMidValue = newMidValue // Always set to data-derived midpoint value when adding
+    updates.colorMidColor = newMidColor // Set intelligently derived midpoint color
+
+    // Always set midpoint visibility to true when adding
+    if (section === "symbol") setShowMidpointSymbol(true)
+    if (section === "choropleth") setShowMidpointChoropleth(true)
+  }
+
+  // Implement `handleRemoveMidpoint` function
+  const handleRemoveMidpoint = (section: "symbol" | "choropleth") => {
+    const currentSettings = dimensionSettings[section]
+    // Reset mid values and hide midpoint
+    const newSettings = {
+      ...dimensionSettings,
+      [section]: {
+        ...currentSettings,
+        colorMidValue: 0, // Reset to default/empty value
+        colorMidColor: "", // Reset to default/empty color
+      },
+    }
+    onUpdateSettings(newSettings)
+    // Explicitly hide midpoint when removing
+    if (section === "symbol") setShowMidpointSymbol(false)
+    if (section === "choropleth") setShowMidpointChoropleth(false)
+  }
+
+  // Logic for "Save scheme" button
+  const handleSaveScheme = (section: "symbol" | "choropleth") => {
+    const currentSettings = dimensionSettings[section]
+    let colorsToSave: string[] = []
+
+    if (currentSettings.colorScale === "linear") {
+      // For linear, save min, mid, max colors
+      colorsToSave = [
+        currentSettings.colorMinColor,
+        currentSettings.colorMidColor,
+        currentSettings.colorMaxColor,
+      ].filter(Boolean)
+    } else {
+      // For categorical, save all defined colors
+      colorsToSave = currentSettings.categoricalColors.map((item) => item.color)
+    }
+
+    setSchemeColorsToSave(colorsToSave)
+    setSchemeSectionToSave(section)
+    // Pass the scheme type (linear/categorical) and midpoint status for linear schemes
+    setShowSaveSchemeModal(true)
+    setSchemeTypeToSave(currentSettings.colorScale) // Assuming a new state `schemeTypeToSave`
+    if (currentSettings.colorScale === "linear") {
+      setSchemeHasMidpointToSave(section === "symbol" ? showMidpointSymbol : showMidpointChoropleth)
+    } else {
+      setSchemeHasMidpointToSave(false)
+    }
+  }
+
+  const handleSaveSchemeConfirm = (
+    schemeName: string,
+    colors: string[],
+    type: "linear" | "categorical",
+    hasMidpoint?: boolean,
+  ) => {
+    saveCustomScheme(schemeName, type, colors, hasMidpoint)
+    const prefix = type === "linear" ? "custom-linear-" : "custom-"
+    const fullSchemeName = `${prefix}${schemeName}`
+
+    const sectionToUpdate = schemeSectionToSave as "symbol" | "choropleth" // Cast to correct type
+    const currentSettingsForSection = dimensionSettings[sectionToUpdate]
+
+    // Call applyColorSchemePreset to get the full updated settings for the section
+    // This will set the colorPalette and the min/mid/max colors or categoricalColors
+    const updatedSettings = applyColorSchemePreset(
+      fullSchemeName, // The new scheme name to apply
+      sectionToUpdate,
+      type,
+      currentSettingsForSection.colorBy,
+      dimensionSettings, // Pass the current full dimensionSettings
+      getUniqueValues, // Use the local getUniqueValues
+      customSchemes,
+      sectionToUpdate === "symbol" ? showMidpointSymbol : showMidpointChoropleth,
+    )
+
+    // Update the parent state with the new settings
+    onUpdateSettings(updatedSettings)
+
+    // Explicitly set the selected scheme for immediate UI update
+    if (sectionToUpdate === "symbol") {
+      setSelectedSymbolColorScheme(fullSchemeName)
+    } else if (sectionToUpdate === "choropleth") {
+      setSelectedChoroplethColorScheme(fullSchemeName)
+    }
+  }
+
+  const handleDeleteCustomScheme = (schemeToDelete: string, section: "symbol" | "choropleth") => {
+    let actualName = ""
+    let actualType: "linear" | "categorical" = "categorical" // Default
+
+    if (schemeToDelete.startsWith("custom-linear-")) {
+      actualName = schemeToDelete.replace("custom-linear-", "")
+      actualType = "linear"
+    } else if (schemeToDelete.startsWith("custom-")) {
+      actualName = schemeToDelete.replace("custom-", "")
+      actualType = "categorical"
+    } else {
+      console.warn("Attempted to delete a non-custom scheme:", schemeToDelete)
+      return
+    }
+
+    const updatedSchemes = customSchemes.filter((s) => !(s.name === actualName && s.type === actualType))
+    setCustomSchemes(updatedSchemes)
+    try {
+      localStorage.setItem("v0_custom_color_schemes", JSON.stringify(updatedSchemes))
+      console.log(`Deleted custom ${actualType} scheme "${actualName}"`)
+    } catch (error) {
+      console.error("Failed to delete custom color scheme to local storage:", error)
+    }
+
+    // Reset the selected scheme for the current section
+    if (section === "symbol") {
+      setSelectedSymbolColorScheme("") // Clear selection
+      // Also clear the color palette in settings
+      handleDimensionSettingChange("symbol", "colorPalette", "")
+    } else if (section === "choropleth") {
+      setSelectedChoroplethColorScheme("") // Clear selection
+      // Also clear the color palette in settings
+      handleDimensionSettingChange("choropleth", "colorPalette", "")
+    }
+  }
+
+  // Auto-populate coordinate columns - Updated to handle geocoded columns better
+  useEffect(() => {
+    const currentColumns = getColumnsForTab(internalActiveTab)
+    const currentDisplayData = getDisplayDataForTab(internalActiveTab)
+
+    if (currentColumns.length > 0) {
+      // Look for latitude columns with intelligent matching
+      const latColumns = currentColumns.filter((col) => {
+        const lowerCol = col.toLowerCase()
+        return (
+          lowerCol === "latitude" ||
+          (lowerCol.includes("lat") && columnTypes[col] === "coordinate") ||
+          // Also check if it's a geocoded latitude column even if not typed yet
+          (lowerCol === "latitude" &&
+            currentDisplayData.some((row) => row.latitude !== undefined && row.latitude !== null))
+        )
+      })
+
+      // Look for longitude columns with intelligent matching
+      const lngColumns = currentColumns.filter((col) => {
+        const lowerCol = col.toLowerCase()
+        return (
+          lowerCol === "longitude" ||
+          ((lowerCol.includes("lon") || lowerCol.includes("lng")) && columnTypes[col] === "coordinate") ||
+          // Also check if it's a geocoded longitude column even if not typed yet
+          (lowerCol === "longitude" &&
+            currentDisplayData.some((row) => row.longitude !== undefined && row.longitude !== null))
+        )
+      })
+
+      // Look for state columns
+      const stateColumn = currentColumns.find((col) => columnTypes[col] === "state")
+
+      // Prioritize exact matches first, then partial matches
+      const bestLatColumn =
+        latColumns.find((col) => col.toLowerCase() === "latitude") || latColumns[0] || dimensionSettings.symbol.latitude
+
+      const bestLngColumn =
+        lngColumns.find((col) => col.toLowerCase() === "longitude") ||
+        lngColumns[0] ||
+        dimensionSettings.symbol.longitude
+
+      // Safely initialize updated settings objects
+      const updatedSymbolSettings = { ...(dimensionSettings.symbol || {}) }
+      const updatedChoroplethSettings = { ...(dimensionSettings.choropleth || {}) }
+      let changed = false
+
+      if (bestLatColumn && bestLatColumn !== updatedSymbolSettings.latitude) {
+        updatedSymbolSettings.latitude = bestLatColumn
+        changed = true
+      }
+      if (bestLngColumn && bestLngColumn !== updatedSymbolSettings.longitude) {
+        updatedSymbolSettings.longitude = bestLngColumn
+        changed = true
+      }
+      // Safely access stateColumn
+      if (stateColumn && stateColumn !== (updatedChoroplethSettings.stateColumn || "")) {
+        updatedChoroplethSettings.stateColumn = stateColumn
+        changed = true
+      }
+
+      if (changed) {
+        onUpdateSettings({
+          ...dimensionSettings,
+          symbol: updatedSymbolSettings,
+          choropleth: updatedChoroplethSettings,
+        })
+      }
+    }
+  }, [
+    internalActiveTab,
+    symbolColumns,
+    choroplethColumns,
+    symbolParsedData,
+    symbolGeocodedData,
+    choroplethParsedData,
+    choroplethGeocodedData,
+    columnTypes,
+    dimensionSettings, // This dependency is fine here as it's for initial auto-population of coordinates
+    onUpdateSettings,
+  ])
+
+  // Main useEffect for auto-population of values and dynamic midpoint color updates
+  useEffect(() => {
+    const currentSettings = latestDimensionSettings.current[internalActiveTab]
+    const colorByColumn = currentSettings.colorBy
+    const colorScale = currentSettings.colorScale
+    const currentTabType = internalActiveTab
+    const currentColumnType = columnTypes[colorByColumn]
+    const isNumericOrDate = currentColumnType === "number" || currentColumnType === "date"
+
+    const hasColorByOrScaleChanged =
+      colorByColumn !== prevActiveTabColorSettings.current.colorBy ||
+      colorScale !== prevActiveTabColorSettings.current.colorScale
+
+    const currentShowMidpoint = currentTabType === "symbol" ? showMidpointSymbol : showMidpointChoropleth
+
+    const tempNewSettings = { ...currentSettings }
+    let changesToParentSettings = false
+
+    // --- Part 1: Auto-populate min/mid/max VALUES for linear scales ---
+    if (colorByColumn && colorScale === "linear" && isNumericOrDate) {
+      const stats = getColumnStats(colorByColumn, currentTabType)
+      const dataMin = stats.min
+      const dataMax = stats.max
+      const dataMid = (dataMin + dataMax) / 2
+      const epsilon = 1e-9
+
+      const isMinDefaultOrAuto =
+        (Math.abs(currentSettings.colorMinValue) < epsilon && currentSettings.colorMinValue === 0) ||
+        (lastAutoPopulatedValues.current[currentTabType].min !== null &&
+          Math.abs(currentSettings.colorMinValue - lastAutoPopulatedValues.current[currentTabType].min!) < epsilon)
+
+      const isMaxDefaultOrAuto =
+        (Math.abs(currentSettings.colorMaxValue) < epsilon && currentSettings.colorMaxValue === 0) ||
+        (lastAutoPopulatedValues.current[currentTabType].max !== null &&
+          Math.abs(currentSettings.colorMaxValue - lastAutoPopulatedValues.current[currentTabType].max!) < epsilon)
+
+      if (
+        (isMinDefaultOrAuto || hasColorByOrScaleChanged) &&
+        Math.abs(tempNewSettings.colorMinValue - dataMin) >= epsilon
+      ) {
+        tempNewSettings.colorMinValue = dataMin
+        changesToParentSettings = true
+      }
+      if (
+        (isMaxDefaultOrAuto || hasColorByOrScaleChanged) &&
+        Math.abs(tempNewSettings.colorMaxValue - dataMax) >= epsilon
+      ) {
+        tempNewSettings.colorMaxValue = dataMax
+        changesToParentSettings = true
+      }
+
+      // Midpoint value logic: Auto-populate if midpoint is visible AND value is default/auto.
+      const isMidValueDefaultOrAuto =
+        (Math.abs(currentSettings.colorMidValue) < epsilon && currentSettings.colorMidValue === 0) ||
+        (lastAutoPopulatedValues.current[currentTabType].mid !== null &&
+          Math.abs(currentSettings.colorMidValue - lastAutoPopulatedValues.current[currentTabType].mid!) < epsilon)
+
+      if (currentShowMidpoint && (isMidValueDefaultOrAuto || hasColorByOrScaleChanged)) {
+        if (Math.abs(tempNewSettings.colorMidValue - dataMid) >= epsilon) {
+          tempNewSettings.colorMidValue = dataMid
+          changesToParentSettings = true
+        }
+      } else if (!currentShowMidpoint && tempNewSettings.colorMidColor !== "") {
+        // If midpoint is not visible, ensure its value is cleared
+        tempNewSettings.colorMidColor = ""
+        changesToParentSettings = true
+      }
+    } else if (colorByColumn && colorScale === "categorical") {
+      // Reset linear-specific values if switching to categorical
+      if (initialColorValues.current[currentTabType].min !== null) {
+        initialColorValues.current = {
+          ...initialColorValues.current,
+          [currentTabType]: { min: null, mid: null, max: null },
+        }
+        lastAutoPopulatedValues.current = {
+          ...lastAutoPopulatedValues.current,
+          [currentTabType]: { min: null, mid: null, max: null },
+        }
+        changesToParentSettings = true
+      }
+    }
+
+    // Only update parent state if changes were detected
+    if (changesToParentSettings) {
+      onUpdateSettings({ ...latestDimensionSettings.current, [currentTabType]: tempNewSettings })
+    }
+
+    // Update ref for next render cycle
+    prevActiveTabColorSettings.current = {
+      colorBy: colorByColumn,
+      colorScale: colorScale,
+    }
+  }, [
+    internalActiveTab,
+    dimensionSettings, // Keep this as the primary trigger for changes in settings
+    symbolParsedData,
+    symbolGeocodedData,
+    choroplethParsedData,
+    choroplethGeocodedData,
+    columnTypes,
+    onUpdateSettings,
+    showMidpointSymbol,
+    showMidpointChoropleth,
+    customSchemes,
+  ])
+
+  // Add this useEffect after the existing effects to debug color updates
+  useEffect(() => {
+    const currentSettings = dimensionSettings[internalActiveTab]
+    if (currentSettings.colorBy && currentSettings.colorScale === "linear") {
+      console.log(`${internalActiveTab} linear colors:`, {
+        min: { value: currentSettings.colorMinValue, color: currentSettings.colorMinColor },
+        mid: { value: currentSettings.colorMidValue, color: currentSettings.colorMidColor },
+        max: { value: currentSettings.colorMaxValue, color: currentSettings.colorMaxColor },
+        palette: currentSettings.colorPalette,
+      })
+    }
+  }, [dimensionSettings, internalActiveTab])
+
+  // Determine the label for the "State" dimension setting based on selectedGeography
+  let subFeatureDimensionLabel: "State" | "Province" | "County" = "State"
+  if (geography === "usa-counties") subFeatureDimensionLabel = "County"
+  else if (geography === "canada-provinces") subFeatureDimensionLabel = "Province"
+
+  // Update the renderDropdown function to show correct icons and ensure proper filtering
+  const renderDropdown = (
+    label: string,
+    value: string,
+    onValueChange: (value: string) => void,
+    allowedTypes: string[],
+    placeholder = "Select column",
+  ) => {
+    const availableColumns = getColumnsByType(allowedTypes)
+
+    return (
+      <div className="space-y-2 w-full">
+        <div className="flex items-center gap-2">
+          <Label className="text-sm font-medium">{label}</Label>
+          <div className="flex gap-1">
+            {allowedTypes.map((type, index) => (
+              <span key={index}>{getGrayTypeIcon(type)}</span>
+            ))}
+          </div>
+        </div>
+        <Select value={value || "default"} onValueChange={(val) => onValueChange(val === "default" ? "" : val)}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder={placeholder} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="default">None</SelectItem>
+            {availableColumns.map((column) => (
+              <SelectItem key={column} value={column}>
+                <div className="flex items-center gap-2">
+                  {getColumnIcon(column)} {/* These icons are now colored */}
+                  {toSentenceCase(column)}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    )
+  }
+
+  // --- tab helpers ----------------------------------------------------------
+  const hasDataForTab = (tab: "symbol" | "choropleth") =>
+    tab === "symbol" ? symbolDataExists : choroplethDataExists || customDataExists
+
+  const isTabDisabled = (tab: "symbol" | "choropleth") => !hasDataForTab(tab)
+
+  const getTabTooltip = (tab: "symbol" | "choropleth") =>
+    tab === "symbol"
+      ? "Add symbol map data to configure dimensions."
+      : "Add choropleth or custom map data to configure dimensions."
+
+  const renderTabButton = (tab: "symbol" | "choropleth", icon: React.ReactNode, label: string, isActive: boolean) => {
+    const disabled = isTabDisabled(tab)
+
+    if (disabled) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-normal opacity-50 text-gray-500 dark:text-gray-400">
+              {icon}
+              {label}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="bg-black text-white border-black px-3 py-2 rounded-md text-xs">
+            {getTabTooltip(tab)}
+          </TooltipContent>
+        </Tooltip>
+      )
+    }
+
+    return (
+      <Button
+        variant={isActive ? "secondary" : "ghost"}
+        size="sm"
+        className="px-3 py-1.5 text-xs font-normal"
+        onClick={() => setInternalActiveTab(tab)}
+      >
+        {icon}
+        {label}
+      </Button>
+    )
+  }
+  // --------------------------------------------------------------------------
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Dimension Mapping</CardTitle>
-        <CardDescription>Map your data columns to visual dimensions like position, size, and color.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="flex space-x-2 border-b border-gray-200 dark:border-gray-700">
-          <button
-            className={`py-2 px-4 text-sm font-medium ${
-              activeTab === "symbol"
-                ? "border-b-2 border-blue-500 text-blue-500"
-                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            }`}
-            onClick={() => setActiveTab("symbol")}
-            disabled={!symbolDataExists}
-          >
-            Symbol Map{" "}
-            {symbolDataExists && (
-              <Badge className="ml-2" variant="secondary">
-                Data Loaded
-              </Badge>
+    <TooltipProvider>
+      <Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
+        <CardHeader
+          className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-5 px-6 rounded-t-xl relative"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">
+                Dimension mapping
+              </CardTitle>
+            </div>
+            <div className="transform transition-transform duration-200 ease-in-out">
+              {isExpanded ? (
+                <ChevronUp className="h-4 w-4 text-gray-600 dark:text-gray-400 transition-colors duration-200" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400 transition-colors duration-200" />
+              )}
+            </div>
+          </div>
+        </CardHeader>
+
+        <div
+          className={`transition-all duration-300 ease-in-out ${
+            isExpanded ? "max-h-[9999px] opacity-100" : "max-h-0 opacity-0"
+          } overflow-hidden`}
+        >
+          <CardContent className="space-y-4 px-6 pb-6 pt-2">
+            <div className="inline-flex h-auto items-center justify-start gap-2 bg-transparent p-0">
+              {renderTabButton(
+                "symbol",
+                <MapPin className="w-3 h-3 mr-1.5 transition-transform duration-300 group-hover:translate-y-0.5" />,
+                "Symbol map",
+                internalActiveTab === "symbol", // Use internal state
+              )}
+
+              {renderTabButton(
+                "choropleth",
+                <BarChart3 className="w-3 h-3 mr-1.5 transition-transform duration-300 group-hover:translate-y-0.5" />,
+                "Choropleth",
+                internalActiveTab === "choropleth", // Use internal state
+              )}
+              {/* REMOVED: Custom map tab button */}
+            </div>
+
+            {internalActiveTab === "choropleth" && ( // Use internal state
+              <div className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                {/* State Panel */}
+                {renderSubPanel(
+                  "state",
+                  subFeatureDimensionLabel,
+                  <Flag className="w-4 h-4" />,
+                  dimensionSettings[internalActiveTab].stateColumn
+                    ? toSentenceCase(dimensionSettings[internalActiveTab].stateColumn)
+                    : "Not mapped",
+                  <div>
+                    {renderDropdown(
+                      `${subFeatureDimensionLabel} column`,
+                      dimensionSettings[internalActiveTab].stateColumn,
+                      (value) => handleDimensionSettingChange(internalActiveTab, "stateColumn", value), // Use new handler
+                      ["state"],
+                    )}
+                  </div>,
+                )}
+
+                {/* Fill Panel */}
+                {renderSubPanel(
+                  "fill",
+                  "Fill",
+                  <Palette className="w-4 h-4" />,
+                  dimensionSettings[internalActiveTab].colorBy
+                    ? toSentenceCase(dimensionSettings[internalActiveTab].colorBy)
+                    : "Not mapped",
+                  <div className="space-y-4">
+                    <div className="flex items-end justify-between gap-2">
+                      {" "}
+                      {/* Flex container for alignment */}
+                      {renderDropdown(
+                        "Fill by",
+                        dimensionSettings[internalActiveTab].colorBy,
+                        (value) => handleDimensionSettingChange(internalActiveTab, "colorBy", value), // Use new handler
+                        ["number", "text", "date", "state"],
+                      )}
+                      {dimensionSettings[internalActiveTab].colorBy && (
+                        <ToggleGroup
+                          type="single"
+                          value={dimensionSettings[internalActiveTab].colorScale}
+                          onValueChange={
+                            (value: "linear" | "categorical") =>
+                              value && handleDimensionSettingChange(internalActiveTab, "colorScale", value) // Use new handler
+                          }
+                          className="flex flex-shrink-0 h-auto rounded-md border bg-muted p-1 text-muted-foreground"
+                          aria-label="Color scale type"
+                        >
+                          <ToggleGroupItem
+                            value="linear"
+                            aria-label="Linear scale"
+                            className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
+                          >
+                            Linear scale
+                          </ToggleGroupItem>
+                          <ToggleGroupItem
+                            value="categorical"
+                            aria-label="Categorical scale"
+                            className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
+                          >
+                            Categorical scale
+                          </ToggleGroupItem>
+                        </ToggleGroup>
+                      )}
+                    </div>
+
+                    {/* MOVED: Color Scheme Preset Dropdown for Choropleth / Custom */}
+                    {dimensionSettings[internalActiveTab].colorBy && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">Color scheme presets</Label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleSaveScheme(internalActiveTab)}
+                            className="h-7 text-xs px-2"
+                          >
+                            <Save className="w-3 h-3 mr-1" /> Save scheme
+                          </Button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={selectedChoroplethColorScheme}
+                            onValueChange={(schemeName) => {
+                              setSelectedChoroplethColorScheme(schemeName)
+                              if (schemeName) {
+                                const updatedSettings = applyColorSchemePreset(
+                                  schemeName,
+                                  internalActiveTab,
+                                  dimensionSettings[internalActiveTab].colorScale,
+                                  dimensionSettings[internalActiveTab].colorBy, // Pass colorByColumn
+                                  dimensionSettings,
+                                  getUniqueValues, // Use the local getUniqueValues
+                                  customSchemes,
+                                  showMidpointChoropleth,
+                                )
+                                onUpdateSettings(updatedSettings)
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Choose a color scheme..." />
+                            </SelectTrigger>
+
+                            <SelectContent className="max-h-80">
+                              {/* Conditional rendering based on colorScale */}
+                              {dimensionSettings[internalActiveTab].colorScale === "linear" && (
+                                <>
+                                  {/* Sequential Schemes */}
+                                  <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b bg-gray-50 dark:bg-gray-800">
+                                    Sequential (Single Hue)
+                                  </div>
+                                  {colorSchemeCategories.sequential["Single Hue"].map((scheme) => (
+                                    <SelectItem
+                                      key={scheme}
+                                      value={scheme}
+                                      className="p-3 pl-8 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                                    >
+                                      <div className="flex items-center gap-3 w-full">
+                                        <span className="text-sm font-medium min-w-[80px] text-gray-900 dark:text-gray-100">
+                                          {scheme}
+                                        </span>
+                                        <div className="flex-1 min-w-[120px]">
+                                          {renderColorSchemePreview(
+                                            d3ColorSchemes[scheme as keyof typeof d3ColorSchemes],
+                                            "linear",
+                                            scheme,
+                                          )}
+                                        </div>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          {d3ColorSchemes[scheme as keyof typeof d3ColorSchemes].length} colors
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+
+                                  <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-t bg-gray-50 dark:bg-gray-800">
+                                    Sequential (Multi-Hue)
+                                  </div>
+                                  {colorSchemeCategories.sequential["Multi-Hue"].map((scheme) => (
+                                    <SelectItem
+                                      key={scheme}
+                                      value={scheme}
+                                      className="p-3 pl-8 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                                    >
+                                      <div className="flex items-center gap-3 w-full">
+                                        <span className="text-sm font-medium min-w-[80px] text-gray-900 dark:text-gray-100">
+                                          {scheme}
+                                        </span>
+                                        <div className="flex-1 min-w-[120px]">
+                                          {renderColorSchemePreview(
+                                            d3ColorSchemes[scheme as keyof typeof d3ColorSchemes],
+                                            "linear",
+                                            scheme,
+                                          )}
+                                        </div>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          {d3ColorSchemes[scheme as keyof typeof d3ColorSchemes].length} colors
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+
+                                  {/* Diverging Schemes */}
+                                  <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-t bg-gray-50 dark:bg-gray-800">
+                                    Diverging
+                                  </div>
+                                  {colorSchemeCategories.diverging.map((scheme) => (
+                                    <SelectItem
+                                      key={scheme}
+                                      value={scheme}
+                                      className="p-3 pl-8 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                                    >
+                                      <div className="flex items-center gap-3 w-full">
+                                        <span className="text-sm font-medium min-w-[80px] text-gray-900 dark:text-gray-100">
+                                          {scheme}
+                                        </span>
+                                        <div className="flex-1 min-w-[120px]">
+                                          {renderColorSchemePreview(
+                                            d3ColorSchemes[scheme as keyof typeof d3ColorSchemes],
+                                            "linear",
+                                            scheme,
+                                          )}
+                                        </div>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          {d3ColorSchemes[scheme as keyof typeof d3ColorSchemes].length} colors
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                  {customSchemes.filter((s) => s.type === "linear").length > 0 && (
+                                    <>
+                                      <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-t bg-gray-50 dark:bg-gray-800">
+                                        Custom Linear
+                                      </div>
+                                      {customSchemes
+                                        .filter((s) => s.type === "linear")
+                                        .map((scheme) => (
+                                          <SelectItem
+                                            key={`custom-linear-${scheme.name}`}
+                                            value={`custom-linear-${scheme.name}`} // Prefix to distinguish
+                                            className="p-3 pl-8 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                                          >
+                                            <div className="flex items-center gap-3 w-full">
+                                              <span className="text-sm font-medium min-w-[80px] text-gray-900 dark:text-gray-100">
+                                                {scheme.name}
+                                              </span>
+                                              <div className="flex-1 min-w-[120px]">
+                                                {/* Render preview using the 3 colors */}
+                                                {renderColorSchemePreview(
+                                                  [
+                                                    scheme.colors[0],
+                                                    scheme.colors[1] || scheme.colors[0],
+                                                    scheme.colors[2] || scheme.colors[0],
+                                                  ],
+                                                  "linear",
+                                                  scheme.name,
+                                                )}
+                                              </div>
+                                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                {scheme.hasMidpoint ? "3 colors" : "2 colors"}
+                                              </span>
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                    </>
+                                  )}
+                                </>
+                              )}
+
+                              {dimensionSettings[internalActiveTab].colorScale === "categorical" && (
+                                <>
+                                  {/* Categorical Schemes */}
+                                  <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-t bg-gray-50 dark:bg-gray-800">
+                                    Categorical
+                                  </div>
+                                  {colorSchemeCategories.categorical.map((scheme) => (
+                                    <SelectItem
+                                      key={scheme}
+                                      value={scheme}
+                                      className="p-3 pl-8 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                                    >
+                                      <div className="flex items-center gap-3 w-full">
+                                        <span className="text-sm font-medium min-w-[80px] text-gray-900 dark:text-gray-100">
+                                          {scheme}
+                                        </span>
+                                        <div className="flex-1 min-w-[120px]">
+                                          {renderColorSchemePreview(
+                                            d3ColorSchemes[scheme as keyof typeof d3ColorSchemes],
+                                            "categorical",
+                                            scheme,
+                                          )}
+                                        </div>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          {d3ColorSchemes[scheme as keyof typeof d3ColorSchemes].length} colors
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                  {/* Custom Schemes */}
+                                  {customSchemes.filter((s) => s.type === "categorical").length > 0 && ( // Filter by type
+                                    <>
+                                      <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-t bg-gray-50 dark:bg-gray-800">
+                                        Custom Categorical
+                                      </div>
+                                      {customSchemes
+                                        .filter((s) => s.type === "categorical")
+                                        .map(
+                                          (
+                                            scheme, // Filter by type
+                                          ) => (
+                                            <SelectItem
+                                              key={`custom-${scheme.name}`}
+                                              value={`custom-${scheme.name}`} // Prefix to distinguish from D3 schemes
+                                              className="p-3 pl-8 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                                            >
+                                              <div className="flex items-center gap-3 w-full">
+                                                <span className="text-sm font-medium min-w-[80px] text-gray-900 dark:text-gray-100">
+                                                  {scheme.name}
+                                                </span>
+                                                <div className="flex-1 min-w-[120px]">
+                                                  {renderColorSchemePreview(scheme.colors, "categorical", scheme.name)}
+                                                </div>
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                  {scheme.colors.length} colors
+                                                </span>
+                                              </div>
+                                            </SelectItem>
+                                          ),
+                                        )}
+                                    </>
+                                  )}
+                                </>
+                              )}
+                            </SelectContent>
+                          </Select>
+                          {/* Delete Custom Scheme Button */}
+                          {selectedChoroplethColorScheme.startsWith("custom-") && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteCustomScheme(selectedChoroplethColorScheme, "choropleth")}
+                              className="h-7 w-7"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Linear Color Scale Settings */}
+                    {dimensionSettings[internalActiveTab].colorScale === "linear" && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">Color range</Label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddMidpoint(internalActiveTab)}
+                            disabled={showMidpointChoropleth}
+                            className="h-7 text-xs px-2"
+                          >
+                            Add midpoint
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="space-y-1">
+                            <Label htmlFor="colorMinValue" className="text-xs">
+                              Min value
+                            </Label>
+                            <input
+                              type="number"
+                              id="colorMinValue"
+                              className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].colorMinValue}
+                              onChange={(e) =>
+                                handleDimensionSettingChange(
+                                  internalActiveTab,
+                                  "colorMinValue",
+                                  Number.parseFloat(e.target.value),
+                                )
+                              }
+                            />
+                          </div>
+
+                          {/* Midpoint Value Input (Conditionally Rendered) */}
+                          {showMidpointChoropleth && (
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <Label htmlFor="colorMidValue" className="text-xs">
+                                  Mid value
+                                </Label>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleRemoveMidpoint(internalActiveTab)}
+                                  className="h-7 w-7"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                              <input
+                                type="number"
+                                id="colorMidValue"
+                                className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                                value={dimensionSettings[internalActiveTab].colorMidValue}
+                                onChange={(e) =>
+                                  handleDimensionSettingChange(
+                                    internalActiveTab,
+                                    "colorMidValue",
+                                    Number.parseFloat(e.target.value),
+                                  )
+                                }
+                              />
+                            </div>
+                          )}
+
+                          <div className="space-y-1">
+                            <Label htmlFor="colorMaxValue" className="text-xs">
+                              Max value
+                            </Label>
+                            <input
+                              type="number"
+                              id="colorMaxValue"
+                              className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].colorMaxValue}
+                              onChange={(e) =>
+                                handleDimensionSettingChange(
+                                  internalActiveTab,
+                                  "colorMaxValue",
+                                  Number.parseFloat(e.target.value),
+                                )
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="space-y-1">
+                            <Label htmlFor="colorMinColor" className="text-xs">
+                              Min color
+                            </Label>
+                            <input
+                              type="color"
+                              id="colorMinColor"
+                              className="w-full h-10 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].colorMinColor}
+                              onChange={(e) =>
+                                handleColorValueChange(internalActiveTab, "colorMinColor", e.target.value)
+                              }
+                            />
+                          </div>
+
+                          {/* Midpoint Color Input (Conditionally Rendered) */}
+                          {showMidpointChoropleth && (
+                            <div className="space-y-1">
+                              <Label htmlFor="colorMidColor" className="text-xs">
+                                Mid color
+                              </Label>
+                              <input
+                                type="color"
+                                id="colorMidColor"
+                                className="w-full h-10 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200"
+                                value={dimensionSettings[internalActiveTab].colorMidColor}
+                                onChange={(e) =>
+                                  handleColorValueChange(internalActiveTab, "colorMidColor", e.target.value)
+                                }
+                              />
+                            </div>
+                          )}
+
+                          <div className="space-y-1">
+                            <Label htmlFor="colorMaxColor" className="text-xs">
+                              Max color
+                            </Label>
+                            <input
+                              type="color"
+                              id="colorMaxColor"
+                              className="w-full h-10 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].colorMaxColor}
+                              onChange={(e) =>
+                                handleColorValueChange(internalActiveTab, "colorMaxColor", e.target.value)
+                              }
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Categorical Color Scale Settings */}
+                    {dimensionSettings[internalActiveTab].colorScale === "categorical" && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">Categories</Label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddColor(internalActiveTab)}
+                            className="h-7 text-xs px-2"
+                          >
+                            Add color +
+                          </Button>
+                        </div>
+                        <div className="space-y-1">
+                          {dimensionSettings[internalActiveTab].categoricalColors.length === 0 ? (
+                            <div className="text-sm text-gray-500 dark:text-gray-400">No categories defined.</div>
+                          ) : (
+                            dimensionSettings[internalActiveTab].categoricalColors.map((item, index) => (
+                              <div
+                                key={item.value}
+                                draggable="true"
+                                onDragStart={(e) => handleDragStart(e, index)}
+                                onDragOver={(e) => handleDragOver(e, index)}
+                                onDragLeave={handleDragLeave}
+                                onDrop={(e) => handleDrop(e, index, internalActiveTab)}
+                                onDragEnd={handleDragEnd}
+                                className={cn(
+                                  "flex items-center gap-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200",
+                                  draggedIndex === index ? "opacity-50" : "",
+                                  dragOverIndex === index ? "border-primary-500 dark:border-primary-400" : "",
+                                )}
+                              >
+                                <div className="w-2 h-10 bg-gray-200 dark:bg-gray-700 cursor-grab rounded-l-md" />
+                                <input
+                                  type="color"
+                                  className="h-10 w-10 rounded-md border-none bg-transparent"
+                                  value={item.color}
+                                  onChange={(e) =>
+                                    handleCategoricalColorChange(internalActiveTab, index, e.target.value)
+                                  }
+                                />
+                                <div className="flex-1 truncate text-sm text-gray-900 dark:text-gray-100 px-2">
+                                  {getUniqueValues(dimensionSettings[internalActiveTab].colorBy)[index]}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>,
+                )}
+
+                {/* Labels Panel */}
+                {renderSubPanel(
+                  "labels",
+                  "Labels",
+                  <Type className="w-4 h-4" />,
+                  dimensionSettings[internalActiveTab].labelTemplate ? "Custom template" : "No template defined",
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="labelTemplate" className="text-sm font-medium">
+                        Label template
+                      </Label>
+                      <textarea
+                        id="labelTemplate"
+                        className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                        placeholder="Enter label template (e.g., {name}, {value})"
+                        value={dimensionSettings[internalActiveTab].labelTemplate}
+                        onChange={(e) =>
+                          handleDimensionSettingChange(internalActiveTab, "labelTemplate", e.target.value)
+                        }
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Use &#123;columnName&#125; to insert column values into the label.
+                      </p>
+                    </div>
+
+                    {/* Label Preview */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Label preview</Label>
+                      <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 text-sm text-gray-900 dark:text-gray-100">
+                        <div
+                          className="break-words"
+                          dangerouslySetInnerHTML={{
+                            __html: renderLabelPreview(
+                              dimensionSettings[internalActiveTab].labelTemplate,
+                              getDisplayDataForTab(internalActiveTab)[0],
+                              columnTypes,
+                              columnFormats,
+                            ),
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>,
+                )}
+              </div>
             )}
-          </button>
-          <button
-            className={`py-2 px-4 text-sm font-medium ${
-              activeTab === "choropleth"
-                ? "border-b-2 border-blue-500 text-blue-500"
-                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            }`}
-            onClick={() => setActiveTab("choropleth")}
-            disabled={!choroplethDataExists}
-          >
-            Choropleth Map{" "}
-            {choroplethDataExists && (
-              <Badge className="ml-2" variant="secondary">
-                Data Loaded
-              </Badge>
+
+            {internalActiveTab === "symbol" && ( // Use internal state
+              <div className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+                {/* Coordinates Panel */}
+                {renderSubPanel(
+                  "coordinates",
+                  "Coordinates",
+                  <MapPin className="w-4 h-4" />,
+                  dimensionSettings[internalActiveTab].latitude && dimensionSettings[internalActiveTab].longitude
+                    ? `${toSentenceCase(dimensionSettings[internalActiveTab].latitude)}, ${toSentenceCase(
+                        dimensionSettings[internalActiveTab].longitude,
+                      )}`
+                    : "Not mapped",
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {renderDropdown(
+                      "Latitude column",
+                      dimensionSettings[internalActiveTab].latitude,
+                      (value) => handleDimensionSettingChange(internalActiveTab, "latitude", value), // Use new handler
+                      ["coordinate"],
+                    )}
+                    {renderDropdown(
+                      "Longitude column",
+                      dimensionSettings[internalActiveTab].longitude,
+                      (value) => handleDimensionSettingChange(internalActiveTab, "longitude", value), // Use new handler
+                      ["coordinate"],
+                    )}
+                  </div>,
+                )}
+
+                {/* Size Panel */}
+                {renderSubPanel(
+                  "size",
+                  "Size",
+                  <Hash className="w-4 h-4" />,
+                  dimensionSettings[internalActiveTab].sizeBy
+                    ? toSentenceCase(dimensionSettings[internalActiveTab].sizeBy)
+                    : "Not mapped",
+                  <div className="space-y-4">
+                    {renderDropdown(
+                      "Size by",
+                      dimensionSettings[internalActiveTab].sizeBy,
+                      (value) => handleDimensionSettingChange(internalActiveTab, "sizeBy", value), // Use new handler
+                      ["number"],
+                    )}
+
+                    {dimensionSettings[internalActiveTab].sizeBy && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Size range</Label>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <Label htmlFor="sizeMin" className="text-xs">
+                              Min size
+                            </Label>
+                            <input
+                              type="number"
+                              id="sizeMin"
+                              className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].sizeMin}
+                              onChange={(e) =>
+                                handleDimensionSettingChange(
+                                  internalActiveTab,
+                                  "sizeMin",
+                                  Number.parseFloat(e.target.value),
+                                )
+                              }
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="sizeMax" className="text-xs">
+                              Max size
+                            </Label>
+                            <input
+                              type="number"
+                              id="sizeMax"
+                              className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].sizeMax}
+                              onChange={(e) =>
+                                handleDimensionSettingChange(
+                                  internalActiveTab,
+                                  "sizeMax",
+                                  Number.parseFloat(e.target.value),
+                                )
+                              }
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>,
+                )}
+
+                {/* Color Panel */}
+                {renderSubPanel(
+                  "color",
+                  "Color",
+                  <Palette className="w-4 h-4" />,
+                  dimensionSettings[internalActiveTab].colorBy
+                    ? toSentenceCase(dimensionSettings[internalActiveTab].colorBy)
+                    : "Not mapped",
+                  <div className="space-y-4">
+                    <div className="flex items-end justify-between gap-2">
+                      {" "}
+                      {/* Flex container for alignment */}
+                      {renderDropdown(
+                        "Color by",
+                        dimensionSettings[internalActiveTab].colorBy,
+                        (value) => handleDimensionSettingChange(internalActiveTab, "colorBy", value), // Use new handler
+                        ["number", "text", "date"],
+                      )}
+                      {dimensionSettings[internalActiveTab].colorBy && (
+                        <ToggleGroup
+                          type="single"
+                          value={dimensionSettings[internalActiveTab].colorScale}
+                          onValueChange={
+                            (value: "linear" | "categorical") =>
+                              value && handleDimensionSettingChange(internalActiveTab, "colorScale", value) // Use new handler
+                          }
+                          className="flex flex-shrink-0 h-auto rounded-md border bg-muted p-1 text-muted-foreground"
+                          aria-label="Color scale type"
+                        >
+                          <ToggleGroupItem
+                            value="linear"
+                            aria-label="Linear scale"
+                            className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
+                          >
+                            Linear scale
+                          </ToggleGroupItem>
+                          <ToggleGroupItem
+                            value="categorical"
+                            aria-label="Categorical scale"
+                            className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm"
+                          >
+                            Categorical scale
+                          </ToggleGroupItem>
+                        </ToggleGroup>
+                      )}
+                    </div>
+
+                    {/* Color Scheme Preset Dropdown for Symbol */}
+                    {dimensionSettings[internalActiveTab].colorBy && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">Color scheme presets</Label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleSaveScheme(internalActiveTab)}
+                            className="h-7 text-xs px-2"
+                          >
+                            <Save className="w-3 h-3 mr-1" /> Save scheme
+                          </Button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={selectedSymbolColorScheme}
+                            onValueChange={(schemeName) => {
+                              setSelectedSymbolColorScheme(schemeName)
+                              if (schemeName) {
+                                const updatedSettings = applyColorSchemePreset(
+                                  schemeName,
+                                  internalActiveTab,
+                                  dimensionSettings[internalActiveTab].colorScale,
+                                  dimensionSettings[internalActiveTab].colorBy, // Pass colorByColumn
+                                  dimensionSettings,
+                                  getUniqueValues, // Use the local getUniqueValues
+                                  customSchemes,
+                                  showMidpointSymbol,
+                                )
+                                onUpdateSettings(updatedSettings)
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Choose a color scheme..." />
+                            </SelectTrigger>
+
+                            <SelectContent className="max-h-80">
+                              {/* Conditional rendering based on colorScale */}
+                              {dimensionSettings[internalActiveTab].colorScale === "linear" && (
+                                <>
+                                  {/* Sequential Schemes */}
+                                  <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b bg-gray-50 dark:bg-gray-800">
+                                    Sequential (Single Hue)
+                                  </div>
+                                  {colorSchemeCategories.sequential["Single Hue"].map((scheme) => (
+                                    <SelectItem
+                                      key={scheme}
+                                      value={scheme}
+                                      className="p-3 pl-8 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                                    >
+                                      <div className="flex items-center gap-3 w-full">
+                                        <span className="text-sm font-medium min-w-[80px] text-gray-900 dark:text-gray-100">
+                                          {scheme}
+                                        </span>
+                                        <div className="flex-1 min-w-[120px]">
+                                          {renderColorSchemePreview(
+                                            d3ColorSchemes[scheme as keyof typeof d3ColorSchemes],
+                                            "linear",
+                                            scheme,
+                                          )}
+                                        </div>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          {d3ColorSchemes[scheme as keyof typeof d3ColorSchemes].length} colors
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+
+                                  <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-t bg-gray-50 dark:bg-gray-800">
+                                    Sequential (Multi-Hue)
+                                  </div>
+                                  {colorSchemeCategories.sequential["Multi-Hue"].map((scheme) => (
+                                    <SelectItem
+                                      key={scheme}
+                                      value={scheme}
+                                      className="p-3 pl-8 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                                    >
+                                      <div className="flex items-center gap-3 w-full">
+                                        <span className="text-sm font-medium min-w-[80px] text-gray-900 dark:text-gray-100">
+                                          {scheme}
+                                        </span>
+                                        <div className="flex-1 min-w-[120px]">
+                                          {renderColorSchemePreview(
+                                            d3ColorSchemes[scheme as keyof typeof d3ColorSchemes],
+                                            "linear",
+                                            scheme,
+                                          )}
+                                        </div>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          {d3ColorSchemes[scheme as keyof typeof d3ColorSchemes].length} colors
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+
+                                  {/* Diverging Schemes */}
+                                  <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-t bg-gray-50 dark:bg-gray-800">
+                                    Diverging
+                                  </div>
+                                  {colorSchemeCategories.diverging.map((scheme) => (
+                                    <SelectItem
+                                      key={`${scheme}`}
+                                      value={scheme}
+                                      className="p-3 pl-8 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                                    >
+                                      <div className="flex items-center gap-3 w-full">
+                                        <span className="text-sm font-medium min-w-[80px] text-gray-900 dark:text-gray-100">
+                                          {scheme}
+                                        </span>
+                                        <div className="flex-1 min-w-[120px]">
+                                          {renderColorSchemePreview(
+                                            d3ColorSchemes[scheme as keyof typeof d3ColorSchemes],
+                                            "linear",
+                                            scheme,
+                                          )}
+                                        </div>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          {d3ColorSchemes[scheme as keyof typeof d3ColorSchemes].length} colors
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                  {customSchemes.filter((s) => s.type === "linear").length > 0 && (
+                                    <>
+                                      <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-t bg-gray-50 dark:bg-gray-800">
+                                        Custom Linear
+                                      </div>
+                                      {customSchemes
+                                        .filter((s) => s.type === "linear")
+                                        .map((scheme) => (
+                                          <SelectItem
+                                            key={`custom-linear-${scheme.name}`}
+                                            value={`custom-linear-${scheme.name}`} // Prefix to distinguish
+                                            className="p-3 pl-8 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                                          >
+                                            <div className="flex items-center gap-3 w-full">
+                                              <span className="text-sm font-medium min-w-[80px] text-gray-900 dark:text-gray-100">
+                                                {scheme.name}
+                                              </span>
+                                              <div className="flex-1 min-w-[120px]">
+                                                {/* Render preview using the 3 colors */}
+                                                {renderColorSchemePreview(
+                                                  [
+                                                    scheme.colors[0],
+                                                    scheme.colors[1] || scheme.colors[0],
+                                                    scheme.colors[2] || scheme.colors[0],
+                                                  ],
+                                                  "linear",
+                                                  scheme.name,
+                                                )}
+                                              </div>
+                                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                {scheme.hasMidpoint ? "3 colors" : "2 colors"}
+                                              </span>
+                                            </div>
+                                          </SelectItem>
+                                        ))}
+                                    </>
+                                  )}
+                                </>
+                              )}
+
+                              {dimensionSettings[internalActiveTab].colorScale === "categorical" && (
+                                <>
+                                  {/* Categorical Schemes */}
+                                  <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-t bg-gray-50 dark:bg-gray-800">
+                                    Categorical
+                                  </div>
+                                  {colorSchemeCategories.categorical.map((scheme) => (
+                                    <SelectItem
+                                      key={`${scheme}`}
+                                      value={scheme}
+                                      className="p-3 pl-8 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                                    >
+                                      <div className="flex items-center gap-3 w-full">
+                                        <span className="text-sm font-medium min-w-[80px] text-gray-900 dark:text-gray-100">
+                                          {scheme}
+                                        </span>
+                                        <div className="flex-1 min-w-[120px]">
+                                          {renderColorSchemePreview(
+                                            d3ColorSchemes[scheme as keyof typeof d3ColorSchemes],
+                                            "categorical",
+                                            scheme,
+                                          )}
+                                        </div>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                          {d3ColorSchemes[scheme as keyof typeof d3ColorSchemes].length} colors
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                  {/* Custom Schemes */}
+                                  {customSchemes.filter((s) => s.type === "categorical").length > 0 && ( // Filter by type
+                                    <>
+                                      <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-t bg-gray-50 dark:bg-gray-800">
+                                        Custom Categorical
+                                      </div>
+                                      {customSchemes
+                                        .filter((s) => s.type === "categorical")
+                                        .map(
+                                          (
+                                            scheme, // Filter by type
+                                          ) => (
+                                            <SelectItem
+                                              key={`custom-${scheme.name}`}
+                                              value={`custom-${scheme.name}`} // Prefix to distinguish from D3 schemes
+                                              className="p-3 pl-8 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+                                            >
+                                              <div className="flex items-center gap-3 w-full">
+                                                <span className="text-sm font-medium min-w-[80px] text-gray-900 dark:text-gray-100">
+                                                  {scheme.name}
+                                                </span>
+                                                <div className="flex-1 min-w-[120px]">
+                                                  {renderColorSchemePreview(scheme.colors, "categorical", scheme.name)}
+                                                </div>
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                  {scheme.colors.length} colors
+                                                </span>
+                                              </div>
+                                            </SelectItem>
+                                          ),
+                                        )}
+                                    </>
+                                  )}
+                                </>
+                              )}
+                            </SelectContent>
+                          </Select>
+                          {/* Delete Custom Scheme Button */}
+                          {selectedSymbolColorScheme.startsWith("custom-") && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteCustomScheme(selectedSymbolColorScheme, "symbol")}
+                              className="h-7 w-7"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Linear Color Scale Settings */}
+                    {dimensionSettings[internalActiveTab].colorScale === "linear" && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">Color range</Label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddMidpoint(internalActiveTab)}
+                            disabled={showMidpointSymbol}
+                            className="h-7 text-xs px-2"
+                          >
+                            Add midpoint
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="space-y-1">
+                            <Label htmlFor="colorMinValue" className="text-xs">
+                              Min value
+                            </Label>
+                            <input
+                              type="number"
+                              id="colorMinValue"
+                              className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].colorMinValue}
+                              onChange={(e) =>
+                                handleDimensionSettingChange(
+                                  internalActiveTab,
+                                  "colorMinValue",
+                                  Number.parseFloat(e.target.value),
+                                )
+                              }
+                            />
+                          </div>
+
+                          {/* Midpoint Value Input (Conditionally Rendered) */}
+                          {showMidpointSymbol && (
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <Label htmlFor="colorMidValue" className="text-xs">
+                                  Mid value
+                                </Label>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleRemoveMidpoint(internalActiveTab)}
+                                  className="h-7 w-7"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                              <input
+                                type="number"
+                                id="colorMidValue"
+                                className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                                value={dimensionSettings[internalActiveTab].colorMidValue}
+                                onChange={(e) =>
+                                  handleDimensionSettingChange(
+                                    internalActiveTab,
+                                    "colorMidValue",
+                                    Number.parseFloat(e.target.value),
+                                  )
+                                }
+                              />
+                            </div>
+                          )}
+
+                          <div className="space-y-1">
+                            <Label htmlFor="colorMaxValue" className="text-xs">
+                              Max value
+                            </Label>
+                            <input
+                              type="number"
+                              id="colorMaxValue"
+                              className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].colorMaxValue}
+                              onChange={(e) =>
+                                handleDimensionSettingChange(
+                                  internalActiveTab,
+                                  "colorMaxValue",
+                                  Number.parseFloat(e.target.value),
+                                )
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="space-y-1">
+                            <Label htmlFor="colorMinColor" className="text-xs">
+                              Min color
+                            </Label>
+                            <input
+                              type="color"
+                              id="colorMinColor"
+                              className="w-full h-10 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].colorMinColor}
+                              onChange={(e) =>
+                                handleColorValueChange(internalActiveTab, "colorMinColor", e.target.value)
+                              }
+                            />
+                          </div>
+
+                          {/* Midpoint Color Input (Conditionally Rendered) */}
+                          {showMidpointSymbol && (
+                            <div className="space-y-1">
+                              <Label htmlFor="colorMidColor" className="text-xs">
+                                Mid color
+                              </Label>
+                              <input
+                                type="color"
+                                id="colorMidColor"
+                                className="w-full h-10 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200"
+                                value={dimensionSettings[internalActiveTab].colorMidColor}
+                                onChange={(e) =>
+                                  handleColorValueChange(internalActiveTab, "colorMidColor", e.target.value)
+                                }
+                              />
+                            </div>
+                          )}
+
+                          <div className="space-y-1">
+                            <Label htmlFor="colorMaxColor" className="text-xs">
+                              Max color
+                            </Label>
+                            <input
+                              type="color"
+                              id="colorMaxColor"
+                              className="w-full h-10 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200"
+                              value={dimensionSettings[internalActiveTab].colorMaxColor}
+                              onChange={(e) =>
+                                handleColorValueChange(internalActiveTab, "colorMaxColor", e.target.value)
+                              }
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Categorical Color Scale Settings */}
+                    {dimensionSettings[internalActiveTab].colorScale === "categorical" && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">Categories</Label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAddColor(internalActiveTab)}
+                            className="h-7 text-xs px-2"
+                          >
+                            Add color +
+                          </Button>
+                        </div>
+                        <div className="space-y-1">
+                          {dimensionSettings[internalActiveTab].categoricalColors.length === 0 ? (
+                            <div className="text-sm text-gray-500 dark:text-gray-400">No categories defined.</div>
+                          ) : (
+                            dimensionSettings[internalActiveTab].categoricalColors.map((item, index) => (
+                              <div
+                                key={item.value}
+                                draggable="true"
+                                onDragStart={(e) => handleDragStart(e, index)}
+                                onDragOver={(e) => handleDragOver(e, index)}
+                                onDragLeave={handleDragLeave}
+                                onDrop={(e) => handleDrop(e, index, internalActiveTab)}
+                                onDragEnd={handleDragEnd}
+                                className={cn(
+                                  "flex items-center gap-2 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-colors duration-200",
+                                  draggedIndex === index ? "opacity-50" : "",
+                                  dragOverIndex === index ? "border-primary-500 dark:border-primary-400" : "",
+                                )}
+                              >
+                                <div className="w-2 h-10 bg-gray-200 dark:bg-gray-700 cursor-grab rounded-l-md" />
+                                <input
+                                  type="color"
+                                  className="h-10 w-10 rounded-md border-none bg-transparent"
+                                  value={item.color}
+                                  onChange={(e) =>
+                                    handleCategoricalColorChange(internalActiveTab, index, e.target.value)
+                                  }
+                                />
+                                <div className="flex-1 truncate text-sm text-gray-900 dark:text-gray-100 px-2">
+                                  {getUniqueValues(dimensionSettings[internalActiveTab].colorBy)[index]}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>,
+                )}
+
+                {/* Labels Panel */}
+                {renderSubPanel(
+                  "labels",
+                  "Labels",
+                  <Type className="w-4 h-4" />,
+                  dimensionSettings[internalActiveTab].labelTemplate ? "Custom template" : "No template defined",
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="labelTemplate" className="text-sm font-medium">
+                        Label template
+                      </Label>
+                      <textarea
+                        id="labelTemplate"
+                        className="w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition-colors duration-200"
+                        placeholder="Enter label template (e.g., {name}, {value})"
+                        value={dimensionSettings[internalActiveTab].labelTemplate}
+                        onChange={(e) =>
+                          handleDimensionSettingChange(internalActiveTab, "labelTemplate", e.target.value)
+                        }
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Use &#123;columnName&#125; to insert column values into the label.
+                      </p>
+                    </div>
+
+                    {/* Label Preview */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Label preview</Label>
+                      <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 text-sm text-gray-900 dark:text-gray-100">
+                        <div
+                          className="break-words"
+                          dangerouslySetInnerHTML={{
+                            __html: renderLabelPreview(
+                              dimensionSettings[internalActiveTab].labelTemplate,
+                              getDisplayDataForTab(internalActiveTab)[0],
+                              columnTypes,
+                              columnFormats,
+                            ),
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>,
+                )}
+              </div>
             )}
-          </button>
-          <button
-            className={`py-2 px-4 text-sm font-medium ${
-              activeTab === "custom"
-                ? "border-b-2 border-blue-500 text-blue-500"
-                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            }`}
-            onClick={() => setActiveTab("custom")}
-            disabled={!customDataExists || !choroplethDataExists}
-          >
-            Custom Map{" "}
-            {customDataExists && (
-              <Badge className="ml-2" variant="secondary">
-                SVG Loaded
-              </Badge>
-            )}{" "}
-            {choroplethDataExists && customDataExists && (
-              <Badge className="ml-2" variant="secondary">
-                Data Loaded
-              </Badge>
-            )}
-          </button>
+          </CardContent>
         </div>
 
-        {!currentActiveTabHasData && (
-          <p className="text-gray-500 dark:text-gray-400">Load data to enable dimension mapping for this map type.</p>
-        )}
-
-        {currentActiveTabHasData && (
-          <>
-            {activeTab === "symbol" && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Location</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="latitude">Latitude Column</Label>
-                    <Select
-                      value={currentSettings.latitude || ""}
-                      onValueChange={(value) => updateSetting("latitude", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select latitude column" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {coordinateColumns.map((col) => (
-                          <SelectItem key={col} value={col}>
-                            {col}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="longitude">Longitude Column</Label>
-                    <Select
-                      value={currentSettings.longitude || ""}
-                      onValueChange={(value) => updateSetting("longitude", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select longitude column" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {coordinateColumns.map((col) => (
-                          <SelectItem key={col} value={col}>
-                            {col}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <h3 className="text-lg font-semibold">Size</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="sizeBy">Size By</Label>
-                    <Select
-                      value={currentSettings.sizeBy || ""}
-                      onValueChange={(value) => updateSetting("sizeBy", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select column for size" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {numericColumns.map((col) => (
-                          <SelectItem key={col} value={col}>
-                            {col}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {currentSettings.sizeBy && (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="sizeMin">Min Size (px)</Label>
-                        <Input
-                          id="sizeMin"
-                          type="number"
-                          value={currentSettings.sizeMin}
-                          onChange={(e) => updateSetting("sizeMin", Number(e.target.value))}
-                          min={1}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="sizeMax">Max Size (px)</Label>
-                        <Input
-                          id="sizeMax"
-                          type="number"
-                          value={currentSettings.sizeMax}
-                          onChange={(e) => updateSetting("sizeMax", Number(e.target.value))}
-                          min={1}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="sizeMinValue">Data Min Value</Label>
-                        <FormattedNumberInput
-                          id="sizeMinValue"
-                          value={currentSettings.sizeMinValue}
-                          onValueChange={(value) => updateSetting("sizeMinValue", value)}
-                          columnFormat={columnFormats[currentSettings.sizeBy]}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="sizeMaxValue">Data Max Value</Label>
-                        <FormattedNumberInput
-                          id="sizeMaxValue"
-                          value={currentSettings.sizeMaxValue}
-                          onValueChange={(value) => updateSetting("sizeMaxValue", value)}
-                          columnFormat={columnFormats[currentSettings.sizeBy]}
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <h3 className="text-lg font-semibold">Color</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="colorBy">Color By</Label>
-                    <Select
-                      value={currentSettings.colorBy || ""}
-                      onValueChange={(value) => updateSetting("colorBy", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select column for color" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {currentColumns.map((col) => (
-                          <SelectItem key={col} value={col}>
-                            {col}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {currentSettings.colorBy && (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="colorScale">Color Scale</Label>
-                        <Select
-                          value={currentSettings.colorScale}
-                          onValueChange={(value) => updateSetting("colorScale", value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select color scale" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="linear">Linear</SelectItem>
-                            <SelectItem value="categorical">Categorical</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {currentSettings.colorScale === "linear" && (
-                        <>
-                          <div className="space-y-2">
-                            <Label htmlFor="colorPalette">Color Palette</Label>
-                            <Select
-                              value={currentSettings.colorPalette}
-                              onValueChange={(value) => {
-                                updateSetting("colorPalette", value)
-                                // Also update the min/mid/max colors based on the chosen palette's range
-                                const palette = colorPalettes[value as keyof typeof colorPalettes]
-                                if (palette && palette.length >= 3) {
-                                  updateSetting("colorMinColor", palette[0])
-                                  updateSetting("colorMidColor", palette[Math.floor(palette.length / 2)])
-                                  updateSetting("colorMaxColor", palette[palette.length - 1])
-                                }
-                              }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select color palette" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Object.keys(colorPalettes).map((paletteName) => (
-                                  <SelectItem key={paletteName} value={paletteName}>
-                                    <div className="flex items-center">
-                                      {paletteName}
-                                      <div className="ml-2 flex -space-x-1">
-                                        {colorPalettes[paletteName as keyof typeof colorPalettes]
-                                          .slice(0, 5)
-                                          .map((color, i) => (
-                                            <div
-                                              key={i}
-                                              className="h-4 w-4 rounded-full border border-gray-200 dark:border-gray-700"
-                                              style={{ backgroundColor: color }}
-                                            />
-                                          ))}
-                                      </div>
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="colorMinValue">Data Min Value</Label>
-                            <FormattedNumberInput
-                              id="colorMinValue"
-                              value={currentSettings.colorMinValue}
-                              onValueChange={(value) => updateSetting("colorMinValue", value)}
-                              columnFormat={columnFormats[currentSettings.colorBy]}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="colorMinColor">Min Color</Label>
-                            <ColorInput
-                              color={currentSettings.colorMinColor}
-                              onChange={(color) => updateSetting("colorMinColor", color)}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="colorMidValue">Data Mid Value</Label>
-                            <FormattedNumberInput
-                              id="colorMidValue"
-                              value={currentSettings.colorMidValue}
-                              onValueChange={(value) => updateSetting("colorMidValue", value)}
-                              columnFormat={columnFormats[currentSettings.colorBy]}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="colorMidColor">Mid Color</Label>
-                            <ColorInput
-                              color={currentSettings.colorMidColor}
-                              onChange={(color) => updateSetting("colorMidColor", color)}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="colorMaxValue">Data Max Value</Label>
-                            <FormattedNumberInput
-                              id="colorMaxValue"
-                              value={currentSettings.colorMaxValue}
-                              onValueChange={(value) => updateSetting("colorMaxValue", value)}
-                              columnFormat={columnFormats[currentSettings.colorBy]}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="colorMaxColor">Max Color</Label>
-                            <ColorInput
-                              color={currentSettings.colorMaxColor}
-                              onChange={(color) => updateSetting("colorMaxColor", color)}
-                            />
-                          </div>
-                        </>
-                      )}
-                      {currentSettings.colorScale === "categorical" && (
-                        <div className="col-span-full space-y-4">
-                          <Label>Categorical Colors</Label>
-                          {getCategoricalValues(currentSettings.colorBy).map((value, index) => (
-                            <div key={value as string | number} className="flex items-center space-x-2">
-                              <Input
-                                value={value as string | number}
-                                readOnly
-                                className="flex-1"
-                                title={getFormattedValue(currentSettings.colorBy, value).toString()}
-                              />
-                              <ColorInput
-                                color={currentSettings.categoricalColors[index]?.color || "#cccccc"} // Default grey
-                                onChange={(color) => {
-                                  const newCategoricalColors = [...currentSettings.categoricalColors]
-                                  newCategoricalColors[index] = { value, color }
-                                  updateSetting("categoricalColors", newCategoricalColors)
-                                }}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-
-                <h3 className="text-lg font-semibold">Labels</h3>
-                <div className="space-y-2">
-                  <Label htmlFor="labelTemplate">Label Template</Label>
-                  <Textarea
-                    id="labelTemplate"
-                    placeholder="e.g., {City}, {State}"
-                    value={currentSettings.labelTemplate || ""}
-                    onChange={(e) => updateSetting("labelTemplate", e.target.value)}
-                    className="font-mono text-xs"
-                  />
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Use {"{Column Name}"} to insert data values.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="labelFontFamily">Font Family</Label>
-                    <Select
-                      value={currentSettings.labelFontFamily}
-                      onValueChange={(value) => updateSetting("labelFontFamily", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select font" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Inter">Inter</SelectItem>
-                        <SelectItem value="Roboto">Roboto</SelectItem>
-                        <SelectItem value="Open Sans">Open Sans</SelectItem>
-                        <SelectItem value="Lato">Lato</SelectItem>
-                        <SelectItem value="Montserrat">Montserrat</SelectItem>
-                        <SelectItem value="Source Sans Pro">Source Sans Pro</SelectItem>
-                        <SelectItem value="Poppins">Poppins</SelectItem>
-                        <SelectItem value="Ubuntu">Ubuntu</SelectItem>
-                        <SelectItem value="Lora">Lora</SelectItem>
-                        <SelectItem value="Playfair Display">Playfair Display</SelectItem>
-                        <SelectItem value="serif">Serif (Fallback)</SelectItem>
-                        <SelectItem value="sans-serif">Sans-serif (Fallback)</SelectItem>
-                        <SelectItem value="monospace">Monospace (Fallback)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="labelFontSize">Font Size (px)</Label>
-                    <Input
-                      id="labelFontSize"
-                      type="number"
-                      value={currentSettings.labelFontSize}
-                      onChange={(e) => updateSetting("labelFontSize", Number(e.target.value))}
-                      min={1}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="labelColor">Font Color</Label>
-                    <ColorInput
-                      color={currentSettings.labelColor}
-                      onChange={(color) => updateSetting("labelColor", color)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="labelOutlineColor">Outline Color</Label>
-                    <ColorInput
-                      color={currentSettings.labelOutlineColor}
-                      onChange={(color) => updateSetting("labelOutlineColor", color)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="labelOutlineThickness">Outline Thickness (px)</Label>
-                    <Input
-                      id="labelOutlineThickness"
-                      type="number"
-                      value={currentSettings.labelOutlineThickness}
-                      onChange={(e) => updateSetting("labelOutlineThickness", Number(e.target.value))}
-                      min={0}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Toggle
-                    pressed={currentSettings.labelBold}
-                    onPressedChange={(pressed) => updateSetting("labelBold", pressed)}
-                    aria-label="Toggle bold"
-                  >
-                    <Bold className="h-4 w-4" />
-                  </Toggle>
-                  <Toggle
-                    pressed={currentSettings.labelItalic}
-                    onPressedChange={(pressed) => updateSetting("labelItalic", pressed)}
-                    aria-label="Toggle italic"
-                  >
-                    <Italic className="h-4 w-4" />
-                  </Toggle>
-                  <Toggle
-                    pressed={currentSettings.labelUnderline}
-                    onPressedChange={(pressed) => updateSetting("labelUnderline", pressed)}
-                    aria-label="Toggle underline"
-                  >
-                    <Underline className="h-4 w-4" />
-                  </Toggle>
-                  <Toggle
-                    pressed={currentSettings.labelStrikethrough}
-                    onPressedChange={(pressed) => updateSetting("labelStrikethrough", pressed)}
-                    aria-label="Toggle strikethrough"
-                  >
-                    <Strikethrough className="h-4 w-4" />
-                  </Toggle>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="labelAlignment">Label Alignment</Label>
-                  <ToggleGroup
-                    type="single"
-                    value={currentSettings.labelAlignment}
-                    onValueChange={(value) => value && updateSetting("labelAlignment", value)}
-                    className="grid grid-cols-3 w-full"
-                  >
-                    <ToggleGroupItem value="top-left" aria-label="Align top-left">
-                      <ArrowUpLeft className="h-4 w-4" />
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="top-center" aria-label="Align top-center">
-                      <ArrowUp className="h-4 w-4" />
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="top-right" aria-label="Align top-right">
-                      <ArrowUpRight className="h-4 w-4" />
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="middle-left" aria-label="Align middle-left">
-                      <ArrowLeft className="h-4 w-4" />
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="center" aria-label="Align center">
-                      <AlignCenter className="h-4 w-4" />
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="middle-right" aria-label="Align middle-right">
-                      <ArrowRight className="h-4 w-4" />
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="bottom-left" aria-label="Align bottom-left">
-                      <ArrowDownLeft className="h-4 w-4" />
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="bottom-center" aria-label="Align bottom-center">
-                      <ArrowDown className="h-4 w-4" />
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="bottom-right" aria-label="Align bottom-right">
-                      <ArrowDownRight className="h-4 w-4" />
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Determines label position relative to symbol.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {(activeTab === "choropleth" || (activeTab === "custom" && customDataExists)) && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Geography and Color</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="stateColumn">{choroplethLabel}</Label> {/* Dynamic label */}
-                    <Select
-                      value={currentSettings.stateColumn || ""}
-                      onValueChange={(value) => updateSetting("stateColumn", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={`Select ${choroplethLabel.toLowerCase().replace(" column", "")}`} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {stateColumns.map((col) => (
-                          <SelectItem key={col} value={col}>
-                            {col}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="colorBy">Color By</Label>
-                    <Select
-                      value={currentSettings.colorBy || ""}
-                      onValueChange={(value) => updateSetting("colorBy", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select column for color" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {numericColumns.map((col) => (
-                          <SelectItem key={col} value={col}>
-                            {col}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {currentSettings.colorBy && (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="colorScale">Color Scale</Label>
-                        <Select
-                          value={currentSettings.colorScale}
-                          onValueChange={(value) => updateSetting("colorScale", value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select color scale" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="linear">Linear</SelectItem>
-                            <SelectItem value="categorical">Categorical</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {currentSettings.colorScale === "linear" && (
-                        <>
-                          <div className="space-y-2">
-                            <Label htmlFor="colorPalette">Color Palette</Label>
-                            <Select
-                              value={currentSettings.colorPalette}
-                              onValueChange={(value) => {
-                                updateSetting("colorPalette", value)
-                                const palette = colorPalettes[value as keyof typeof colorPalettes]
-                                if (palette && palette.length >= 3) {
-                                  updateSetting("colorMinColor", palette[0])
-                                  updateSetting("colorMidColor", palette[Math.floor(palette.length / 2)])
-                                  updateSetting("colorMaxColor", palette[palette.length - 1])
-                                }
-                              }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select color palette" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Object.keys(colorPalettes).map((paletteName) => (
-                                  <SelectItem key={paletteName} value={paletteName}>
-                                    <div className="flex items-center">
-                                      {paletteName}
-                                      <div className="ml-2 flex -space-x-1">
-                                        {colorPalettes[paletteName as keyof typeof colorPalettes]
-                                          .slice(0, 5)
-                                          .map((color, i) => (
-                                            <div
-                                              key={i}
-                                              className="h-4 w-4 rounded-full border border-gray-200 dark:border-gray-700"
-                                              style={{ backgroundColor: color }}
-                                            />
-                                          ))}
-                                      </div>
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="colorMinValue">Data Min Value</Label>
-                            <FormattedNumberInput
-                              id="colorMinValue"
-                              value={currentSettings.colorMinValue}
-                              onValueChange={(value) => updateSetting("colorMinValue", value)}
-                              columnFormat={columnFormats[currentSettings.colorBy]}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="colorMinColor">Min Color</Label>
-                            <ColorInput
-                              color={currentSettings.colorMinColor}
-                              onChange={(color) => updateSetting("colorMinColor", color)}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="colorMidValue">Data Mid Value</Label>
-                            <FormattedNumberInput
-                              id="colorMidValue"
-                              value={currentSettings.colorMidValue}
-                              onValueChange={(value) => updateSetting("colorMidValue", value)}
-                              columnFormat={columnFormats[currentSettings.colorBy]}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="colorMidColor">Mid Color</Label>
-                            <ColorInput
-                              color={currentSettings.colorMidColor}
-                              onChange={(color) => updateSetting("colorMidColor", color)}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="colorMaxValue">Data Max Value</Label>
-                            <FormattedNumberInput
-                              id="colorMaxValue"
-                              value={currentSettings.colorMaxValue}
-                              onValueChange={(value) => updateSetting("colorMaxValue", value)}
-                              columnFormat={columnFormats[currentSettings.colorBy]}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="colorMaxColor">Max Color</Label>
-                            <ColorInput
-                              color={currentSettings.colorMaxColor}
-                              onChange={(color) => updateSetting("colorMaxColor", color)}
-                            />
-                          </div>
-                        </>
-                      )}
-                      {currentSettings.colorScale === "categorical" && (
-                        <div className="col-span-full space-y-4">
-                          <Label>Categorical Colors</Label>
-                          {getCategoricalValues(currentSettings.colorBy).map((value, index) => (
-                            <div key={value as string | number} className="flex items-center space-x-2">
-                              <Input
-                                value={value as string | number}
-                                readOnly
-                                className="flex-1"
-                                title={getFormattedValue(currentSettings.colorBy, value).toString()}
-                              />
-                              <ColorInput
-                                color={currentSettings.categoricalColors[index]?.color || "#cccccc"} // Default grey
-                                onChange={(color) => {
-                                  const newCategoricalColors = [...currentSettings.categoricalColors]
-                                  newCategoricalColors[index] = { value, color }
-                                  updateSetting("categoricalColors", newCategoricalColors)
-                                }}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-
-                <h3 className="text-lg font-semibold">Labels</h3>
-                <div className="space-y-2">
-                  <Label htmlFor="labelTemplate">Label Template</Label>
-                  <Textarea
-                    id="labelTemplate"
-                    placeholder="e.g., {State}: {Value}"
-                    value={currentSettings.labelTemplate || ""}
-                    onChange={(e) => updateSetting("labelTemplate", e.target.value)}
-                    className="font-mono text-xs"
-                  />
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Use {"{Column Name}"} to insert data values.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="labelFontFamily">Font Family</Label>
-                    <Select
-                      value={currentSettings.labelFontFamily}
-                      onValueChange={(value) => updateSetting("labelFontFamily", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select font" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Inter">Inter</SelectItem>
-                        <SelectItem value="Roboto">Roboto</SelectItem>
-                        <SelectItem value="Open Sans">Open Sans</SelectItem>
-                        <SelectItem value="Lato">Lato</SelectItem>
-                        <SelectItem value="Montserrat">Montserrat</SelectItem>
-                        <SelectItem value="Source Sans Pro">Source Sans Pro</SelectItem>
-                        <SelectItem value="Poppins">Poppins</SelectItem>
-                        <SelectItem value="Ubuntu">Ubuntu</SelectItem>
-                        <SelectItem value="Lora">Lora</SelectItem>
-                        <SelectItem value="Playfair Display">Playfair Display</SelectItem>
-                        <SelectItem value="serif">Serif (Fallback)</SelectItem>
-                        <SelectItem value="sans-serif">Sans-serif (Fallback)</SelectItem>
-                        <SelectItem value="monospace">Monospace (Fallback)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="labelFontSize">Font Size (px)</Label>
-                    <Input
-                      id="labelFontSize"
-                      type="number"
-                      value={currentSettings.labelFontSize}
-                      onChange={(e) => updateSetting("labelFontSize", Number(e.target.value))}
-                      min={1}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="labelColor">Font Color</Label>
-                    <ColorInput
-                      color={currentSettings.labelColor}
-                      onChange={(color) => updateSetting("labelColor", color)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="labelOutlineColor">Outline Color</Label>
-                    <ColorInput
-                      color={currentSettings.labelOutlineColor}
-                      onChange={(color) => updateSetting("labelOutlineColor", color)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="labelOutlineThickness">Outline Thickness (px)</Label>
-                    <Input
-                      id="labelOutlineThickness"
-                      type="number"
-                      value={currentSettings.labelOutlineThickness}
-                      onChange={(e) => updateSetting("labelOutlineThickness", Number(e.target.value))}
-                      min={0}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Toggle
-                    pressed={currentSettings.labelBold}
-                    onPressedChange={(pressed) => updateSetting("labelBold", pressed)}
-                    aria-label="Toggle bold"
-                  >
-                    <Bold className="h-4 w-4" />
-                  </Toggle>
-                  <Toggle
-                    pressed={currentSettings.labelItalic}
-                    onPressedChange={(pressed) => updateSetting("labelItalic", pressed)}
-                    aria-label="Toggle italic"
-                  >
-                    <Italic className="h-4 w-4" />
-                  </Toggle>
-                  <Toggle
-                    pressed={currentSettings.labelUnderline}
-                    onPressedChange={(pressed) => updateSetting("labelUnderline", pressed)}
-                    aria-label="Toggle underline"
-                  >
-                    <Underline className="h-4 w-4" />
-                  </Toggle>
-                  <Toggle
-                    pressed={currentSettings.labelStrikethrough}
-                    onPressedChange={(pressed) => updateSetting("labelStrikethrough", pressed)}
-                    aria-label="Toggle strikethrough"
-                  >
-                    <Strikethrough className="h-4 w-4" />
-                  </Toggle>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </CardContent>
-    </Card>
+        {/* Save Scheme Modal */}
+        <SaveSchemeModal
+          open={showSaveSchemeModal}
+          onOpenChange={setShowSaveSchemeModal}
+          colors={schemeColorsToSave}
+          type={schemeTypeToSave}
+          hasMidpoint={schemeHasMidpointToSave}
+          onConfirm={handleSaveSchemeConfirm}
+        />
+      </Card>
+    </TooltipProvider>
   )
+
+  // --- sub panel helpers ----------------------------------------------------
+  function renderSubPanel(
+    panelKey: string,
+    title: string,
+    icon: React.ReactNode,
+    description: string,
+    content: React.ReactNode,
+  ) {
+    const isPanelExpanded = expandedPanels[panelKey]
+
+    return (
+      <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
+        <div
+          className="flex items-center justify-between gap-2 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
+          onClick={() => togglePanel(panelKey)}
+        >
+          <div className="flex items-center gap-2">
+            {icon}
+            <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">{title}</h4>
+          </div>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>
+            {isPanelExpanded ? (
+              <ChevronUp className="h-4 w-4 text-gray-600 dark:text-gray-400 transition-colors duration-200" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400 transition-colors duration-200" />
+            )}
+          </div>
+        </div>
+        <div
+          className={`transition-all duration-300 ease-in-out ${
+            isPanelExpanded ? "max-h-[9999px] opacity-100" : "max-h-0 opacity-0"
+          } overflow-hidden`}
+        >
+          <div className="px-4 pb-4 pt-2">{content}</div>
+        </div>
+      </div>
+    )
+  }
+
+  // --- color scheme helpers -------------------------------------------------
+  function renderColorSchemePreview(colors: string[], type: string, schemeName: string) {
+    if (type === "linear") {
+      return (
+        <div className="flex h-4 w-full">
+          {colors.map((color, index) => (
+            <div key={`${schemeName}-${index}`} className="flex-1" style={{ backgroundColor: color }} />
+          ))}
+        </div>
+      )
+    } else {
+      return (
+        <div className="flex h-4 w-full">
+          {colors.slice(0, 8).map((color, index) => (
+            <div key={`${schemeName}-${index}`} className="flex-1" style={{ backgroundColor: color }} />
+          ))}
+        </div>
+      )
+    }
+  }
+}
+
+// --- components -------------------------------------------------------------
+interface SaveSchemeModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  colors: string[]
+  type: "linear" | "categorical" | null
+  hasMidpoint?: boolean
+  onConfirm: (schemeName: string, colors: string[], type: "linear" | "categorical", hasMidpoint?: boolean) => void
+}
+
+function SaveSchemeModal({ open, onOpenChange, colors, type, hasMidpoint, onConfirm }: SaveSchemeModalProps) {
+  const [schemeName, setSchemeName] = useState("")
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Save color scheme</DialogTitle>
+          <DialogDescription>Give your custom color scheme a name so you can reuse it later.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="name" className="text-right">
+              Name
+            </Label>
+            <Input
+              id="name"
+              value={schemeName}
+              onChange={(e) => setSchemeName(e.target.value)}
+              className="col-span-3"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="colors" className="text-right">
+              Colors
+            </Label>
+            <div className="col-span-3 flex gap-2">
+              {colors.map((color, index) => (
+                <div key={index} className="w-6 h-6 rounded-md" style={{ backgroundColor: color }} />
+              ))}
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            onClick={() => {
+              if (schemeName && type) {
+                onConfirm(schemeName, colors, type, hasMidpoint)
+                onOpenChange(false)
+                setSchemeName("")
+              }
+            }}
+          >
+            Save scheme
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// --- data -------------------------------------------------------------------
+const d3ColorSchemes: { [key: string]: string[] } = {
+  ...colorSchemes,
+  Category10: categoricalPalettes[0].colors,
+  Set3: categoricalPalettes[1].colors,
+  Pastel1: categoricalPalettes[2].colors,
+}
+
+const colorSchemeCategories: {
+  sequential: { "Single Hue": string[]; "Multi-Hue": string[] }
+  diverging: string[]
+  categorical: string[]
+} = {
+  sequential: {
+    "Single Hue": ["Blues", "Greens", "Oranges", "Purples", "Reds"],
+    "Multi-Hue": [
+      "BuGn",
+      "BuPu",
+      "GnBu",
+      "OrRd",
+      "PuBu",
+      "PuBuGn",
+      "PuRd",
+      "RdPu",
+      "YlGn",
+      "YlGnBu",
+      "YlOrBr",
+      "YlOrRd",
+    ],
+  },
+  diverging: ["BrBG", "PiYG", "PRGn", "PuOr", "RdBu", "RdGy", "RdYlGn", "RdYlBu", "Spectral"],
+  categorical: ["Category10", "Accent", "Dark2", "Paired", "Pastel1", "Pastel2", "Set1", "Set2", "Set3"],
 }
