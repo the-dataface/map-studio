@@ -1239,6 +1239,7 @@ export function MapPreview({
           title: "Invalid TopoJSON",
           description: "The downloaded map file is missing required data.",
           variant: "destructive",
+          duration: 4000,
         })
         return
       }
@@ -1587,7 +1588,7 @@ export function MapPreview({
       }
     }
 
-    // Render symbol data if available, and only if not using a custom map
+    // Render symbol data if available
 
     console.log("=== SYMBOL RENDERING DEBUG ===")
     console.log("Should render symbols:", shouldRenderSymbols)
@@ -2000,7 +2001,18 @@ export function MapPreview({
             if (d.pathNode) {
               // For custom maps, calculate centroid from the actual path or group element
               const bbox = d.pathNode.getBBox()
-              centroid = [bbox.x + bbox.width / 2, bbox.y + bbox.height / 2]
+              const ctm = d.pathNode.getCTM() // Get the Current Transformation Matrix
+              if (ctm && svgRef.current) {
+                // Transform the center of the bounding box using the CTM
+                const transformedPoint = svgRef.current.createSVGPoint()
+                transformedPoint.x = bbox.x + bbox.width / 2
+                transformedPoint.y = bbox.y + bbox.height / 2
+                const screenPoint = transformedPoint.matrixTransform(ctm)
+                centroid = [screenPoint.x, screenPoint.y]
+              } else {
+                // Fallback if CTM is not available or svgRef.current is null
+                centroid = [bbox.x + bbox.width / 2, bbox.y + bbox.height / 2]
+              }
             } else {
               // For TopoJSON data, use d3 path centroid
               centroid = path.centroid(d)
