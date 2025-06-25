@@ -41,3 +41,6 @@ const MapPreview: React.FC<MapPreviewProps> = ({ latitude, longitude, zoom = 13 
 
 // Allow both `import MapPreview` and `import { MapPreview }`
 export default MapPreview
+
+// Provide a named export for compatibility with `import { MapPreview }`
+export { MapPreview }
