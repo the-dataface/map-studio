@@ -311,97 +311,31 @@ const normalizeGeoIdentifier = (
   return trimmed // Default fallback
 }
 
-// Enhanced function to extract state/county/province from SVG ID
-const extractStateFromSVGId = (id: string, geoType: string): string | null => {
+// Replace the existing `extractStateFromSVGId` function definition with the following:
+const extractCandidateFromSVGId = (id: string): string | null => {
   if (!id) return null
 
-  console.log(`Extracting geo ID from SVG ID: "${id}" for geoType: "${geoType}"`)
-
-  // Patterns for US States
-  const usStatePatterns = [
-    /^State-(\d{2})$/i, // State-01 (FIPS code)
-    /^State-([A-Z]{2})$/i, // State-CA
-    /^State-([a-zA-Z\s]+)$/i, // State-California
-    /State.*?([A-Z]{2})$/i, // Any State prefix with 2-letter code at end
-    /State.*?([a-zA-Z\s]{4,})$/i, // Any State prefix with longer name
+  const geoNameOrAbbrPatterns = [
+    /State-([a-zA-Z\s]{2,})$/i, // State-California, State-CA
+    /Province-([a-zA-Z\s]{2,})$/i, // Province-Alberta, Province-AB
+    /Country-([a-zA-Z\s]{2,})$/i, // Country-Canada, Country-US
+    /^([A-Z]{2})$/, // Direct 2-letter abbreviation like "CA"
+    /^([a-zA-Z\s]+)$/, // Direct full name like "California"
   ]
 
-  // Patterns for US Counties (expecting 5-digit FIPS)
-  const usCountyPatterns = [
-    /^County-(\d{5})$/i, // County-01001 (FIPS code)
-    /^(\d{5})$/i, // 01001 (FIPS code directly)
+  const fipsPatterns = [
+    /^(\d{5})$/, // Direct 5-digit FIPS (for counties)
+    /^(\d{2})$/, // Direct 2-digit FIPS (for states)
   ]
 
-  // Patterns for Canadian Provinces
-  const canadaProvincePatterns = [
-    /^Province-(\d{2})$/i, // Province-01 (numeric, if any)
-    /^Province-([A-Z]{2})$/i, // Province-AB
-    /^Province-([a-zA-Z\s]+)$/i, // Province-Alberta
-    /Province.*?([A-Z]{2})$/i,
-    /Province.*?([a-zA-Z\s]{4,})$/i,
-  ]
+  const allPatterns = [...fipsPatterns, ...geoNameOrAbbrPatterns]
 
-  // General patterns (e.g., for world countries or direct IDs)
-  const generalPatterns = [
-    /^(\d{2})$/i, // 01 (FIPS code directly, for states)
-    /^([A-Z]{2})$/i, // CA (state abbr directly)
-    /^([a-zA-Z\s]+)$/i, // California (state name directly)
-  ]
-
-  let patternsToUse: RegExp[] = []
-  if (geoType.startsWith("usa-states")) {
-    patternsToUse = [...usStatePatterns, ...generalPatterns]
-  } else if (geoType.startsWith("usa-counties")) {
-    patternsToUse = [...usCountyPatterns]
-  } else if (geoType.startsWith("canada-provinces")) {
-    patternsToUse = [...canadaProvincePatterns, ...generalPatterns] // General for direct abbr/name
-  } else {
-    patternsToUse = [...generalPatterns] // For world or other custom
-  }
-
-  for (const pattern of patternsToUse) {
+  for (const pattern of allPatterns) {
     const match = id.match(pattern)
     if (match && match[1]) {
-      const extracted = match[1].trim()
-      let normalized: string
-
-      // Handle FIPS codes for US states/counties
-      if (pattern.source.includes("\\d{2}") || pattern.source.includes("\\d{5}")) {
-        if (geoType.startsWith("usa-states")) {
-          const fipsAbbr = fipsToStateAbbrMap[extracted]
-          if (fipsAbbr) {
-            normalized = fipsAbbr
-            console.log(
-              `Pattern matched FIPS: ${pattern} -> extracted: "${extracted}" -> converted to abbr: "${normalized}"`,
-            )
-          } else {
-            console.log(`Pattern matched FIPS: ${pattern} -> extracted: "${extracted}" but no FIPS mapping found.`)
-            continue
-          }
-        } else if (geoType.startsWith("usa-counties")) {
-          normalized = extracted // For counties, FIPS is the identifier
-          console.log(`Pattern matched FIPS (county): ${pattern} -> extracted: "${extracted}"`)
-        } else {
-          normalized = normalizeGeoIdentifier(extracted, geoType)
-        }
-      } else {
-        normalized = normalizeGeoIdentifier(extracted, geoType)
-        console.log(`Pattern matched: ${pattern} -> extracted: "${extracted}" -> normalized: "${normalized}"`)
-      }
-
-      // Verify the normalized value is a valid identifier for the current geoType
-      if (
-        (geoType.startsWith("usa-states") && stateMap[normalized]) ||
-        (geoType.startsWith("canada-provinces") && canadaProvinceMap[normalized]) ||
-        (geoType.startsWith("usa-counties") && normalized.length === 5 && /^\d{5}$/.test(normalized)) || // Simple FIPS check
-        (geoType === "world" && normalized.length > 0) // For world, any non-empty string is fine
-      ) {
-        return normalized
-      }
+      return match[1].trim()
     }
   }
-
-  console.log(`No valid geo identifier extracted from ID: "${id}" for geoType: "${geoType}"`)
   return null
 }
 
@@ -1310,7 +1244,7 @@ export function MapPreview({
       }
 
       // Utility ─ find a country feature by several possible identifiers
-      function findCountryFeature(features: any[], candidates: (string | number)[]): any {
+      function findCountryFeature(features: any[], candidates: (string | number)[]) {
         return features.find((f) => {
           const props = f.properties ?? {}
           return candidates.some((c) =>
@@ -1397,9 +1331,10 @@ export function MapPreview({
         // Canada Nation: use world atlas, find Canada
         if (objects.countries) {
           const allCountries = topojson.feature(geoAtlasData, objects.countries).features
-          countryFeatureForClipping = findCountryFeature(allCountries, ["Canada", "CAN", 124])
-          if (countryFeatureForClipping) {
-            nationMesh = topojson.mesh(geoAtlasData, countryFeatureForClipping)
+          const targetCountryName = selectedGeography === "usa-nation" ? "United States" : "Canada"
+          const specificCountryFeature = findCountryFeature(allCountries, ["Canada", "CAN", 124])
+          if (specificCountryFeature) {
+            nationMesh = topojson.mesh(geoAtlasData, specificCountryFeature)
           } else {
             console.warn("[map-studio] Could not find Canada in world atlas, rendering all countries")
             nationMesh = topojson.mesh(geoAtlasData, objects.countries)
@@ -1607,12 +1542,8 @@ export function MapPreview({
 
           if (effectiveId) {
             if (customMapData) {
-              // For custom maps, first try to extract and normalize using specific patterns
-              featureKey = extractStateFromSVGId(effectiveId, selectedGeography)
-              // If extraction failed, try to normalize the raw effectiveId as a last resort
-              if (!featureKey) {
-                featureKey = normalizeGeoIdentifier(effectiveId, selectedGeography)
-              }
+              const extractedCandidate = extractCandidateFromSVGId(effectiveId)
+              featureKey = normalizeGeoIdentifier(extractedCandidate || effectiveId, selectedGeography)
             } else {
               // For standard TopoJSON maps (which use d.id on paths)
               const d = element.datum() as any // Here, d.properties.name or d.id is valid for TopoJSON
@@ -1625,7 +1556,6 @@ export function MapPreview({
               } else if (selectedGeography === "world") {
                 featureKey = d?.properties?.name || String(d?.id) || effectiveId // For world maps, use name or ID directly
               } else if (selectedGeography === "usa-nation" || selectedGeography === "canada-nation") {
-                // For single nation views, the feature key is the nation itself
                 featureKey = selectedGeography === "usa-nation" ? "United States" : "Canada"
               }
             }
@@ -1994,26 +1924,27 @@ export function MapPreview({
           const id = element.attr("id")
           let effectiveId = id
 
-          // If it's a path without an ID, check parent G's ID
           if (el.tagName === "path" && !effectiveId && el.parentElement && el.parentElement.tagName === "g") {
             effectiveId = d3.select(el.parentElement).attr("id")
           }
 
-          let featureId = null
+          let featureIdCandidate = null
           if (effectiveId) {
-            // For custom maps, first try to extract and normalize using specific patterns
-            featureId = extractStateFromSVGId(effectiveId, selectedGeography)
-            // If extraction failed, try to normalize the raw effectiveId as a last resort
-            if (!featureId) {
-              featureId = normalizeGeoIdentifier(effectiveId, selectedGeography)
-            }
+            featureIdCandidate = extractCandidateFromSVGId(effectiveId)
           }
 
-          if (featureId && !featuresForLabels.some((f) => f.id === featureId)) {
-            // Avoid duplicates and add only if we have data for it later
+          let normalizedFeatureId = null
+          if (featureIdCandidate) {
+            normalizedFeatureId = normalizeGeoIdentifier(featureIdCandidate, selectedGeography)
+          } else {
+            // Fallback: If no specific pattern matched, try to normalize the raw effectiveId
+            normalizedFeatureId = normalizeGeoIdentifier(effectiveId, selectedGeography)
+          }
+
+          if (normalizedFeatureId && !featuresForLabels.some((f) => f.id === normalizedFeatureId)) {
             featuresForLabels.push({
-              id: featureId,
-              properties: { postal: featureId, name: featureId }, // Mock properties for consistency
+              id: normalizedFeatureId,
+              properties: { postal: normalizedFeatureId, name: normalizedFeatureId }, // Mock properties for consistency
               pathNode: el, // Store reference to the actual DOM node
             })
           }
@@ -2030,7 +1961,7 @@ export function MapPreview({
           // Determine the identifier for lookup in geoDataMap
           let featureIdentifier: string | null = null
           if (customMapData) {
-            featureIdentifier = d.id // For custom maps, the stored ID is already normalized
+            featureIdentifier = d.id
           } else {
             // For TopoJSON data, normalize based on selectedGeography
             if (selectedGeography.startsWith("usa-states")) {
@@ -2042,7 +1973,7 @@ export function MapPreview({
             } else if (selectedGeography === "world") {
               featureIdentifier = d?.properties?.name || String(d?.id) || null
             } else if (selectedGeography === "usa-nation" || selectedGeography === "canada-nation") {
-              featureIdentifier = d?.properties?.name || String(d?.id) || null // Use name for single country
+              featureIdentifier = d?.properties?.name || String(d?.id) || null
             }
           }
 
@@ -2816,3 +2747,4 @@ export function MapPreview({
     </Card>
   )
 }
+</merged_code>
