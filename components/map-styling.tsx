@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import ColorInput from "@/components/color-input"
+import { ColorInput } from "@/components/color-input"
 import { ChromePicker } from "react-color"
 import { Checkbox } from "@/components/ui/checkbox" // Assuming this component exists or is imported from shadcn/ui
 import type { SavedStyle } from "@/app/page" // Assuming SavedStyle is exported from app/page.tsx
