@@ -5,7 +5,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select"
 import { ChevronDown, ChevronUp, Download, Copy, Trash2 } from "lucide-react"
 import type { DataRow, GeocodedRow } from "@/app/page"
 import { MapPin, BarChart3, Hash, Type, Calendar, Flag, XCircle, Database, Loader2, Check } from "lucide-react"
@@ -29,7 +29,7 @@ interface DataPreviewProps {
   customDataLoaded: boolean
   onMapTypeChange: (mapType: "symbol" | "choropleth" | "custom") => void
   columnFormats: ColumnFormat
-  selectedGeography: "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world"
+  selectedGeography: "usa-states" | "usa-counties" | "usa-nation" | "canada-provinces" | "canada-nation" | "world" // Add this
 }
 
 interface ColumnType {
@@ -212,6 +212,7 @@ const initializeColumnFormats = () => {
 }
 
 export function DataPreview({
+  // Changed from export default function to export function
   data,
   columns,
   mapType,
@@ -227,11 +228,12 @@ export function DataPreview({
   customDataLoaded,
   onMapTypeChange,
   columnFormats,
-  selectedGeography,
+  selectedGeography, // Destructure new prop
 }: DataPreviewProps) {
   const [isExpanded, setIsExpanded] = useState(true)
   const [inferredTypes, setInferredTypes] = useState<ColumnType>({})
 
+  // NEW: Enhanced tab logic - always show choropleth tab as active when custom map has choropleth data
   const [internalActiveTab, setInternalActiveTab] = useState<"symbol" | "choropleth">(() => {
     if (mapType === "custom" && choroplethDataExists) {
       return "choropleth"
@@ -240,6 +242,7 @@ export function DataPreview({
   })
 
   useEffect(() => {
+    // NEW: Enhanced logic for setting internal active tab
     if (mapType === "custom" && choroplethDataExists) {
       setInternalActiveTab("choropleth")
     } else {
@@ -484,11 +487,11 @@ export function DataPreview({
       case "number":
         return "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/30 hover:border-green-300 dark:hover:border-green-700"
       case "date":
-        return "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:border-blue-300 dark:hover:border-700"
+        return "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:border-blue-300 dark:hover:border-blue-700"
       case "state":
-        return "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/30 hover:border-orange-300 dark:hover:border-700"
+        return "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/30 hover:border-orange-300 dark:hover:border-orange-700"
       default:
-        return "text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-900/30 hover:border-gray-300 dark:hover:border-700"
+        return "text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-900/30 hover:border-gray-300 dark:hover:border-gray-700"
     }
   }
 
@@ -632,8 +635,10 @@ export function DataPreview({
   }
 
   const handleClearData = () => {
+    // NEW: Enhanced clear logic - determine which data type to clear based on current context
     let dataTypeToClear = mapType
 
+    // If we're showing choropleth data in a custom map context, clear choropleth data
     if (mapType === "custom" && choroplethDataExists && data.length > 0) {
       dataTypeToClear = "choropleth"
     }
@@ -677,7 +682,9 @@ export function DataPreview({
   const handleTabChange = (tab: "symbol" | "choropleth") => {
     if (hasDataForTab(tab)) {
       setInternalActiveTab(tab)
+      // NEW: Enhanced tab change logic
       if (tab === "choropleth" && customDataExists) {
+        // If switching to choropleth and custom map exists, use custom map type
         onMapTypeChange("custom")
       } else {
         onMapTypeChange(tab)
@@ -711,6 +718,7 @@ export function DataPreview({
   }
 
   const renderTabButton = (tab: "symbol" | "choropleth", icon: React.ReactNode, label: string, isActive: boolean) => {
+    // NEW: Enhanced active state logic
     const actualIsActive = isActive || (mapType === "custom" && tab === "choropleth" && choroplethDataExists)
 
     const disabled = isTabDisabled(tab)
@@ -989,6 +997,7 @@ export function DataPreview({
               </Tooltip>
             </div>
 
+            {/* Render the table only if mapType is 'symbol' or 'choropleth', or if custom map with choropleth data */}
             {(mapType === "symbol" || mapType === "choropleth" || (mapType === "custom" && choroplethDataExists)) && (
               <div
                 className="overflow-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg relative animate-in fade-in-50 slide-in-from-bottom-2 duration-300"
@@ -1027,14 +1036,12 @@ export function DataPreview({
                                   <SelectTrigger
                                     className={`h-6 w-auto min-w-[80px] text-xs ${getDropdownColor(columnTypes[column] || inferredTypes[column] || "text")} transition-all duration-200 relative z-30`}
                                   >
-                                    <SelectValue>
-                                      <div className="flex items-center gap-2">
-                                        {getColumnIcon(columnTypes[column] || inferredTypes[column] || "text")}
-                                        <span>
-                                          {toSentenceCase(columnTypes[column] || inferredTypes[column] || "text")}
-                                        </span>
-                                      </div>
-                                    </SelectValue>
+                                    <div className="flex items-center gap-2">
+                                      {getColumnIcon(columnTypes[column] || inferredTypes[column] || "text")}
+                                      <span>
+                                        {toSentenceCase(columnTypes[column] || inferredTypes[column] || "text")}
+                                      </span>
+                                    </div>
                                   </SelectTrigger>
                                   <SelectContent
                                     className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-lg z-[100]"
@@ -1092,7 +1099,7 @@ export function DataPreview({
                                       <div className="flex items-center justify-between w-full">
                                         <div className="flex items-center gap-2">
                                           <Flag className="w-3 h-3" />
-                                          <span>{stateColumnOptionLabel}</span>
+                                          <span>{stateColumnOptionLabel}</span> {/* <--- Change made here */}
                                         </div>
                                       </div>
                                     </SelectItem>
@@ -1202,18 +1209,16 @@ export function DataPreview({
                                     <SelectTrigger
                                       className={`h-6 w-full text-xs ${getDropdownColor(columnType)} transition-all duration-200 relative z-30`}
                                     >
-                                      <SelectValue>
-                                        <div className="flex items-center gap-2">
-                                          <span>
-                                            {getFormatOptions(columnType as "number" | "date" | "state").find(
-                                              (opt) =>
-                                                opt.value ===
-                                                (columnFormats[column] ||
-                                                  getDefaultFormat(columnType as "number" | "date" | "state")),
-                                            )?.label || "Format"}
-                                          </span>
-                                        </div>
-                                      </SelectValue>
+                                      <div className="flex items-center gap-2">
+                                        <span>
+                                          {getFormatOptions(columnType as "number" | "date" | "state").find(
+                                            (opt) =>
+                                              opt.value ===
+                                              (columnFormats[column] ||
+                                                getDefaultFormat(columnType as "number" | "date" | "state")),
+                                          )?.label || "Format"}
+                                        </span>
+                                      </div>
                                     </SelectTrigger>
                                     <SelectContent
                                       className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-lg z-[100]"
@@ -1248,6 +1253,7 @@ export function DataPreview({
               </div>
             )}
 
+            {/* Render the custom map message only if mapType is 'custom' and no choropleth data */}
             {mapType === "custom" && !choroplethDataExists && (
               <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800 transition-colors duration-200 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
                 <div className="flex items-center gap-2 mb-2">
