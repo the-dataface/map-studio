@@ -56,4 +56,4 @@ const DataPreview: React.FC<DataPreviewProps> = ({ data, columns, mapType, selec
   )
 }
 
-export default DataPreview
+export { DataPreview }
