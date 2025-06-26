@@ -1439,22 +1439,6 @@ export function MapPreview({
         )
       }
 
-      // Determine which fill/stroke colors to use for sub-features (states, counties, or individual countries in world map)
-      let subFeatureFillColor = stylingSettings.base.defaultStateFillColor
-      let subFeatureStrokeColor = stylingSettings.base.defaultStateStrokeColor
-      let subFeatureStrokeWidth = stylingSettings.base.defaultStateStrokeWidth
-
-      if (
-        selectedGeography === "usa-nation" ||
-        selectedGeography === "canada-nation" ||
-        selectedGeography === "world"
-      ) {
-        // For single nations or world map, individual features are treated as "nations" for styling
-        subFeatureFillColor = stylingSettings.base.nationFillColor
-        subFeatureStrokeColor = stylingSettings.base.nationStrokeColor
-        subFeatureStrokeWidth = stylingSettings.base.nationStrokeWidth
-      }
-
       // Render sub-features (states, counties, provinces, or individual countries for world map)
       console.log("=== SUB-FEATURE FEATURES DEBUG ===")
       console.log("Number of features:", geoFeatures.length)
@@ -1488,9 +1472,9 @@ export function MapPreview({
           console.log(`Creating feature path with ID: ${featureId}`)
           return featureId
         })
-        .attr("fill", subFeatureFillColor) // Use the determined fill color
-        .attr("stroke", subFeatureStrokeColor) // Use the determined stroke color
-        .attr("stroke-width", subFeatureStrokeWidth) // Use the determined stroke width
+        .attr("fill", stylingSettings.base.defaultStateFillColor)
+        .attr("stroke", stylingSettings.base.defaultStateStrokeColor)
+        .attr("stroke-width", stylingSettings.base.defaultStateStrokeWidth)
         .attr("stroke-linejoin", "round")
         .attr("stroke-linecap", "round")
         .attr("d", path)
@@ -1539,17 +1523,9 @@ export function MapPreview({
       if (dimensionSettings?.choropleth?.colorScale === "linear") {
         const domain = [dimensionSettings.choropleth.colorMinValue, dimensionSettings.choropleth.colorMaxValue]
         const rangeColors = [
-          stylingSettings.base.defaultStateFillColor, // Use defaultStateFillColor as min color if not set
-          stylingSettings.base.defaultStateFillColor, // Use defaultStateFillColor as max color if not set
+          dimensionSettings.choropleth.colorMinColor || stylingSettings.base.defaultStateFillColor,
+          dimensionSettings.choropleth.colorMaxColor || stylingSettings.base.defaultStateFillColor,
         ]
-
-        // Override with actual min/max colors if they are defined in dimension settings
-        if (dimensionSettings.choropleth.colorMinColor) {
-          rangeColors[0] = dimensionSettings.choropleth.colorMinColor
-        }
-        if (dimensionSettings.choropleth.colorMaxColor) {
-          rangeColors[rangeColors.length - 1] = dimensionSettings.choropleth.colorMaxColor
-        }
 
         if (dimensionSettings.choropleth.colorMidColor) {
           domain.splice(1, 0, dimensionSettings.choropleth.colorMidValue)
@@ -1611,15 +1587,7 @@ export function MapPreview({
           }
 
           if (!featureKey) {
-            // If no feature key, apply default fill based on whether it's a nation or sub-feature
-            const isNationFeature =
-              selectedGeography === "usa-nation" ||
-              selectedGeography === "canada-nation" ||
-              selectedGeography === "world"
-            element.attr(
-              "fill",
-              isNationFeature ? stylingSettings.base.nationFillColor : stylingSettings.base.defaultStateFillColor,
-            )
+            element.attr("fill", stylingSettings.base.defaultStateFillColor)
             return
           }
 
@@ -1630,15 +1598,7 @@ export function MapPreview({
             featuresColored++
             console.log(`✅ Applied color ${color} to feature ${featureKey} (value: ${value})`)
           } else {
-            // If no data found, apply default fill based on whether it's a nation or sub-feature
-            const isNationFeature =
-              selectedGeography === "usa-nation" ||
-              selectedGeography === "canada-nation" ||
-              selectedGeography === "world"
-            element.attr(
-              "fill",
-              isNationFeature ? stylingSettings.base.nationFillColor : stylingSettings.base.defaultStateFillColor,
-            )
+            element.attr("fill", stylingSettings.base.defaultStateFillColor)
             console.log(`No data found for feature: ${featureKey}, applying default fill.`)
           }
         })
@@ -1699,17 +1659,9 @@ export function MapPreview({
           if (dimensionSettings.symbol.colorScale === "linear") {
             const domain = [dimensionSettings.symbol.colorMinValue, dimensionSettings.symbol.colorMaxValue]
             const rangeColors = [
-              stylingSettings.symbol.symbolFillColor, // Use default symbol fill color as min color if not set
-              stylingSettings.symbol.symbolFillColor, // Use default symbol fill color as max color if not set
+              dimensionSettings.symbol.colorMinColor || stylingSettings.symbol.symbolFillColor,
+              stylingSettings.symbol.colorMaxColor || stylingSettings.symbol.symbolFillColor,
             ]
-
-            // Override with actual min/max colors if they are defined in dimension settings
-            if (dimensionSettings.symbol.colorMinColor) {
-              rangeColors[0] = dimensionSettings.symbol.colorMinColor
-            }
-            if (dimensionSettings.symbol.colorMaxColor) {
-              rangeColors[rangeColors.length - 1] = dimensionSettings.symbol.colorMaxColor
-            }
 
             if (dimensionSettings.symbol.colorMidColor) {
               domain.splice(1, 0, dimensionSettings.symbol.colorMidValue)
@@ -2331,17 +2283,9 @@ export function MapPreview({
 
         const domain = [dimensionSettings.symbol.colorMinValue, dimensionSettings.symbol.colorMaxValue]
         const rangeColors = [
-          stylingSettings.symbol.symbolFillColor, // Use default symbol fill color as min color if not set
-          stylingSettings.symbol.symbolFillColor, // Use default symbol fill color as max color if not set
+          dimensionSettings.symbol.colorMinColor || stylingSettings.symbol.symbolFillColor,
+          stylingSettings.symbol.colorMaxColor || stylingSettings.symbol.symbolFillColor,
         ]
-
-        // Override with actual min/max colors if they are defined in dimension settings
-        if (dimensionSettings.symbol.colorMinColor) {
-          rangeColors[0] = dimensionSettings.symbol.colorMinColor
-        }
-        if (dimensionSettings.symbol.colorMaxColor) {
-          rangeColors[rangeColors.length - 1] = dimensionSettings.symbol.colorMaxColor
-        }
 
         if (dimensionSettings.symbol.colorMidColor) {
           domain.splice(1, 0, dimensionSettings.symbol.colorMidValue)
@@ -2536,17 +2480,9 @@ export function MapPreview({
 
         const domain = [dimensionSettings.choropleth.colorMinValue, dimensionSettings.choropleth.colorMaxValue]
         const rangeColors = [
-          stylingSettings.base.defaultStateFillColor, // Use defaultStateFillColor as min color if not set
-          stylingSettings.base.defaultStateFillColor, // Use defaultStateFillColor as max color if not set
+          dimensionSettings.choropleth.colorMinColor || stylingSettings.base.defaultStateFillColor,
+          dimensionSettings.choropleth.colorMaxColor || stylingSettings.base.defaultStateFillColor,
         ]
-
-        // Override with actual min/max colors if they are defined in dimension settings
-        if (dimensionSettings.choropleth.colorMinColor) {
-          rangeColors[0] = dimensionSettings.choropleth.colorMinColor
-        }
-        if (dimensionSettings.choropleth.colorMaxColor) {
-          rangeColors[rangeColors.length - 1] = dimensionSettings.choropleth.colorMaxColor
-        }
 
         if (dimensionSettings.choropleth.colorMidColor) {
           domain.splice(1, 0, dimensionSettings.choropleth.colorMidValue)
