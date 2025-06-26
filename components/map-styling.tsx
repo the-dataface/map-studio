@@ -14,7 +14,14 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { toast } from "@/components/ui/use-toast"
-import { SaveSchemeModal } from "./save-scheme-modal"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 interface StylingSettings {
   activeTab: "base" | "symbol" | "choropleth"
@@ -117,6 +124,7 @@ export function MapStyling({
   const [isExpanded, setIsExpanded] = useState(true)
   const [activeTab, setActiveTab] = useState(stylingSettings.activeTab)
   const [showSaveModal, setShowSaveModal] = useState(false)
+  const [styleNameToSave, setStyleNameToSave] = useState("")
 
   // Explicitly manage nation and state panel visibility
   // Nation/Country Styles panel is ALWAYS visible
@@ -302,11 +310,43 @@ export function MapStyling({
                   <Button variant="outline" size="sm" onClick={() => setShowSaveModal(true)}>
                     <Save className="w-3 h-3 mr-1" /> Save Current
                   </Button>
-                  <SaveSchemeModal
-                    isOpen={showSaveModal}
-                    onClose={() => setShowSaveModal(false)}
-                    onSave={handleSaveStyle}
-                  />
+                  <Dialog open={showSaveModal} onOpenChange={setShowSaveModal}>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Save current map style</DialogTitle>
+                        <DialogDescription>Enter a name so you can reuse this base-map style later.</DialogDescription>
+                      </DialogHeader>
+
+                      <Input
+                        value={styleNameToSave}
+                        onChange={(e) => setStyleNameToSave(e.target.value)}
+                        placeholder="Style name"
+                        autoFocus
+                      />
+
+                      <DialogFooter className="mt-4">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setShowSaveModal(false)
+                            setStyleNameToSave("")
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          disabled={!styleNameToSave.trim()}
+                          onClick={() => {
+                            handleSaveStyle(styleNameToSave.trim())
+                            setShowSaveModal(false)
+                            setStyleNameToSave("")
+                          }}
+                        >
+                          Save
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {stylingSettings.base.savedStyles.map((style) => (
