@@ -116,7 +116,7 @@ export function MapProjectionSelection({
             </ScrollArea>
           </div>
           {/* Projection Selection */}
-          <div className="flex-grow">
+          <div className="flex-grow-1">
             <Label htmlFor="projection-select" className="mb-2 block">
               Select projection
             </Label>
