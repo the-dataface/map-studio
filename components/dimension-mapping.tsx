@@ -73,3 +73,4 @@ const DimensionMapping: React.FC<DimensionMappingProps> = ({
 }
 
 export default DimensionMapping
+export { DimensionMapping }
