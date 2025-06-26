@@ -146,6 +146,7 @@ export function MapProjectionSelection({
           </div>
         </div>
         {/* Clip to Country Checkbox with Tooltip */}
+        {/*
         <div className="flex items-center space-x-2 mt-4">
           <TooltipProvider>
             <Tooltip>
@@ -166,6 +167,7 @@ export function MapProjectionSelection({
           </TooltipProvider>
           <Label htmlFor="clip-to-country">Clip map to selected country</Label>
         </div>
+        */}
       </CardContent>
     </Card>
   )

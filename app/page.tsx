@@ -805,7 +805,6 @@ export default function MapStudio() {
                   choroplethDataLength={choroplethData.parsedData.length}
                   customDataLoaded={customData.customMapData.length > 0}
                   onMapTypeChange={setActiveMapType}
-                  selectedGeography={selectedGeography} // Pass selectedGeography
                 />
 
                 <DimensionMapping
@@ -824,7 +823,6 @@ export default function MapStudio() {
                   choroplethParsedData={choroplethData.parsedData}
                   choroplethGeocodedData={choroplethData.geocodedData}
                   choroplethColumns={choroplethData.columns}
-                  selectedGeography={selectedGeography} // Pass selectedGeography
                 />
               </>
             )}
@@ -835,7 +833,6 @@ export default function MapStudio() {
               symbolDataExists={hasDataForType("symbol")}
               choroplethDataExists={hasDataForType("choropleth")}
               customDataExists={hasDataForType("custom")}
-              selectedGeography={selectedGeography} // Pass selectedGeography to MapStyling
             />
 
             <MapPreview
