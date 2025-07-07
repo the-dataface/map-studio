@@ -29,14 +29,82 @@ interface DataInputProps {
   ) => void
   isExpanded: boolean
   setIsExpanded: (expanded: boolean) => void
+  onClearData: (mapType: "symbol" | "choropleth" | "custom") => void // New prop
 }
 
-export function DataInput({ onDataLoad, isExpanded, setIsExpanded }: DataInputProps) {
+export function DataInput({ onDataLoad, isExpanded, setIsExpanded, onClearData }: DataInputProps) {
   const [activeTab, setActiveTab] = useState<"symbol" | "choropleth" | "custom">("symbol")
   const [symbolRawData, setSymbolRawData] = useState("")
   const [choroplethRawData, setChoroplethRawData] = useState("")
   const [customSVG, setCustomSVG] = useState("")
   const [showHelpModal, setShowHelpModal] = useState(false) // New state for controlling the help modal
+
+  const ensurePathsClosedAndFormatSVG = (svgString: string): { formattedSvg: string; closedPathCount: number } => {
+    let closedCount = 0
+    try {
+      const parser = new DOMParser()
+      const doc = parser.parseFromString(svgString, "image/svg+xml")
+      const paths = doc.querySelectorAll("path")
+
+      paths.forEach((path) => {
+        const d = path.getAttribute("d")
+        if (d && !d.trim().endsWith("Z") && !d.trim().endsWith("z")) {
+          path.setAttribute("d", d.trim() + "Z")
+          closedCount++
+        }
+      })
+
+      const serializer = new XMLSerializer()
+      const modifiedSvgString = serializer.serializeToString(doc)
+
+      // Apply the existing formatting logic
+      let formatted = modifiedSvgString.trim().replace(/\s+/g, " ")
+      formatted = formatted
+        .replace(/(<[^/][^>]*>)(?!<)/g, "$1\n")
+        .replace(/(<\/[^>]+>)/g, "\n$1\n")
+        .replace(/(<[^>]*\/>)/g, "$1\n")
+        .replace(/\n\s*\n/g, "\n")
+        .split("\n")
+        .map((line, index) => {
+          const trimmed = line.trim()
+          if (!trimmed) return ""
+
+          const openTags = (
+            modifiedSvgString.substring(0, modifiedSvgString.indexOf(trimmed)).match(/<[^/][^>]*>/g) || []
+          ).length
+          const closeTags = (
+            modifiedSvgString.substring(0, modifiedSvgString.indexOf(trimmed)).match(/<\/[^>]+>/g) || []
+          ).length
+          const selfClosing = (
+            modifiedSvgString.substring(0, modifiedSvgString.indexOf(trimmed)).match(/<[^>]*\/>/g) || []
+          ).length
+
+          let indent = Math.max(0, openTags - closeTags - selfClosing)
+
+          if (trimmed.startsWith("</")) {
+            indent = Math.max(0, indent - 1)
+          }
+
+          return "  ".repeat(indent) + trimmed
+        })
+        .filter((line) => line.trim())
+        .join("\n")
+
+      return { formattedSvg: formatted, closedPathCount: closedCount }
+    } catch (e) {
+      console.error("Error in ensurePathsClosedAndFormatSVG:", e)
+      return {
+        formattedSvg: svgString
+          .replace(/></g, ">\n<")
+          .replace(/^\s+|\s+$/gm, "")
+          .split("\n")
+          .map((line) => line.trim())
+          .filter((line) => line)
+          .join("\n"),
+        closedPathCount: 0,
+      }
+    }
+  }
 
   const parseCSVData = (csvText: string): { data: DataRow[]; columns: string[] } => {
     if (!csvText.trim()) return { data: [], columns: [] }
@@ -123,57 +191,6 @@ WI,108.0,64168,91.7,Midwest
 WY,6.0,65003,93.3,West`
 
     setChoroplethRawData(sampleData)
-  }
-
-  const formatSVG = (svg: string) => {
-    try {
-      // Remove extra whitespace and normalize
-      let formatted = svg.trim().replace(/\s+/g, " ")
-
-      // Add proper indentation and line breaks
-      formatted = formatted
-        // Add line breaks after opening tags
-        .replace(/(<[^/][^>]*>)(?!<)/g, "$1\n")
-        // Add line breaks before closing tags
-        .replace(/(<\/[^>]+>)/g, "\n$1\n")
-        // Add line breaks after self-closing tags
-        .replace(/(<[^>]*\/>)/g, "$1\n")
-        // Clean up multiple line breaks
-        .replace(/\n\s*\n/g, "\n")
-        // Add proper indentation
-        .split("\n")
-        .map((line, index) => {
-          const trimmed = line.trim()
-          if (!trimmed) return ""
-
-          // Calculate indentation level
-          const openTags = (svg.substring(0, svg.indexOf(trimmed)).match(/<[^/][^>]*>/g) || []).length
-          const closeTags = (svg.substring(0, svg.indexOf(trimmed)).match(/<\/[^>]+>/g) || []).length
-          const selfClosing = (svg.substring(0, svg.indexOf(trimmed)).match(/<[^>]*\/>/g) || []).length
-
-          let indent = Math.max(0, openTags - closeTags - selfClosing)
-
-          // Reduce indent for closing tags
-          if (trimmed.startsWith("</")) {
-            indent = Math.max(0, indent - 1)
-          }
-
-          return "  ".repeat(indent) + trimmed
-        })
-        .filter((line) => line.trim())
-        .join("\n")
-
-      return formatted
-    } catch (e) {
-      // If formatting fails, return basic formatting
-      return svg
-        .replace(/></g, ">\n<")
-        .replace(/^\s+|\s+$/gm, "")
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line)
-        .join("\n")
-    }
   }
 
   // Add a validation function
@@ -278,9 +295,17 @@ WY,6.0,65003,93.3,West`
       }
 
       if (customSVG.trim()) {
-        onDataLoad("custom", [], [], "", customSVG)
+        const { formattedSvg, closedPathCount } = ensurePathsClosedAndFormatSVG(customSVG)
+
+        onDataLoad("custom", [], [], "", formattedSvg)
+
+        let toastDescription = "Custom map loaded successfully."
+        if (closedPathCount > 0) {
+          toastDescription += ` ${closedPathCount} path${closedPathCount > 1 ? "s" : ""} automatically closed.`
+        }
+
         toast({
-          description: "Custom map loaded successfully.",
+          description: toastDescription,
           variant: "success",
           icon: <CheckCircle className="h-5 w-5" />,
         })
@@ -442,7 +467,10 @@ Supports both comma-separated (CSV) and tab-separated (TSV) formats."
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setCustomSVG("")}
+                      onClick={() => {
+                        setCustomSVG("")
+                        onClearData("custom") // Call onClearData for custom map
+                      }}
                       disabled={!customSVG.trim()}
                       className="transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
