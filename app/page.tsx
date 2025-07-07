@@ -12,7 +12,7 @@ import { MapStyling } from '@/components/map-styling';
 import { MapProjectionSelection } from '@/components/map-projection-selection';
 
 export interface DataRow {
-	[key: string]: string | number;
+	[key: string]: string | number | boolean | undefined;
 }
 
 export interface GeocodedRow extends DataRow {
@@ -651,26 +651,39 @@ export default function MapStudio() {
 		// Update symbol data with geocoded coordinates
 		if (symbolData.parsedData.length > 0) {
 			const newColumns = [...symbolData.columns];
-			let latCol = dimensionSettings.symbol.latitude;
-			let lngCol = dimensionSettings.symbol.longitude;
 
-			// Check if 'latitude' and 'longitude' columns are newly added by geocoding
-			if (!newColumns.includes('latitude') && geocodedData.some((row) => row.latitude !== undefined)) {
+			// Possible names for latitude/longitude columns (case-insensitive)
+			const latNames = ['latitude', 'lat', 'Latitude', 'Lat'];
+			const lngNames = ['longitude', 'long', 'lng', 'lon', 'Longitude', 'Long', 'Lng', 'Lon'];
+
+			// Find first matching column for latitude/longitude
+			const latCol =
+				newColumns.find((col) => latNames.includes(col.trim().toLowerCase())) ||
+				newColumns.find((col) => latNames.some((name) => col.trim().toLowerCase() === name.toLowerCase()));
+			const lngCol =
+				newColumns.find((col) => lngNames.includes(col.trim().toLowerCase())) ||
+				newColumns.find((col) => lngNames.some((name) => col.trim().toLowerCase() === name.toLowerCase()));
+
+			let chosenLatCol = latCol;
+			let chosenLngCol = lngCol;
+
+			// If no suitable column exists and geocoded data is present, add 'latitude'/'longitude'
+			if (!chosenLatCol && geocodedData.some((row) => row.latitude !== undefined)) {
 				newColumns.push('latitude');
-				latCol = 'latitude'; // Set to the new geocoded column name
+				chosenLatCol = 'latitude';
 			}
-			if (!newColumns.includes('longitude') && geocodedData.some((row) => row.longitude !== undefined)) {
+			if (!chosenLngCol && geocodedData.some((row) => row.longitude !== undefined)) {
 				newColumns.push('longitude');
-				lngCol = 'longitude'; // Set to the new geocoded column name
+				chosenLngCol = 'longitude';
 			}
 
-			// Update column types to include the geocoded columns as coordinate type
+			// Update column types to include the chosen columns as coordinate type
 			const newColumnTypes = { ...columnTypes };
-			if (geocodedData.some((row) => row.latitude !== undefined)) {
-				newColumnTypes['latitude'] = 'coordinate';
+			if (chosenLatCol) {
+				newColumnTypes[chosenLatCol] = 'coordinate';
 			}
-			if (geocodedData.some((row) => row.longitude !== undefined)) {
-				newColumnTypes['longitude'] = 'coordinate';
+			if (chosenLngCol) {
+				newColumnTypes[chosenLngCol] = 'coordinate';
 			}
 
 			// Update both column types and symbol data
@@ -681,14 +694,13 @@ export default function MapStudio() {
 				columns: newColumns,
 			}));
 
-			// Directly update dimension settings for symbol map with geocoded columns
-			// This ensures MapPreview gets the correct dimension settings immediately
+			// Directly update dimension settings for symbol map with chosen columns
 			setDimensionSettings((prevSettings: any) => ({
 				...prevSettings,
 				symbol: {
 					...prevSettings.symbol,
-					latitude: latCol,
-					longitude: lngCol,
+					latitude: chosenLatCol || prevSettings.symbol.latitude,
+					longitude: chosenLngCol || prevSettings.symbol.longitude,
 				},
 			}));
 		}
@@ -736,7 +748,9 @@ export default function MapStudio() {
 				? choroplethData.parsedData
 				: symbolData.parsedData;
 
-		return rows.slice(0, 10).map((r) => Object.values(r));
+		return rows
+			.slice(0, 10)
+			.map((r) => Object.values(r).map((v) => (typeof v === 'string' || typeof v === 'number' ? v : '')));
 	}, [activeMapType, symbolData.parsedData, choroplethData.parsedData]);
 
 	useEffect(() => {

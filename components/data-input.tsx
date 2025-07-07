@@ -110,10 +110,43 @@ export function DataInput({ onDataLoad, isExpanded, setIsExpanded, onClearData }
     if (!csvText.trim()) return { data: [], columns: [] }
 
     const lines = csvText.trim().split("\n")
-    const headers = lines[0].split(/[,\t]/).map((h) => h.trim().replace(/"/g, ""))
+    // Detect delimiter: if header contains tab, use tab; else use comma
+    const delimiter = lines[0].includes("\t") ? "\t" : ","
 
+    // Helper for CSV: split line by comma, respecting quoted fields
+    function splitCSV(line: string): string[] {
+      const result: string[] = []
+      let current = ''
+      let inQuotes = false
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i]
+        if (char === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"'; i++ // Escaped quote
+          } else {
+            inQuotes = !inQuotes
+          }
+        } else if (char === ',' && !inQuotes) {
+          result.push(current)
+          current = ''
+        } else {
+          current += char
+        }
+      }
+      result.push(current)
+      return result
+    }
+
+    // Split headers
+    const headers = delimiter === '\t'
+      ? lines[0].split('\t').map((h) => h.trim().replace(/"/g, ""))
+      : splitCSV(lines[0]).map((h) => h.trim().replace(/"/g, ""))
+
+    // Split data lines
     const data = lines.slice(1).map((line) => {
-      const values = line.split(/[,\t]/).map((v) => v.trim().replace(/"/g, ""))
+      const values = delimiter === '\t'
+        ? line.split('\t').map((v) => v.trim().replace(/"/g, ""))
+        : splitCSV(line).map((v) => v.trim().replace(/"/g, ""))
       const row: DataRow = {}
       headers.forEach((header, index) => {
         row[header] = values[index] || ""
