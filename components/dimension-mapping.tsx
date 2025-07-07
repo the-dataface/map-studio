@@ -56,7 +56,7 @@ interface DimensionMappingProps {
 	symbolDataExists: boolean;
 	choroplethDataExists: boolean;
 	customDataExists: boolean; // Still need this to determine if custom map is loaded
-	columnTypes: { [key: string]: 'text' | 'number' | 'date' | 'coordinate' | 'state' };
+	columnTypes: { [key: string]: 'text' | 'number' | 'date' | 'coordinate' | 'state' | 'country' };
 	dimensionSettings: DimensionSettings; // Use the defined interface
 	onUpdateSettings: (settings: DimensionSettings) => void; // Use the defined interface
 	columnFormats: { [key: string]: string }; // Add columnFormats prop
@@ -2690,7 +2690,7 @@ export function DimensionMapping({
 											`${subnationalLabel} column`, // Use dynamic label
 											dimensionSettings[internalActiveTab].stateColumn,
 											(value) => handleDimensionSettingChange(internalActiveTab, 'stateColumn', value), // Use new handler
-											['state']
+											['state', 'country']
 										)}
 									</div>
 								)}

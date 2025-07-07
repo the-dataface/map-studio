@@ -35,7 +35,7 @@ interface DataPreviewProps {
 }
 
 interface ColumnType {
-	[key: string]: 'text' | 'number' | 'date' | 'coordinate' | 'state';
+	[key: string]: 'text' | 'number' | 'date' | 'coordinate' | 'state' | 'country';
 }
 
 interface ColumnFormat {
@@ -267,9 +267,231 @@ const isStateColumn = (column: string, data: (DataRow | GeocodedRow)[]): boolean
 	);
 };
 
+const isCountryColumn = (column: string): boolean => {
+	return /country/i.test(column);
+};
+
 const initializeColumnFormats = () => {
 	console.log('Initializing column formats');
 };
+
+// Replace the partial countryNameToIso3 and iso3ToCountryName maps with a comprehensive mapping for all countries
+// (Below is a representative sample; in production, use a full list. For demo, include all countries in the sample data and common alternates.)
+const countryNameToIso3: Record<string, string> = {
+	Afghanistan: 'AFG',
+	Albania: 'ALB',
+	Algeria: 'DZA',
+	Andorra: 'AND',
+	Angola: 'AGO',
+	Argentina: 'ARG',
+	Armenia: 'ARM',
+	Australia: 'AUS',
+	Austria: 'AUT',
+	Azerbaijan: 'AZE',
+	Bahamas: 'BHS',
+	Bahrain: 'BHR',
+	Bangladesh: 'BGD',
+	Barbados: 'BRB',
+	Belarus: 'BLR',
+	Belgium: 'BEL',
+	Belize: 'BLZ',
+	Benin: 'BEN',
+	Bhutan: 'BTN',
+	Bolivia: 'BOL',
+	'Bosnia and Herzegovina': 'BIH',
+	Botswana: 'BWA',
+	Brazil: 'BRA',
+	Brunei: 'BRN',
+	Bulgaria: 'BGR',
+	'Burkina Faso': 'BFA',
+	Burundi: 'BDI',
+	'Cabo Verde': 'CPV',
+	Cambodia: 'KHM',
+	Cameroon: 'CMR',
+	Canada: 'CAN',
+	'Central African Republic': 'CAF',
+	Chad: 'TCD',
+	Chile: 'CHL',
+	China: 'CHN',
+	Colombia: 'COL',
+	Comoros: 'COM',
+	'Congo (Congo-Brazzaville)': 'COG',
+	'Congo (Democratic Republic)': 'COD',
+	'Costa Rica': 'CRI',
+	Croatia: 'HRV',
+	Cuba: 'CUB',
+	Cyprus: 'CYP',
+	Czechia: 'CZE',
+	Denmark: 'DNK',
+	Djibouti: 'DJI',
+	Dominica: 'DMA',
+	'Dominican Republic': 'DOM',
+	Ecuador: 'ECU',
+	Egypt: 'EGY',
+	'El Salvador': 'SLV',
+	'Equatorial Guinea': 'GNQ',
+	Eritrea: 'ERI',
+	Estonia: 'EST',
+	Eswatini: 'SWZ',
+	Ethiopia: 'ETH',
+	Fiji: 'FJI',
+	Finland: 'FIN',
+	France: 'FRA',
+	Gabon: 'GAB',
+	Gambia: 'GMB',
+	Georgia: 'GEO',
+	Germany: 'DEU',
+	Ghana: 'GHA',
+	Greece: 'GRC',
+	Grenada: 'GRD',
+	Guatemala: 'GTM',
+	Guinea: 'GIN',
+	'Guinea-Bissau': 'GNB',
+	Guyana: 'GUY',
+	Haiti: 'HTI',
+	Honduras: 'HND',
+	Hungary: 'HUN',
+	Iceland: 'ISL',
+	India: 'IND',
+	Indonesia: 'IDN',
+	Iran: 'IRN',
+	Iraq: 'IRQ',
+	Ireland: 'IRL',
+	Israel: 'ISR',
+	Italy: 'ITA',
+	Jamaica: 'JAM',
+	Japan: 'JPN',
+	Jordan: 'JOR',
+	Kazakhstan: 'KAZ',
+	Kenya: 'KEN',
+	Kiribati: 'KIR',
+	Kuwait: 'KWT',
+	Kyrgyzstan: 'KGZ',
+	Laos: 'LAO',
+	Latvia: 'LVA',
+	Lebanon: 'LBN',
+	Lesotho: 'LSO',
+	Liberia: 'LBR',
+	Libya: 'LBY',
+	Liechtenstein: 'LIE',
+	Lithuania: 'LTU',
+	Luxembourg: 'LUX',
+	Madagascar: 'MDG',
+	Malawi: 'MWI',
+	Malaysia: 'MYS',
+	Maldives: 'MDV',
+	Mali: 'MLI',
+	Malta: 'MLT',
+	'Marshall Islands': 'MHL',
+	Mauritania: 'MRT',
+	Mauritius: 'MUS',
+	Mexico: 'MEX',
+	Micronesia: 'FSM',
+	Moldova: 'MDA',
+	Monaco: 'MCO',
+	Mongolia: 'MNG',
+	Montenegro: 'MNE',
+	Morocco: 'MAR',
+	Mozambique: 'MOZ',
+	Myanmar: 'MMR',
+	Namibia: 'NAM',
+	Nauru: 'NRU',
+	Nepal: 'NPL',
+	Netherlands: 'NLD',
+	'New Zealand': 'NZL',
+	Nicaragua: 'NIC',
+	Niger: 'NER',
+	Nigeria: 'NGA',
+	'North Korea': 'PRK',
+	'North Macedonia': 'MKD',
+	Norway: 'NOR',
+	Oman: 'OMN',
+	Pakistan: 'PAK',
+	Palau: 'PLW',
+	Palestine: 'PSE',
+	Panama: 'PAN',
+	'Papua New Guinea': 'PNG',
+	Paraguay: 'PRY',
+	Peru: 'PER',
+	Philippines: 'PHL',
+	Poland: 'POL',
+	Portugal: 'PRT',
+	Qatar: 'QAT',
+	Romania: 'ROU',
+	Russia: 'RUS',
+	Rwanda: 'RWA',
+	'Saint Kitts and Nevis': 'KNA',
+	'Saint Lucia': 'LCA',
+	'Saint Vincent and the Grenadines': 'VCT',
+	Samoa: 'WSM',
+	'San Marino': 'SMR',
+	'Sao Tome and Principe': 'STP',
+	'Saudi Arabia': 'SAU',
+	Senegal: 'SEN',
+	Serbia: 'SRB',
+	Seychelles: 'SYC',
+	'Sierra Leone': 'SLE',
+	Singapore: 'SGP',
+	Slovakia: 'SVK',
+	Slovenia: 'SVN',
+	'Solomon Islands': 'SLB',
+	Somalia: 'SOM',
+	'South Africa': 'ZAF',
+	'South Korea': 'KOR',
+	'South Sudan': 'SSD',
+	Spain: 'ESP',
+	'Sri Lanka': 'LKA',
+	Sudan: 'SDN',
+	Suriname: 'SUR',
+	Sweden: 'SWE',
+	Switzerland: 'CHE',
+	Syria: 'SYR',
+	Taiwan: 'TWN',
+	Tajikistan: 'TJK',
+	Tanzania: 'TZA',
+	Thailand: 'THA',
+	'Timor-Leste': 'TLS',
+	Togo: 'TGO',
+	Tonga: 'TON',
+	'Trinidad and Tobago': 'TTO',
+	Tunisia: 'TUN',
+	Turkey: 'TUR',
+	Turkmenistan: 'TKM',
+	Tuvalu: 'TUV',
+	Uganda: 'UGA',
+	Ukraine: 'UKR',
+	'United Arab Emirates': 'ARE',
+	'United Kingdom': 'GBR',
+	'United States of America': 'USA',
+	Uruguay: 'URY',
+	Uzbekistan: 'UZB',
+	Vanuatu: 'VUT',
+	'Vatican City': 'VAT',
+	Venezuela: 'VEN',
+	Vietnam: 'VNM',
+	Yemen: 'YEM',
+	Zambia: 'ZMB',
+	Zimbabwe: 'ZWE',
+	'Ivory Coast': 'CIV',
+	"Côte d'Ivoire": 'CIV',
+};
+const iso3ToCountryName: Record<string, string> = Object.fromEntries(
+	Object.entries(countryNameToIso3).map(([k, v]) => [v, k])
+);
+
+function formatCountry(value: any, format: string): string {
+	if (value === null || value === undefined || value === '') return '';
+	const str = String(value).trim();
+	if (format === 'default' || !format) return str;
+	if (format === 'iso3') {
+		if (str.length === 3 && iso3ToCountryName[str.toUpperCase()]) return str.toUpperCase();
+		return countryNameToIso3[str] || str;
+	} else if (format === 'full') {
+		if (str.length === 3 && iso3ToCountryName[str.toUpperCase()]) return iso3ToCountryName[str.toUpperCase()];
+		return str;
+	}
+	return str;
+}
 
 export function DataPreview({
 	data,
@@ -522,6 +744,8 @@ export function DataPreview({
 		columns.forEach((column) => {
 			if (isCoordinateColumn(column)) {
 				newInferredTypes[column] = 'coordinate';
+			} else if (isCountryColumn(column)) {
+				newInferredTypes[column] = 'country';
 			} else if (isStateColumn(column, data)) {
 				newInferredTypes[column] = 'state';
 			} else if (isDateColumn(column, data)) {
@@ -533,8 +757,13 @@ export function DataPreview({
 			}
 
 			const inferredType = newInferredTypes[column];
-			if (inferredType === 'number' || inferredType === 'date' || inferredType === 'state') {
-				newColumnFormats[column] = detectFormat(column, inferredType);
+			if (
+				inferredType === 'number' ||
+				inferredType === 'date' ||
+				inferredType === 'state' ||
+				inferredType === 'country'
+			) {
+				newColumnFormats[column] = detectFormat(column, inferredType as any);
 			}
 		});
 
@@ -745,6 +974,10 @@ export function DataPreview({
 			return formatState(value, format);
 		}
 
+		if (type === 'country' && format) {
+			return formatCountry(value, format);
+		}
+
 		return String(value || '');
 	};
 
@@ -870,7 +1103,9 @@ export function DataPreview({
 		);
 	};
 
-	const getFormatOptions = (type: 'number' | 'date' | 'state') => {
+	const getFormatOptions = (
+		type: 'number' | 'date' | 'state' | 'country' | 'province'
+	): Array<{ value: string; label: string; example: string }> => {
 		switch (type) {
 			case 'number':
 				return [
@@ -897,17 +1132,24 @@ export function DataPreview({
 					{ value: 'dd/mm/yy', label: 'DD/MM/YY', example: '15/03/24' },
 				];
 			case 'state':
-				// Only show format options for Provinces and States, not for Countries or Counties
-				if (selectedGeography === 'usa-states' || selectedGeography === 'canada-provinces') {
-					return [
-						{ value: 'abbreviated', label: 'Abbreviated', example: selectedGeography === 'usa-states' ? 'CA' : 'ON' },
-						{ value: 'full', label: 'Full', example: selectedGeography === 'usa-states' ? 'California' : 'Ontario' },
-					];
-				}
-				return []; // No format options for countries or counties
+			case 'province':
+				return [
+					{ value: 'abbreviated', label: 'Abbreviated', example: 'CA / ON' },
+					{ value: 'full', label: 'Full', example: 'California / Ontario' },
+				];
+			case 'country':
+				return [
+					{ value: 'default', label: 'Default', example: 'United States' },
+					{ value: 'full', label: 'Full name', example: 'United States' },
+					{ value: 'iso3', label: 'ISO3', example: 'USA' },
+				];
 			default:
 				return [];
 		}
+	};
+
+	const shouldShowFormatting = (type: string) => {
+		return type === 'number' || type === 'date' || type === 'state' || type === 'province' || type === 'country';
 	};
 
 	const hasFormattableColumns = () => {
@@ -925,12 +1167,12 @@ export function DataPreview({
 	const handleColumnTypeChange = (column: string, type: string) => {
 		const newTypes = {
 			...columnTypes,
-			[column]: type as 'text' | 'number' | 'date' | 'coordinate' | 'state',
+			[column]: type as 'text' | 'number' | 'date' | 'coordinate' | 'state' | 'country',
 		};
 		onUpdateColumnTypes(newTypes);
 
 		const newFormats = { ...columnFormats };
-		if (type === 'number' || type === 'date' || type === 'state') {
+		if (type === 'number' || type === 'date' || type === 'state' || type === 'country') {
 			newFormats[column] = getDefaultFormat(type as 'number' | 'date' | 'state');
 		} else {
 			delete newFormats[column];
@@ -958,18 +1200,42 @@ export function DataPreview({
 		if (type === 'state') {
 			return subnationalLabel;
 		}
+		if (type === 'country') {
+			return 'Country';
+		}
 		return toSentenceCase(type);
 	};
 
-	// Helper function to check if a column type should have formatting options
-	const shouldShowFormatting = (type: string) => {
-		if (type === 'number' || type === 'date') return true;
-		if (type === 'state') {
-			// Only show formatting for Provinces and States, not for Countries or Counties
-			return selectedGeography === 'usa-states' || selectedGeography === 'canada-provinces';
+	// Fix useEffect for duplicate country detection
+	useEffect(() => {
+		const countryCol = columns.find((col) => (columnTypes[col] || inferredTypes[col]) === 'country');
+		if (!countryCol) return;
+		const seenFull = new Set<string>();
+		const seenIso3 = new Set<string>();
+		let hasDuplicates = false;
+		for (const row of data as any[]) {
+			const raw = row[countryCol];
+			if (raw == null) continue;
+			const full = formatCountry(raw, 'full');
+			const iso3 = formatCountry(raw, 'iso3');
+			if (seenFull.has(full) && seenIso3.has(iso3)) {
+				hasDuplicates = true;
+				break;
+			}
+			seenFull.add(full);
+			seenIso3.add(iso3);
 		}
-		return false;
-	};
+		if (hasDuplicates) {
+			toast({
+				title: 'Duplicate country keys detected',
+				description:
+					'Your data contains both full names and ISO3 codes for the same country (e.g., "USA" and "United States"). This may cause some countries to not fill correctly. Please use a consistent format.',
+				variant: 'default',
+				duration: 6000,
+			});
+		}
+		return undefined;
+	}, [data, columns, columnTypes, inferredTypes]);
 
 	if (!data.length && !customDataLoaded) {
 		return (
@@ -1226,6 +1492,16 @@ export function DataPreview({
 																				</div>
 																			</div>
 																		</SelectItem>
+																		<SelectItem
+																			value="country"
+																			className="text-gray-900 dark:text-gray-100 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
+																			<div className="flex items-center justify-between w-full">
+																				<div className="flex items-center gap-2">
+																					<Flag className="w-3 h-3" />
+																					<span>Country</span>
+																				</div>
+																			</div>
+																		</SelectItem>
 																	</SelectContent>
 																</Select>
 															</div>
@@ -1317,7 +1593,12 @@ export function DataPreview({
 																			columnFormats[column] ||
 																			getDefaultFormat(columnType as 'number' | 'date' | 'state')
 																		}
-																		onValueChange={(value) => onUpdateColumnFormats(value)}>
+																		onValueChange={(value) => {
+																			onUpdateColumnFormats({
+																				...columnFormats,
+																				[column]: value,
+																			});
+																		}}>
 																		<SelectTrigger
 																			className={`h-6 w-full text-xs ${getDropdownColor(
 																				columnType

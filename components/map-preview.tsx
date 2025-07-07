@@ -44,7 +44,7 @@ interface TopoJSONData {
 }
 
 interface ColumnType {
-	[key: string]: 'text' | 'number' | 'date' | 'coordinate' | 'state';
+	[key: string]: 'text' | 'number' | 'date' | 'coordinate' | 'state' | 'country';
 }
 
 interface ColumnFormat {
@@ -264,14 +264,16 @@ const fipsToStateAbbrMap: Record<string, string> = {
 	'78': 'VI',
 };
 
-// Enhanced geographic identifier normalization function
+const stripDiacritics = (str: string): string => str.normalize('NFD').replace(/\p{Diacritic}/gu, '');
+
 const normalizeGeoIdentifier = (
 	value: string,
 	geoType: 'usa-states' | 'usa-counties' | 'usa-nation' | 'canada-provinces' | 'canada-nation' | 'world'
 ): string => {
 	if (!value) return '';
 
-	const trimmed = String(value).trim();
+	// Remove diacritics for robust matching
+	const trimmed = stripDiacritics(String(value).trim());
 
 	if (geoType.startsWith('usa-states')) {
 		// NEW: Check for 2-digit FIPS code first if applicable
@@ -303,7 +305,7 @@ const normalizeGeoIdentifier = (
 		const abbreviation = reverseCanadaProvinceMap[lowerValue];
 		if (abbreviation) return abbreviation;
 		for (const [abbr, fullName] of Object.entries(canadaProvinceMap)) {
-			if (fullName.toLowerCase() === lowerValue) return abbr;
+			if (stripDiacritics(fullName).toLowerCase() === lowerValue) return abbr;
 		}
 		return trimmed.toUpperCase(); // Fallback
 	} else if (geoType === 'world') {
@@ -914,6 +916,38 @@ function getSubnationalLabel(geo: string, plural = false) {
 	if (geo === 'usa-counties') return plural ? 'Counties' : 'County';
 	if (geo === 'canada-provinces') return plural ? 'Provinces' : 'Province';
 	return plural ? 'Regions' : 'Region';
+}
+
+// Add ISO3 country code map (partial, for demo; should be expanded for full support)
+const countryNameToIso3: Record<string, string> = {
+	'United States': 'USA',
+	Canada: 'CAN',
+	Mexico: 'MEX',
+	Brazil: 'BRA',
+	China: 'CHN',
+	India: 'IND',
+	'United Kingdom': 'GBR',
+	France: 'FRA',
+	Germany: 'DEU',
+	Japan: 'JPN',
+	// ... add more as needed ...
+};
+const iso3ToCountryName: Record<string, string> = Object.fromEntries(
+	Object.entries(countryNameToIso3).map(([k, v]) => [v, k])
+);
+
+function formatCountry(value: any, format: string): string {
+	if (value === null || value === undefined || value === '') return '';
+	const str = String(value).trim();
+	if (format === 'default' || !format) return str;
+	if (format === 'iso3') {
+		if (str.length === 3 && iso3ToCountryName[str.toUpperCase()]) return str.toUpperCase();
+		return countryNameToIso3[str] || str;
+	} else if (format === 'full') {
+		if (str.length === 3 && iso3ToCountryName[str.toUpperCase()]) return iso3ToCountryName[str.toUpperCase()];
+		return str;
+	}
+	return str;
 }
 
 export function MapPreview({
@@ -1620,7 +1654,29 @@ export function MapPreview({
 							} else if (selectedGeography.startsWith('usa-counties')) {
 								featureKey = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null; // Use d.id (FIPS) for US counties
 							} else if (selectedGeography.startsWith('canada-provinces')) {
-								featureKey = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null; // Use d.id (abbr) for Canadian provinces
+								// Try both abbreviation and full name
+								const abbrKey = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null;
+								const nameKey = d?.properties?.name
+									? normalizeGeoIdentifier(String(d.properties.name), selectedGeography)
+									: null;
+								// Add detailed logging
+								console.log('[Canada Choropleth Debug]', {
+									id: d?.id,
+									name: d?.properties?.name,
+									abbrKey,
+									nameKey,
+									abbrKeyFound: abbrKey && geoDataMap.has(abbrKey),
+									nameKeyFound: nameKey && geoDataMap.has(nameKey),
+									geoDataMapKeys: Array.from(geoDataMap.keys()),
+								});
+								// Prefer abbrKey, but fallback to nameKey if not found in geoDataMap
+								if (abbrKey && geoDataMap.has(abbrKey)) {
+									featureKey = abbrKey;
+								} else if (nameKey && geoDataMap.has(nameKey)) {
+									featureKey = nameKey;
+								} else {
+									featureKey = abbrKey || nameKey;
+								}
 							} else if (
 								selectedGeography === 'world' ||
 								selectedGeography === 'usa-nation' ||
@@ -2068,13 +2124,62 @@ export function MapPreview({
 						} else if (selectedGeography.startsWith('usa-counties')) {
 							featureIdentifier = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null;
 						} else if (selectedGeography.startsWith('canada-provinces')) {
-							featureIdentifier = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null;
-						} else if (
-							selectedGeography === 'world' ||
-							selectedGeography === 'usa-nation' ||
-							selectedGeography === 'canada-nation'
-						) {
-							featureIdentifier = d?.properties?.name || String(d?.id) || null;
+							// Try both abbreviation and full name
+							const abbrKey = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null;
+							const nameKey = d?.properties?.name
+								? normalizeGeoIdentifier(String(d.properties.name), selectedGeography)
+								: null;
+							// Prefer abbrKey, but fallback to nameKey if not found in geoDataMap
+							if (abbrKey && geoDataMap.has(abbrKey)) {
+								featureKey = abbrKey;
+							} else if (nameKey && geoDataMap.has(nameKey)) {
+								featureKey = nameKey;
+							} else {
+								featureKey = abbrKey || nameKey;
+							}
+						} else if (selectedGeography === 'world') {
+							// Try matching by multiple properties, accounting for diacritics and case
+							const candidates = [
+								d?.id,
+								d?.properties?.name,
+								d?.properties?.name_long,
+								d?.properties?.admin,
+								d?.properties?.iso_a3,
+							]
+								.filter(Boolean)
+								.map((v) => normalizeGeoIdentifier(stripDiacritics(String(v)), selectedGeography));
+							// Try exact match for each candidate
+							let debugMatchType = 'none';
+							featureKey = candidates.find((c) => geoDataMap.has(c)) || null;
+							if (featureKey) debugMatchType = 'exact';
+							// Fuzzy match: if no exact match, try includes/startsWith/endsWith
+							if (!featureKey) {
+								const geoKeys = Array.from(geoDataMap.keys());
+								featureKey =
+									geoKeys.find((k) =>
+										candidates.some(
+											(c) => k.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(k.toLowerCase())
+										)
+									) || null;
+								if (featureKey) debugMatchType = 'fuzzy';
+							}
+							// Debug logging
+							const geoKeys = Array.from(geoDataMap.keys());
+							console.log('[World Choropleth Debug]', {
+								id: d?.id,
+								name: d?.properties?.name,
+								candidates,
+								geoKeys,
+								exactMatches: candidates.map((c) => geoDataMap.has(c)),
+								fuzzyMatches: candidates.map((c) =>
+									geoKeys.some(
+										(k) => k.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(k.toLowerCase())
+									)
+								),
+								selectedFeatureKey: featureKey,
+								matchType: debugMatchType,
+								valueFound: featureKey ? geoDataMap.has(featureKey) : false,
+							});
 						}
 					}
 

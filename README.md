@@ -41,6 +41,7 @@ Map Studio is a tool for quickly visualizing geospatial data. It allows users to
 - [x] **Improved Error, Warning, and Success Notifications**
 - [ ] **Data Checks and Verifications for Choropleth Data**
 - [x] **Add scroll to map preview indicator and collapse all button**
+- [x] **Add more sample data options** for various geographies and map types
 
 ### Getting Started
 
