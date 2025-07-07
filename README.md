@@ -31,9 +31,9 @@ Map Studio is a tool for quickly visualizing geospatial data. It allows users to
 ### On the roadmap
 -   [ ] **Export Settings**: Save and share your settings (including data, dimensions,and styling) as a JSON file.
 -   [ ] **Import Settings**: Load a saved settings JSON to continue editing.
--   [ ] **US Counties**: Add US county outlines as a layer option in the basemap.
--   [ ] **Canada and Other Countries**: Add options to render different countries or a world map.
--   [ ] **Alternative Projections**: Add options to change the rendered projection of the map.
+-   [x] **US Counties**: Add US county outlines as a layer option in the basemap.
+-   [x] **Canada and Other Countries**: Add options to render different countries or a world map.
+-   [x] **Alternative Projections**: Add options to change the rendered projection of the map.
 -   [ ] **Data Upload**: Add fields to upload a dataset instead of pasting.
 -   [ ] **Improved Label Positioning**: Make auto-positioning setting for symbol map layers more intelligent and add support for connected labels in choropleth layers.
 -   [x] **Improved Error, Warning, and Success Notifications**
