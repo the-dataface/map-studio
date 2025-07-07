@@ -26,6 +26,8 @@ interface MapPreviewProps {
 	selectedGeography: 'usa-states' | 'usa-counties' | 'usa-nation' | 'canada-provinces' | 'canada-nation' | 'world'; // New prop
 	selectedProjection: 'albersUsa' | 'mercator' | 'equalEarth' | 'albers'; // Added "albers"
 	clipToCountry: boolean; // New prop
+	isExpanded: boolean;
+	setIsExpanded: (expanded: boolean) => void;
 }
 
 interface TopoJSONData {
@@ -930,6 +932,8 @@ export function MapPreview({
 	selectedGeography, // Destructure new prop
 	selectedProjection, // Destructure new prop
 	clipToCountry, // Destructure new prop
+	isExpanded,
+	setIsExpanded,
 }: MapPreviewProps) {
 	console.log('=== MAP PREVIEW RENDER DEBUG ===');
 	console.log('Map type:', mapType);
@@ -939,7 +943,6 @@ export function MapPreview({
 	console.log('Selected Projection:', selectedProjection);
 	console.log('Clip to Country:', clipToCountry);
 
-	const [isExpanded, setIsExpanded] = useState(true);
 	const [geoAtlasData, setGeoAtlasData] = useState<TopoJSONData | null>(null); // Renamed from usData
 	const [isLoading, setIsLoading] = useState(true);
 	const svgRef = useRef<SVGSVGElement>(null);
@@ -2689,6 +2692,12 @@ export function MapPreview({
 		clipToCountry, // Added to dependencies
 		toast,
 	]);
+
+	useEffect(() => {
+		const handler = () => setIsExpanded(false);
+		window.addEventListener('collapse-all-panels', handler);
+		return () => window.removeEventListener('collapse-all-panels', handler);
+	}, []);
 
 	const renderMap = useCallback(() => {
 		console.log('renderMap useCallback triggered');

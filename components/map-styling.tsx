@@ -153,6 +153,8 @@ interface MapStylingProps {
 	symbolDataExists: boolean;
 	choroplethDataExists: boolean;
 	customDataExists: boolean; // NEW
+	isExpanded: boolean;
+	setIsExpanded: (expanded: boolean) => void;
 }
 
 const googleFontFamilies = [
@@ -176,8 +178,9 @@ export function MapStyling({
 	symbolDataExists,
 	choroplethDataExists,
 	customDataExists, // NEW
+	isExpanded,
+	setIsExpanded,
 }: MapStylingProps) {
-	const [isExpanded, setIsExpanded] = useState(true);
 	const [activeTab, setActiveTab] = useState(stylingSettings.activeTab);
 	const [expandedPanels, setExpandedPanels] = useState<{ [key: string]: boolean }>({
 		savedStyles: false, // Collapsed by default
@@ -193,6 +196,17 @@ export function MapStyling({
 	useEffect(() => {
 		setActiveTab(stylingSettings.activeTab);
 	}, [stylingSettings.activeTab]);
+
+	useEffect(() => {
+		const handler = () =>
+			setExpandedPanels((prev: { [key: string]: boolean }) => {
+				const collapsed: { [key: string]: boolean } = {};
+				Object.keys(prev).forEach((k) => (collapsed[k] = false));
+				return collapsed;
+			});
+		window.addEventListener('collapse-all-panels', handler);
+		return () => window.removeEventListener('collapse-all-panels', handler);
+	}, []);
 
 	const togglePanel = (panelKey: string) => {
 		setExpandedPanels((prev) => ({
@@ -381,7 +395,7 @@ export function MapStyling({
 		<TooltipProvider>
 			<Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
 				<CardHeader
-					className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-5 px-6 rounded-t-xl relative"
+					className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-6 px-6 rounded-t-xl relative"
 					onClick={() => setIsExpanded(!isExpanded)}>
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-2">
