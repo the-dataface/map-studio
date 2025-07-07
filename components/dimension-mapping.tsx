@@ -67,6 +67,8 @@ interface DimensionMappingProps {
 	symbolColumns: string[];
 	choroplethColumns: string[];
 	selectedGeography: string; // NEW: Add selectedGeography prop
+	isExpanded: boolean;
+	setIsExpanded: (expanded: boolean) => void;
 }
 
 interface DimensionSettings {
@@ -816,11 +818,12 @@ export function DimensionMapping({
 	symbolColumns,
 	choroplethColumns,
 	selectedGeography, // NEW: Add selectedGeography prop
+	isExpanded,
+	setIsExpanded,
 }: DimensionMappingProps) {
 	// Add this log at the beginning of the function
 	console.log('Current symbol size range:', dimensionSettings.symbol.sizeMin, '-', dimensionSettings.symbol.sizeMax);
 
-	const [isExpanded, setIsExpanded] = useState(true);
 	const [expandedPanels, setExpandedPanels] = useState<{ [key: string]: boolean }>({
 		coordinates: true,
 		size: false,
@@ -1861,7 +1864,7 @@ export function DimensionMapping({
 		return (
 			<TooltipProvider>
 				<Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
-					<CardHeader className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-5 px-6 rounded-t-xl">
+					<CardHeader className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-6 px-6 rounded-t-xl">
 						<CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">
 							Dimension mapping
 						</CardTitle>
@@ -1925,11 +1928,22 @@ export function DimensionMapping({
 		'62': 'NU', // Nunavut
 	};
 
+	useEffect(() => {
+		const handler = () =>
+			setExpandedPanels((prev: { [key: string]: boolean }) => {
+				const collapsed: { [key: string]: boolean } = {};
+				Object.keys(prev).forEach((k) => (collapsed[k] = false));
+				return collapsed;
+			});
+		window.addEventListener('collapse-all-panels', handler);
+		return () => window.removeEventListener('collapse-all-panels', handler);
+	}, []);
+
 	return (
 		<TooltipProvider>
 			<Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
 				<CardHeader
-					className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-5 px-6 rounded-t-xl relative"
+					className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-6 px-6 rounded-t-xl relative"
 					onClick={() => setIsExpanded(!isExpanded)}>
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-2">

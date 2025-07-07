@@ -30,6 +30,8 @@ interface DataPreviewProps {
 	onMapTypeChange: (mapType: 'symbol' | 'choropleth' | 'custom') => void;
 	columnFormats: ColumnFormat;
 	selectedGeography: string;
+	isExpanded: boolean;
+	setIsExpanded: (expanded: boolean) => void;
 }
 
 interface ColumnType {
@@ -286,8 +288,9 @@ export function DataPreview({
 	onMapTypeChange,
 	columnFormats,
 	selectedGeography,
+	isExpanded,
+	setIsExpanded,
 }: DataPreviewProps) {
-	const [isExpanded, setIsExpanded] = useState(true);
 	const [inferredTypes, setInferredTypes] = useState<ColumnType>({});
 
 	// NEW: Enhanced tab logic - always show choropleth tab as active when custom map has choropleth data
@@ -306,6 +309,12 @@ export function DataPreview({
 			setInternalActiveTab(mapType === 'custom' ? 'choropleth' : mapType);
 		}
 	}, [mapType, choroplethDataExists]);
+
+	useEffect(() => {
+		const handler = () => setIsExpanded(false);
+		window.addEventListener('collapse-all-panels', handler);
+		return () => window.removeEventListener('collapse-all-panels', handler);
+	}, []);
 
 	const formatNumber = (value: any, format: string): string => {
 		if (value === null || value === undefined || value === '') return '';
@@ -622,13 +631,13 @@ export function DataPreview({
 
 		if (geocodedRow.geocoded === true) {
 			if (geocodedRow.source === 'persistent' || geocodedRow.source === 'session') {
-				return <Database className="w-3 h-3 text-blue-500" title="Found in cache" />;
+				return <Database className="w-3 h-3 text-blue-500" />;
 			}
-			return <Check className="w-3 h-3 text-green-500" title="Successfully geocoded" />;
+			return <Check className="w-3 h-3 text-green-500" />;
 		} else if (geocodedRow.geocoded === false) {
-			return <XCircle className="w-3 h-3 text-red-500" title="Geocoding failed" />;
+			return <XCircle className="w-3 h-3 text-red-500" />;
 		} else if (geocodedRow.processing === true) {
-			return <Loader2 className="w-3 h-3 text-orange-500 animate-spin" title="Processing geocoding" />;
+			return <Loader2 className="w-3 h-3 text-orange-500 animate-spin" />;
 		}
 
 		return null;
@@ -1308,9 +1317,7 @@ export function DataPreview({
 																			columnFormats[column] ||
 																			getDefaultFormat(columnType as 'number' | 'date' | 'state')
 																		}
-																		onValueChange={(value) =>
-																			onUpdateColumnFormats((prev) => ({ ...prev, [column]: value }))
-																		}>
+																		onValueChange={(value) => onUpdateColumnFormats(value)}>
 																		<SelectTrigger
 																			className={`h-6 w-full text-xs ${getDropdownColor(
 																				columnType

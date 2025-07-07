@@ -35,6 +35,8 @@ interface GeocodingSectionProps {
 	setGeocodedData: (data: GeocodedRow[]) => void;
 	isGeocoding: boolean;
 	setIsGeocoding: (loading: boolean) => void;
+	isExpanded: boolean;
+	setIsExpanded: (expanded: boolean) => void;
 }
 
 interface GeocodingStatus {
@@ -120,8 +122,9 @@ export function GeocodingSection({
 	setGeocodedData,
 	isGeocoding,
 	setIsGeocoding,
+	isExpanded,
+	setIsExpanded,
 }: GeocodingSectionProps) {
-	const [isExpanded, setIsExpanded] = useState(true);
 	const [fullAddressColumn, setFullAddressColumn] = useState<string>('none');
 	const [cityColumn, setCityColumn] = useState<string>('none');
 	const [stateColumn, setStateColumn] = useState<string>('none');

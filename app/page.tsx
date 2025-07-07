@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { DataInput } from '@/components/data-input';
 import { GeocodingSection } from '@/components/geocoding-section';
 import { DataPreview } from '@/components/data-preview';
@@ -10,6 +10,8 @@ import { Header } from '@/components/header';
 import { Toaster } from '@/components/ui/toaster';
 import { MapStyling } from '@/components/map-styling';
 import { MapProjectionSelection } from '@/components/map-projection-selection';
+import { FloatingActionButtons } from '@/components/floating-action-buttons';
+import React from 'react';
 
 export interface DataRow {
 	[key: string]: string | number | boolean | undefined;
@@ -181,6 +183,13 @@ export default function MapStudio() {
 	const [activeMapType, setActiveMapType] = useState<'symbol' | 'choropleth' | 'custom'>('symbol');
 	const [dataInputExpanded, setDataInputExpanded] = useState(true);
 	const [showGeocoding, setShowGeocoding] = useState(false);
+	const [geocodingExpanded, setGeocodingExpanded] = useState(true);
+	const [projectionExpanded, setProjectionExpanded] = useState(true);
+	const [dataPreviewExpanded, setDataPreviewExpanded] = useState(true);
+	const [dimensionMappingExpanded, setDimensionMappingExpanded] = useState(true);
+	const [mapStylingExpanded, setMapStylingExpanded] = useState(true);
+	const [mapPreviewExpanded, setMapPreviewExpanded] = useState(true);
+	const [mapInView, setMapInView] = useState(false);
 
 	// Map Projection and Geography states
 	const [selectedGeography, setSelectedGeography] = useState<
@@ -775,6 +784,60 @@ export default function MapStudio() {
 		}
 	}, [selectedGeography, selectedProjection]);
 
+	// Ref for map preview
+	const mapPreviewRef = useRef<HTMLDivElement>(null);
+
+	// Track if map preview is fully in view using scroll/resize events
+	useEffect(() => {
+		function checkMapInView() {
+			const ref = mapPreviewRef.current;
+			if (!ref) return;
+			const rect = ref.getBoundingClientRect();
+			const visibleHeight = Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0);
+			const percentVisible = visibleHeight / rect.height;
+			setMapInView(rect.top >= 0 && percentVisible > 0.6);
+		}
+		checkMapInView();
+		window.addEventListener('scroll', checkMapInView, { passive: true });
+		window.addEventListener('resize', checkMapInView);
+		return () => {
+			window.removeEventListener('scroll', checkMapInView);
+			window.removeEventListener('resize', checkMapInView);
+		};
+	}, [mapPreviewRef]);
+
+	// Handler to scroll to map preview and expand it
+	const handleScrollToMap = () => {
+		setMapPreviewExpanded(true);
+		setTimeout(() => {
+			if (mapPreviewRef.current) {
+				mapPreviewRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			} else {
+				const el = document.getElementById('map-preview-section');
+				if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			}
+		}, 50);
+	};
+
+	// Handler to collapse all panels except map preview
+	const handleCollapseAll = () => {
+		setDataInputExpanded(false);
+		setGeocodingExpanded(false);
+		setProjectionExpanded(false);
+		setDataPreviewExpanded(false);
+		setDimensionMappingExpanded(false);
+		setMapStylingExpanded(false);
+	};
+
+	// Compute if any panel except map preview is expanded
+	const anyPanelExpanded =
+		dataInputExpanded ||
+		geocodingExpanded ||
+		projectionExpanded ||
+		dataPreviewExpanded ||
+		dimensionMappingExpanded ||
+		mapStylingExpanded;
+
 	return (
 		<div className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-200">
 			<Header />
@@ -784,22 +847,23 @@ export default function MapStudio() {
 					onDataLoad={handleDataLoad}
 					isExpanded={dataInputExpanded}
 					setIsExpanded={setDataInputExpanded}
-					onClearData={handleClearData} // Pass handleClearData to DataInput
+					onClearData={handleClearData}
 				/>
 
-				{hasAnyData() &&
-					!hasDataForType('custom') && ( // Conditional rendering for MapProjectionSelection
-						<MapProjectionSelection
-							geography={selectedGeography}
-							projection={selectedProjection}
-							onGeographyChange={updateSelectedGeography}
-							onProjectionChange={setSelectedProjection}
-							columns={getCurrentColumns()}
-							sampleRows={getCurrentSampleRows()}
-							clipToCountry={clipToCountry} // New prop
-							onClipToCountryChange={setClipToCountry} // New prop
-						/>
-					)}
+				{hasAnyData() && !hasDataForType('custom') && (
+					<MapProjectionSelection
+						geography={selectedGeography}
+						projection={selectedProjection}
+						onGeographyChange={updateSelectedGeography}
+						onProjectionChange={setSelectedProjection}
+						columns={getCurrentColumns()}
+						sampleRows={getCurrentSampleRows()}
+						clipToCountry={clipToCountry}
+						onClipToCountryChange={setClipToCountry}
+						isExpanded={projectionExpanded}
+						setIsExpanded={setProjectionExpanded}
+					/>
+				)}
 
 				{showGeocoding && (
 					<GeocodingSection
@@ -808,6 +872,8 @@ export default function MapStudio() {
 						setGeocodedData={updateGeocodedData}
 						isGeocoding={isGeocoding}
 						setIsGeocoding={setIsGeocoding}
+						isExpanded={geocodingExpanded}
+						setIsExpanded={setGeocodingExpanded}
 					/>
 				)}
 
@@ -816,8 +882,8 @@ export default function MapStudio() {
 						{!onlyCustomDataLoaded && (
 							<>
 								<DataPreview
-									data={getCurrentDisplayData()} // Use enhanced function
-									columns={getCurrentColumns()} // Use enhanced function
+									data={getCurrentDisplayData()}
+									columns={getCurrentColumns()}
 									mapType={activeMapType}
 									onClearData={handleClearData}
 									symbolDataExists={hasDataForType('symbol')}
@@ -827,12 +893,13 @@ export default function MapStudio() {
 									onUpdateColumnTypes={updateColumnTypes}
 									onUpdateColumnFormats={updateColumnFormats}
 									columnFormats={columnFormats}
-									// Pass data lengths for header badges
 									symbolDataLength={symbolData.parsedData.length}
 									choroplethDataLength={choroplethData.parsedData.length}
 									customDataLoaded={customData.customMapData.length > 0}
 									onMapTypeChange={setActiveMapType}
 									selectedGeography={dimensionSettings.selectedGeography}
+									isExpanded={dataPreviewExpanded}
+									setIsExpanded={setDataPreviewExpanded}
 								/>
 
 								<DimensionMapping
@@ -851,6 +918,8 @@ export default function MapStudio() {
 									choroplethGeocodedData={choroplethData.geocodedData}
 									choroplethColumns={choroplethData.columns}
 									selectedGeography={dimensionSettings.selectedGeography}
+									isExpanded={dimensionMappingExpanded}
+									setIsExpanded={setDimensionMappingExpanded}
 								/>
 							</>
 						)}
@@ -861,28 +930,53 @@ export default function MapStudio() {
 							symbolDataExists={hasDataForType('symbol')}
 							choroplethDataExists={hasDataForType('choropleth')}
 							customDataExists={hasDataForType('custom')}
+							isExpanded={mapStylingExpanded}
+							setIsExpanded={setMapStylingExpanded}
 						/>
 
-						<MapPreview
-							symbolData={getSymbolDisplayData()}
-							choroplethData={getChoroplethDisplayData()}
-							symbolColumns={symbolData.columns}
-							choroplethColumns={choroplethData.columns}
-							mapType={activeMapType}
-							dimensionSettings={dimensionSettings}
-							stylingSettings={stylingSettings}
-							symbolDataExists={hasDataForType('symbol')}
-							choroplethDataExists={hasDataForType('choropleth')}
-							columnTypes={columnTypes}
-							columnFormats={columnFormats}
-							customMapData={customData.customMapData}
-							selectedGeography={selectedGeography}
-							selectedProjection={selectedProjection}
-							clipToCountry={clipToCountry} // New prop
-						/>
+						<div ref={mapPreviewRef} id="map-preview-section">
+							<MapPreview
+								symbolData={getSymbolDisplayData()}
+								choroplethData={getChoroplethDisplayData()}
+								symbolColumns={symbolData.columns}
+								choroplethColumns={choroplethData.columns}
+								mapType={activeMapType}
+								dimensionSettings={dimensionSettings}
+								stylingSettings={stylingSettings}
+								symbolDataExists={hasDataForType('symbol')}
+								choroplethDataExists={hasDataForType('choropleth')}
+								columnTypes={columnTypes}
+								columnFormats={columnFormats}
+								customMapData={customData.customMapData}
+								selectedGeography={selectedGeography}
+								selectedProjection={selectedProjection}
+								clipToCountry={clipToCountry}
+								isExpanded={mapPreviewExpanded}
+								setIsExpanded={setMapPreviewExpanded}
+							/>
+						</div>
 					</>
 				)}
 			</main>
+			{/* Floating action buttons */}
+			<FloatingActionButtons
+				onScrollToMap={() => {
+					setMapPreviewExpanded(true);
+					setTimeout(() => {
+						if (mapPreviewRef.current) {
+							mapPreviewRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+						} else {
+							const el = document.getElementById('map-preview-section');
+							if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+						}
+					}, 50);
+				}}
+				onCollapseAll={handleCollapseAll}
+				visible={hasAnyData()}
+				showCollapse={anyPanelExpanded}
+				showJump={!mapInView || !mapPreviewExpanded}
+				mapPreviewExpanded={mapPreviewExpanded}
+			/>
 			<Toaster />
 		</div>
 	);
