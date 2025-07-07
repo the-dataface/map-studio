@@ -34,7 +34,7 @@ interface DataState {
 }
 
 interface ColumnType {
-	[key: string]: 'text' | 'number' | 'date' | 'coordinate' | 'state';
+	[key: string]: 'text' | 'number' | 'date' | 'coordinate' | 'state' | 'country';
 }
 
 interface ColumnFormat {
@@ -557,8 +557,9 @@ export default function MapStudio() {
 		const hasStateColumn = lowerCaseColumns.some((col) => col.includes('state') || col.includes('province'));
 		const hasLatLon =
 			lowerCaseColumns.some((col) => col.includes('lat')) && lowerCaseColumns.some((col) => col.includes('lon'));
+		const hasCountyColumn = lowerCaseColumns.some((col) => col.includes('county') || col.includes('fips'));
 
-		const sampleDataString = JSON.stringify(parsedData.slice(0, 10)).toLowerCase(); // Use parsedData for inference
+		const sampleDataString = JSON.stringify(parsedData.slice(0, 10)).toLowerCase();
 		const containsUsStates =
 			sampleDataString.includes('california') ||
 			sampleDataString.includes('texas') ||
@@ -580,7 +581,6 @@ export default function MapStudio() {
 			sampleDataString.includes('alberta');
 
 		// Check for US counties
-		const hasCountyColumn = lowerCaseColumns.some((col) => col.includes('county') || col.includes('fips'));
 		const containsUsCounties = sampleDataString.match(/\b\d{5}\b/); // Simple check for 5-digit FIPS
 
 		if (hasCountryColumn || containsWorldCountries) {
@@ -589,10 +589,10 @@ export default function MapStudio() {
 		} else if (hasCanadaProvinceColumn || containsCanadaProvinces) {
 			inferredGeo = 'canada-provinces';
 			inferredProj = 'mercator'; // Mercator is often used for Canada
-		} else if (hasCountyColumn || containsUsCounties) {
+		} else if (hasCountyColumn) {
 			inferredGeo = 'usa-counties';
 			inferredProj = 'albersUsa';
-		} else if (hasStateColumn || containsUsStates) {
+		} else if (hasStateColumn) {
 			inferredGeo = 'usa-states';
 			inferredProj = 'albersUsa';
 		} else if (hasLatLon) {
@@ -608,7 +608,36 @@ export default function MapStudio() {
 		if (inferredProj !== selectedProjection) {
 			setSelectedProjection(inferredProj);
 		}
+
+		// REMOVE regionColumn auto-mapping from here
 	};
+
+	// Add a useEffect to auto-map the region column after columnTypes and columns are updated
+	useEffect(() => {
+		// Only run if there is data and columns
+		const currentData = getCurrentData();
+		if (!currentData || !currentData.columns || currentData.columns.length === 0) return;
+
+		// Find the region column based on columnTypes
+		const regionColumn = currentData.columns.find(
+			(col) => columnTypes[col] === 'state' || columnTypes[col] === 'country' || columnTypes[col] === 'coordinate'
+		);
+		if (!regionColumn) return;
+
+		// Only update if the region column is not already set
+		const mapType = activeMapType;
+		if (dimensionSettings[mapType]?.stateColumn !== regionColumn) {
+			setDimensionSettings((prev: any) => ({
+				...prev,
+				[mapType]: {
+					...prev[mapType],
+					colorBy: '',
+					sizeBy: '',
+					stateColumn: regionColumn,
+				},
+			}));
+		}
+	}, [columnTypes, activeMapType, getCurrentData, dimensionSettings, setDimensionSettings]);
 
 	const handleClearData = (mapType: 'symbol' | 'choropleth' | 'custom') => {
 		const emptyDataState: DataState = {
@@ -624,12 +653,69 @@ export default function MapStudio() {
 			case 'symbol':
 				setSymbolData(emptyDataState);
 				setShowGeocoding(false); // Hide geocoding when symbol data is cleared
+				setDimensionSettings((prev: any) => ({
+					...prev,
+					symbol: {
+						latitude: '',
+						longitude: '',
+						sizeBy: '',
+						sizeMin: 5,
+						sizeMax: 20,
+						sizeMinValue: 0,
+						sizeMaxValue: 100,
+						colorBy: '',
+						colorScale: 'linear',
+						colorPalette: 'Blues',
+						colorMinValue: 0,
+						colorMidValue: 50,
+						colorMaxValue: 100,
+						colorMinColor: '#f7fbff',
+						colorMidColor: '#6baed6',
+						colorMaxColor: '#08519c',
+						categoricalColors: [],
+						labelTemplate: '',
+					},
+				}));
 				break;
 			case 'choropleth':
 				setChoroplethData(emptyDataState);
+				setDimensionSettings((prev: any) => ({
+					...prev,
+					choropleth: {
+						stateColumn: '',
+						colorBy: '',
+						colorScale: 'linear',
+						colorPalette: 'Blues',
+						colorMinValue: 0,
+						colorMidValue: 50,
+						colorMaxValue: 100,
+						colorMinColor: '#f7fbff',
+						colorMidColor: '#6baed6',
+						colorMaxColor: '#08519c',
+						categoricalColors: [],
+						labelTemplate: '',
+					},
+				}));
 				break;
 			case 'custom':
 				setCustomData(emptyDataState);
+				setDimensionSettings((prev: any) => ({
+					...prev,
+					custom: {
+						stateColumn: '',
+						colorBy: '',
+						colorScale: 'linear',
+						colorPalette: 'Blues',
+						colorMinValue: 0,
+						colorMidValue: 50,
+						colorMaxValue: 100,
+						colorMinColor: '#f7fbff',
+						colorMidColor: '#6baed6',
+						colorMaxColor: '#08519c',
+						categoricalColors: [],
+						labelTemplate: '',
+					},
+				}));
 				break;
 		}
 
@@ -654,6 +740,16 @@ export default function MapStudio() {
 			setDataInputExpanded(true);
 			setActiveMapType('symbol'); // Default to symbol tab if no data
 		}
+
+		// When clearing data, reset dimension mapping for colorBy and sizeBy
+		setDimensionSettings((prev: any) => ({
+			...prev,
+			[mapType]: {
+				...prev[mapType],
+				colorBy: '',
+				sizeBy: '',
+			},
+		}));
 	};
 
 	const updateGeocodedData = (geocodedData: GeocodedRow[]) => {
@@ -975,7 +1071,6 @@ export default function MapStudio() {
 				visible={hasAnyData()}
 				showCollapse={anyPanelExpanded}
 				showJump={!mapInView || !mapPreviewExpanded}
-				mapPreviewExpanded={mapPreviewExpanded}
 			/>
 			<Toaster />
 		</div>
