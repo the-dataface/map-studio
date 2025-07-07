@@ -1,7 +1,8 @@
 # Map Studio
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/sams-teams-projects/v0-map-studio)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/o5qMIcsCPvW)
+[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://map-studio.vercel.app/)
+
+[https://map-studio.vercel.app/](https://map-studio.vercel.app/)
 
 ## Overview
 
@@ -54,19 +55,5 @@ Map Studio is a tool for quickly visualizing geospatial data. It allows users to
 
 For more detailed instructions and guidelines, please refer to the [GitHub Wiki](https://github.com/sams-teams-projects/v0-map-studio/wiki) (coming soon!).
 
-## Deployment
-
-Your project is live at:
-
-**[https://vercel.com/sams-teams-projects/v0-map-studio](https://vercel.com/sams-teams-projects/v0-map-studio)**
-
-## Build your app
-
-Continue building your app on:
-
-**[https://v0.dev/chat/projects/o5qMIcsCPvW](https://v0.dev/chat/projects/o5qMIcsCPvW)**
-
 ## Credits
-
-- **Sam Vickars**
-- **The DataFace**
+Designed and built by Sam Vickars of [The DataFace](https://thedataface.com), using v0 and Cursor.
