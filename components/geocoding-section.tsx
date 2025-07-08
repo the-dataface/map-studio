@@ -316,37 +316,54 @@ export function GeocodingSection({
 
 	// Function to geocode using cache-first approach
 	const geocodeAddress = async (address: string, city?: string, state?: string) => {
-		// Create cache key for city/state combinations
-		let cacheKey = address.toLowerCase().trim();
-		if (city && state) {
-			cacheKey = createCacheKey(city, state);
-		}
+		// Create both possible cache keys
+		const addressKey = address.toLowerCase().trim();
+		const cityStateKey = city && state ? createCacheKey(city, state) : null;
 
-		// 1. Check session cache first (in-memory for current session)
-		if (sessionCache[cacheKey]) {
+		// 1. Check session cache for both keys
+		if (sessionCache[addressKey]) {
 			return {
-				lat: sessionCache[cacheKey].lat,
-				lng: sessionCache[cacheKey].lng,
+				lat: sessionCache[addressKey].lat,
+				lng: sessionCache[addressKey].lng,
+				fromCache: true,
+				source: 'session',
+			};
+		}
+		if (cityStateKey && sessionCache[cityStateKey]) {
+			return {
+				lat: sessionCache[cityStateKey].lat,
+				lng: sessionCache[cityStateKey].lng,
 				fromCache: true,
 				source: 'session',
 			};
 		}
 
-		// 2. Check persistent cache (localStorage)
-		const cachedLocation = getCachedLocation(cacheKey);
-		if (cachedLocation) {
-			// Also store in session cache for faster access during the current session
-			sessionCache[cacheKey] = { lat: cachedLocation.lat, lng: cachedLocation.lng };
+		// 2. Check persistent cache (localStorage) for both keys
+		const cachedLocationAddress = getCachedLocation(addressKey);
+		if (cachedLocationAddress) {
+			sessionCache[addressKey] = { lat: cachedLocationAddress.lat, lng: cachedLocationAddress.lng };
 			return {
-				lat: cachedLocation.lat,
-				lng: cachedLocation.lng,
+				lat: cachedLocationAddress.lat,
+				lng: cachedLocationAddress.lng,
 				fromCache: true,
 				source: 'persistent',
 			};
 		}
+		if (cityStateKey) {
+			const cachedLocationCityState = getCachedLocation(cityStateKey);
+			if (cachedLocationCityState) {
+				sessionCache[cityStateKey] = { lat: cachedLocationCityState.lat, lng: cachedLocationCityState.lng };
+				return {
+					lat: cachedLocationCityState.lat,
+					lng: cachedLocationCityState.lng,
+					fromCache: true,
+					source: 'persistent',
+				};
+			}
+		}
 
+		// 3. If not in cache, use Nominatim (OpenStreetMap) geocoding service
 		try {
-			// 3. If not in cache, use Nominatim (OpenStreetMap) geocoding service
 			const encodedAddress = encodeURIComponent(address);
 			const response = await fetch(
 				`https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1&addressdetails=1`,
@@ -370,9 +387,9 @@ export function GeocodingSection({
 					lng: Number.parseFloat(result.lon),
 				};
 
-				// Cache the result in both session and persistent storage
-				sessionCache[cacheKey] = coordinates;
-				saveCachedLocation(cacheKey, coordinates.lat, coordinates.lng, 'nominatim');
+				// Cache the result in both session and persistent storage (using addressKey)
+				sessionCache[addressKey] = coordinates;
+				saveCachedLocation(addressKey, coordinates.lat, coordinates.lng, 'nominatim');
 
 				return { ...coordinates, fromCache: false, source: 'api' };
 			}
