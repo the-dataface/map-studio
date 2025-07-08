@@ -153,20 +153,18 @@ export function GeocodingSection({
 
 			const cityCol = columns.find((col) => col.toLowerCase().includes('city') || col.toLowerCase().includes('town'));
 
-			const stateCol = columns.find(
-				(col) =>
-					col.toLowerCase().includes('state') ||
-					col.toLowerCase().includes('province') ||
-					col.toLowerCase().includes('region')
-			);
-
-			const countryCol = columns.find((col) => col.toLowerCase().includes('country'));
+			// Only match exact names for state/province/country/county
+			const matchSet = (col: string, names: string[]) => names.includes(col.trim().toLowerCase());
+			const stateCol = columns.find((col) => matchSet(col, ['state']));
+			const provinceCol = columns.find((col) => matchSet(col, ['province']));
+			const countryCol = columns.find((col) => matchSet(col, ['country']));
+			const countyCol = columns.find((col) => matchSet(col, ['county']));
 
 			// Always auto-populate dropdowns on new columns
 			if (addressColumn) {
 				setFullAddressColumn(addressColumn);
-			} else if (cityCol && !stateCol) {
-				// If city exists but no state/province/region, auto-populate city into address dropdown
+			} else if (cityCol && !stateCol && !provinceCol && !countryCol && !countyCol) {
+				// If city exists but no state/province/country/county, auto-populate city into address dropdown
 				setFullAddressColumn(cityCol);
 			} else {
 				setFullAddressColumn('none');
@@ -178,11 +176,15 @@ export function GeocodingSection({
 				setCityColumn('none');
 			}
 
-			// If no state/province/region but there is a country column, use country for state dropdown
+			// Priority: state > province > country > county
 			if (stateCol) {
 				setStateColumn(stateCol);
+			} else if (provinceCol) {
+				setStateColumn(provinceCol);
 			} else if (countryCol) {
 				setStateColumn(countryCol);
+			} else if (countyCol) {
+				setStateColumn(countyCol);
 			} else {
 				setStateColumn('none');
 			}
@@ -655,11 +657,11 @@ export function GeocodingSection({
 		}
 	}, [showConsentModal, handleCacheConsent]);
 
-	// Dynamic label for state/province/country
-	const hasProvince = columns.some((col) => col.toLowerCase().includes('province'));
-	const hasCountry = columns.some((col) => col.toLowerCase().includes('country'));
-	const hasState = columns.some((col) => col.toLowerCase().includes('state'));
-	const hasRegion = columns.some((col) => col.toLowerCase().includes('region'));
+	// Dynamic label for state/province/country/county
+	const hasState = columns.some((col) => col.trim().toLowerCase() === 'state');
+	const hasProvince = columns.some((col) => col.trim().toLowerCase() === 'province');
+	const hasCountry = columns.some((col) => col.trim().toLowerCase() === 'country');
+	const hasCounty = columns.some((col) => col.trim().toLowerCase() === 'county');
 	let stateLabel = 'State column';
 	let statePlaceholder = 'State';
 	let abbrNote = 'Abbreviated state names';
@@ -667,14 +669,14 @@ export function GeocodingSection({
 		stateLabel = 'Province column';
 		statePlaceholder = 'Province';
 		abbrNote = 'Abbreviated province names';
-	} else if (!hasState && !hasProvince && hasRegion) {
-		stateLabel = 'Region column';
-		statePlaceholder = 'Region';
-		abbrNote = 'Abbreviated region names';
-	} else if (!hasState && !hasProvince && !hasRegion && hasCountry) {
+	} else if (!hasState && !hasProvince && hasCountry) {
 		stateLabel = 'Country column';
 		statePlaceholder = 'Country';
 		abbrNote = 'Country names';
+	} else if (!hasState && !hasProvince && !hasCountry && hasCounty) {
+		stateLabel = 'County column';
+		statePlaceholder = 'County';
+		abbrNote = 'County names';
 	}
 
 	return (
