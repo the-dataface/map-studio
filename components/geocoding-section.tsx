@@ -116,6 +116,11 @@ const stateAbbreviations: Record<string, string> = {
 	wyoming: 'WY',
 };
 
+// Helper for randomized delay
+function randomDelay(min: number, max: number) {
+	return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 export function GeocodingSection({
 	columns,
 	parsedData,
@@ -441,6 +446,7 @@ export function GeocodingSection({
 		// Set initial data with processing status
 		setGeocodedData([...geocodedResults]);
 
+		let apiCallCount = 0;
 		for (let i = 0; i < parsedData.length; i++) {
 			const row = parsedData[i];
 			let address = '';
@@ -524,7 +530,14 @@ export function GeocodingSection({
 					setGeocodedData([...geocodedResults]);
 
 					if (!result.fromCache) {
-						await new Promise((resolve) => setTimeout(resolve, 1000));
+						apiCallCount++;
+						let delay = 0;
+						if (apiCallCount <= 10) {
+							delay = randomDelay(200, 400);
+						} else {
+							delay = randomDelay(800, 1500);
+						}
+						await new Promise((resolve) => setTimeout(resolve, delay));
 					}
 				} catch (error) {
 					console.warn(`Failed to geocode: ${address}`, error);
