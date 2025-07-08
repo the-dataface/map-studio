@@ -151,28 +151,37 @@ export function GeocodingSection({
 					col.toLowerCase().includes('location') ||
 					col.toLowerCase().includes('addr')
 			);
-			if (addressColumn && fullAddressColumn === 'none') {
-				setFullAddressColumn(addressColumn);
-			}
 
 			// Match city column
 			const cityCol = columns.find((col) => col.toLowerCase().includes('city') || col.toLowerCase().includes('town'));
-			if (cityCol && cityColumn === 'none') {
-				setCityColumn(cityCol);
-			}
 
-			// Match state column
+			// Match state/province/region column
 			const stateCol = columns.find(
 				(col) =>
 					col.toLowerCase().includes('state') ||
 					col.toLowerCase().includes('province') ||
 					col.toLowerCase().includes('region')
 			);
+
+			// If user hasn't chosen, set auto-matches
+			if (addressColumn && fullAddressColumn === 'none') {
+				setFullAddressColumn(addressColumn);
+			}
+
+			if (cityCol && cityColumn === 'none') {
+				setCityColumn(cityCol);
+			}
+
 			if (stateCol && stateColumn === 'none') {
 				setStateColumn(stateCol);
 			}
+
+			// If city exists but no state/province/region, auto-populate city into address dropdown
+			if (cityCol && !stateCol && fullAddressColumn === 'none') {
+				setFullAddressColumn(cityCol);
+			}
 		}
-	}, [columns, fullAddressColumn, cityColumn, stateColumn]);
+	}, [columns]);
 
 	// Check for existing preferences on component mount
 	useEffect(() => {
@@ -640,6 +649,10 @@ export function GeocodingSection({
 		}
 	}, [showConsentModal, handleCacheConsent]);
 
+	// Dynamic label for state/province
+	const hasProvince = columns.some((col) => col.toLowerCase().includes('province'));
+	const stateLabel = hasProvince ? 'Province column' : 'State column';
+
 	return (
 		<>
 			<Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
@@ -777,11 +790,11 @@ export function GeocodingSection({
 
 								<div>
 									<label className="text-sm font-medium mb-2 block text-gray-900 dark:text-white transition-colors duration-200">
-										State column
+										{stateLabel}
 									</label>
 									<Select value={stateColumn} onValueChange={setStateColumn}>
 										<SelectTrigger className="bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white transition-all duration-200 hover:border-blue-500 focus:border-blue-500">
-											<SelectValue placeholder="State" />
+											<SelectValue placeholder={hasProvince ? 'Province' : 'State'} />
 										</SelectTrigger>
 										<SelectContent className="bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-700">
 											<SelectItem
@@ -802,7 +815,7 @@ export function GeocodingSection({
 									{stateColumn !== 'none' && (
 										<p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1 transition-all duration-200 animate-in fade-in-50 slide-in-from-bottom-1">
 											<span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-											Abbreviated state names
+											Abbreviated {hasProvince ? 'province' : 'state'} names
 										</p>
 									)}
 								</div>
