@@ -144,7 +144,6 @@ export function GeocodingSection({
 	// Intelligent column matching
 	useEffect(() => {
 		if (columns.length > 0) {
-			// Match full address column
 			const addressColumn = columns.find(
 				(col) =>
 					col.toLowerCase().includes('address') ||
@@ -152,10 +151,8 @@ export function GeocodingSection({
 					col.toLowerCase().includes('addr')
 			);
 
-			// Match city column
 			const cityCol = columns.find((col) => col.toLowerCase().includes('city') || col.toLowerCase().includes('town'));
 
-			// Match state/province/region column
 			const stateCol = columns.find(
 				(col) =>
 					col.toLowerCase().includes('state') ||
@@ -163,22 +160,31 @@ export function GeocodingSection({
 					col.toLowerCase().includes('region')
 			);
 
-			// If user hasn't chosen, set auto-matches
-			if (addressColumn && fullAddressColumn === 'none') {
+			const countryCol = columns.find((col) => col.toLowerCase().includes('country'));
+
+			// Always auto-populate dropdowns on new columns
+			if (addressColumn) {
 				setFullAddressColumn(addressColumn);
-			}
-
-			if (cityCol && cityColumn === 'none') {
-				setCityColumn(cityCol);
-			}
-
-			if (stateCol && stateColumn === 'none') {
-				setStateColumn(stateCol);
-			}
-
-			// If city exists but no state/province/region, auto-populate city into address dropdown
-			if (cityCol && !stateCol && fullAddressColumn === 'none') {
+			} else if (cityCol && !stateCol) {
+				// If city exists but no state/province/region, auto-populate city into address dropdown
 				setFullAddressColumn(cityCol);
+			} else {
+				setFullAddressColumn('none');
+			}
+
+			if (cityCol) {
+				setCityColumn(cityCol);
+			} else {
+				setCityColumn('none');
+			}
+
+			// If no state/province/region but there is a country column, use country for state dropdown
+			if (stateCol) {
+				setStateColumn(stateCol);
+			} else if (countryCol) {
+				setStateColumn(countryCol);
+			} else {
+				setStateColumn('none');
 			}
 		}
 	}, [columns]);
@@ -649,9 +655,27 @@ export function GeocodingSection({
 		}
 	}, [showConsentModal, handleCacheConsent]);
 
-	// Dynamic label for state/province
+	// Dynamic label for state/province/country
 	const hasProvince = columns.some((col) => col.toLowerCase().includes('province'));
-	const stateLabel = hasProvince ? 'Province column' : 'State column';
+	const hasCountry = columns.some((col) => col.toLowerCase().includes('country'));
+	const hasState = columns.some((col) => col.toLowerCase().includes('state'));
+	const hasRegion = columns.some((col) => col.toLowerCase().includes('region'));
+	let stateLabel = 'State column';
+	let statePlaceholder = 'State';
+	let abbrNote = 'Abbreviated state names';
+	if (!hasState && hasProvince) {
+		stateLabel = 'Province column';
+		statePlaceholder = 'Province';
+		abbrNote = 'Abbreviated province names';
+	} else if (!hasState && !hasProvince && hasRegion) {
+		stateLabel = 'Region column';
+		statePlaceholder = 'Region';
+		abbrNote = 'Abbreviated region names';
+	} else if (!hasState && !hasProvince && !hasRegion && hasCountry) {
+		stateLabel = 'Country column';
+		statePlaceholder = 'Country';
+		abbrNote = 'Country names';
+	}
 
 	return (
 		<>
@@ -794,7 +818,7 @@ export function GeocodingSection({
 									</label>
 									<Select value={stateColumn} onValueChange={setStateColumn}>
 										<SelectTrigger className="bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white transition-all duration-200 hover:border-blue-500 focus:border-blue-500">
-											<SelectValue placeholder={hasProvince ? 'Province' : 'State'} />
+											<SelectValue placeholder={statePlaceholder} />
 										</SelectTrigger>
 										<SelectContent className="bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-700">
 											<SelectItem
@@ -815,7 +839,7 @@ export function GeocodingSection({
 									{stateColumn !== 'none' && (
 										<p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1 transition-all duration-200 animate-in fade-in-50 slide-in-from-bottom-1">
 											<span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-											Abbreviated {hasProvince ? 'province' : 'state'} names
+											{abbrNote}
 										</p>
 									)}
 								</div>
