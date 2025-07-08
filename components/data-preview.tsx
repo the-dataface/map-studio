@@ -229,46 +229,13 @@ const isNumericColumn = (column: string, data: (DataRow | GeocodedRow)[]): boole
 };
 
 const isStateColumn = (column: string, data: (DataRow | GeocodedRow)[]): boolean => {
-	if (/(state|province)/i.test(column)) return true;
-
-	if (data.length === 0) return false;
-
-	let stateMatchCount = 0;
-	let provinceMatchCount = 0;
-	let sgcMatchCount = 0;
-	const sampleSize = Math.min(data.length, 50);
-
-	for (let i = 0; i < sampleSize; i++) {
-		const value = String(data[i][column] || '').trim();
-		if (value === '') continue;
-
-		// Check for US states
-		if (stateMap[value.toUpperCase()] || Object.values(stateMap).some((s) => s.toLowerCase() === value.toLowerCase())) {
-			stateMatchCount++;
-		}
-
-		// Check for Canadian provinces
-		if (
-			canadaProvinceMap[value.toUpperCase()] ||
-			Object.values(canadaProvinceMap).some((p) => p.toLowerCase() === value.toLowerCase())
-		) {
-			provinceMatchCount++;
-		}
-
-		// Check for SGC codes
-		if (sgcToProvinceMap[value] || /^\d{2}$/.test(value)) {
-			sgcMatchCount++;
-		}
-	}
-
-	// Return true if any type has a high match rate
-	return (
-		stateMatchCount / sampleSize > 0.7 || provinceMatchCount / sampleSize > 0.7 || sgcMatchCount / sampleSize > 0.7
-	);
+	const colName = column.trim().toLowerCase();
+	return colName === 'state' || colName === 'province' || colName === 'county';
 };
 
 const isCountryColumn = (column: string): boolean => {
-	return /country/i.test(column);
+	const colName = column.trim().toLowerCase();
+	return colName === 'country';
 };
 
 const initializeColumnFormats = () => {
@@ -818,6 +785,9 @@ export function DataPreview({
 				return <Hash className="w-3 h-3" />;
 			case 'date':
 				return <Calendar className="w-3 h-3" />;
+			case 'state':
+			case 'country':
+				return <Flag className="w-3 h-3" />;
 			default:
 				return <Type className="w-3 h-3" />;
 		}
@@ -1492,16 +1462,18 @@ export function DataPreview({
 																				</div>
 																			</div>
 																		</SelectItem>
-																		<SelectItem
-																			value="country"
-																			className="text-gray-900 dark:text-gray-100 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
-																			<div className="flex items-center justify-between w-full">
-																				<div className="flex items-center gap-2">
-																					<Flag className="w-3 h-3" />
-																					<span>Country</span>
+																		{subnationalLabel !== 'Country' && (
+																			<SelectItem
+																				value="country"
+																				className="text-gray-900 dark:text-gray-100 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
+																				<div className="flex items-center justify-between w-full">
+																					<div className="flex items-center gap-2">
+																						<Flag className="w-3 h-3" />
+																						<span>Country</span>
+																					</div>
 																				</div>
-																			</div>
-																		</SelectItem>
+																			</SelectItem>
+																		)}
 																	</SelectContent>
 																</Select>
 															</div>

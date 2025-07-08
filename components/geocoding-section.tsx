@@ -116,6 +116,11 @@ const stateAbbreviations: Record<string, string> = {
 	wyoming: 'WY',
 };
 
+// Helper for randomized delay
+function randomDelay(min: number, max: number) {
+	return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 export function GeocodingSection({
 	columns,
 	parsedData,
@@ -144,35 +149,52 @@ export function GeocodingSection({
 	// Intelligent column matching
 	useEffect(() => {
 		if (columns.length > 0) {
-			// Match full address column
 			const addressColumn = columns.find(
 				(col) =>
 					col.toLowerCase().includes('address') ||
 					col.toLowerCase().includes('location') ||
 					col.toLowerCase().includes('addr')
 			);
-			if (addressColumn && fullAddressColumn === 'none') {
-				setFullAddressColumn(addressColumn);
-			}
 
-			// Match city column
 			const cityCol = columns.find((col) => col.toLowerCase().includes('city') || col.toLowerCase().includes('town'));
-			if (cityCol && cityColumn === 'none') {
-				setCityColumn(cityCol);
+
+			// Only match exact names for state/province/country/county
+			const matchSet = (col: string, names: string[]) => names.includes(col.trim().toLowerCase());
+			const stateCol = columns.find((col) => matchSet(col, ['state']));
+			const provinceCol = columns.find((col) => matchSet(col, ['province']));
+			const countryCol = columns.find((col) => matchSet(col, ['country']));
+			const countyCol = columns.find((col) => matchSet(col, ['county']));
+
+			// Always auto-populate dropdowns on new columns
+			if (addressColumn) {
+				setFullAddressColumn(addressColumn);
+			} else if (cityCol && !stateCol && !provinceCol && !countryCol && !countyCol) {
+				// If city exists but no state/province/country/county, auto-populate city into address dropdown
+				setFullAddressColumn(cityCol);
+			} else {
+				setFullAddressColumn('none');
 			}
 
-			// Match state column
-			const stateCol = columns.find(
-				(col) =>
-					col.toLowerCase().includes('state') ||
-					col.toLowerCase().includes('province') ||
-					col.toLowerCase().includes('region')
-			);
-			if (stateCol && stateColumn === 'none') {
+			if (cityCol) {
+				setCityColumn(cityCol);
+			} else {
+				setCityColumn('none');
+			}
+
+			// Priority: state > province > country > county
+			if (stateCol) {
 				setStateColumn(stateCol);
+			} else if (provinceCol) {
+				setStateColumn(provinceCol);
+			} else if (countryCol) {
+				setStateColumn(countryCol);
+			} else if (countyCol) {
+				setStateColumn(countyCol);
+			} else {
+				setStateColumn('none');
 			}
 		}
-	}, [columns, fullAddressColumn, cityColumn, stateColumn]);
+	}, [columns]);
 
 	// Check for existing preferences on component mount
 	useEffect(() => {
@@ -299,37 +321,54 @@ export function GeocodingSection({
 
 	// Function to geocode using cache-first approach
 	const geocodeAddress = async (address: string, city?: string, state?: string) => {
-		// Create cache key for city/state combinations
-		let cacheKey = address.toLowerCase().trim();
-		if (city && state) {
-			cacheKey = createCacheKey(city, state);
-		}
+		// Create both possible cache keys
+		const addressKey = address.toLowerCase().trim();
+		const cityStateKey = city && state ? createCacheKey(city, state) : null;
 
-		// 1. Check session cache first (in-memory for current session)
-		if (sessionCache[cacheKey]) {
+		// 1. Check session cache for both keys
+		if (sessionCache[addressKey]) {
 			return {
-				lat: sessionCache[cacheKey].lat,
-				lng: sessionCache[cacheKey].lng,
+				lat: sessionCache[addressKey].lat,
+				lng: sessionCache[addressKey].lng,
+				fromCache: true,
+				source: 'session',
+			};
+		}
+		if (cityStateKey && sessionCache[cityStateKey]) {
+			return {
+				lat: sessionCache[cityStateKey].lat,
+				lng: sessionCache[cityStateKey].lng,
 				fromCache: true,
 				source: 'session',
 			};
 		}
 
-		// 2. Check persistent cache (localStorage)
-		const cachedLocation = getCachedLocation(cacheKey);
-		if (cachedLocation) {
-			// Also store in session cache for faster access during the current session
-			sessionCache[cacheKey] = { lat: cachedLocation.lat, lng: cachedLocation.lng };
+		// 2. Check persistent cache (localStorage) for both keys
+		const cachedLocationAddress = getCachedLocation(addressKey);
+		if (cachedLocationAddress) {
+			sessionCache[addressKey] = { lat: cachedLocationAddress.lat, lng: cachedLocationAddress.lng };
 			return {
-				lat: cachedLocation.lat,
-				lng: cachedLocation.lng,
+				lat: cachedLocationAddress.lat,
+				lng: cachedLocationAddress.lng,
 				fromCache: true,
 				source: 'persistent',
 			};
 		}
+		if (cityStateKey) {
+			const cachedLocationCityState = getCachedLocation(cityStateKey);
+			if (cachedLocationCityState) {
+				sessionCache[cityStateKey] = { lat: cachedLocationCityState.lat, lng: cachedLocationCityState.lng };
+				return {
+					lat: cachedLocationCityState.lat,
+					lng: cachedLocationCityState.lng,
+					fromCache: true,
+					source: 'persistent',
+				};
+			}
+		}
 
+		// 3. If not in cache, use Nominatim (OpenStreetMap) geocoding service
 		try {
-			// 3. If not in cache, use Nominatim (OpenStreetMap) geocoding service
 			const encodedAddress = encodeURIComponent(address);
 			const response = await fetch(
 				`https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1&addressdetails=1`,
@@ -353,9 +392,9 @@ export function GeocodingSection({
 					lng: Number.parseFloat(result.lon),
 				};
 
-				// Cache the result in both session and persistent storage
-				sessionCache[cacheKey] = coordinates;
-				saveCachedLocation(cacheKey, coordinates.lat, coordinates.lng, 'nominatim');
+				// Cache the result in both session and persistent storage (using addressKey)
+				sessionCache[addressKey] = coordinates;
+				saveCachedLocation(addressKey, coordinates.lat, coordinates.lng, 'nominatim');
 
 				return { ...coordinates, fromCache: false, source: 'api' };
 			}
@@ -407,6 +446,7 @@ export function GeocodingSection({
 		// Set initial data with processing status
 		setGeocodedData([...geocodedResults]);
 
+		let apiCallCount = 0;
 		for (let i = 0; i < parsedData.length; i++) {
 			const row = parsedData[i];
 			let address = '';
@@ -490,7 +530,14 @@ export function GeocodingSection({
 					setGeocodedData([...geocodedResults]);
 
 					if (!result.fromCache) {
-						await new Promise((resolve) => setTimeout(resolve, 1000));
+						apiCallCount++;
+						let delay = 0;
+						if (apiCallCount <= 10) {
+							delay = randomDelay(200, 400);
+						} else {
+							delay = randomDelay(800, 1500);
+						}
+						await new Promise((resolve) => setTimeout(resolve, delay));
 					}
 				} catch (error) {
 					console.warn(`Failed to geocode: ${address}`, error);
@@ -640,6 +687,28 @@ export function GeocodingSection({
 		}
 	}, [showConsentModal, handleCacheConsent]);
 
+	// Dynamic label for state/province/country/county
+	const hasState = columns.some((col) => col.trim().toLowerCase() === 'state');
+	const hasProvince = columns.some((col) => col.trim().toLowerCase() === 'province');
+	const hasCountry = columns.some((col) => col.trim().toLowerCase() === 'country');
+	const hasCounty = columns.some((col) => col.trim().toLowerCase() === 'county');
+	let stateLabel = 'State column';
+	let statePlaceholder = 'State';
+	let abbrNote = 'Abbreviated state names';
+	if (!hasState && hasProvince) {
+		stateLabel = 'Province column';
+		statePlaceholder = 'Province';
+		abbrNote = 'Abbreviated province names';
+	} else if (!hasState && !hasProvince && hasCountry) {
+		stateLabel = 'Country column';
+		statePlaceholder = 'Country';
+		abbrNote = 'Country names';
+	} else if (!hasState && !hasProvince && !hasCountry && hasCounty) {
+		stateLabel = 'County column';
+		statePlaceholder = 'County';
+		abbrNote = 'County names';
+	}
+
 	return (
 		<>
 			<Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
@@ -777,11 +846,11 @@ export function GeocodingSection({
 
 								<div>
 									<label className="text-sm font-medium mb-2 block text-gray-900 dark:text-white transition-colors duration-200">
-										State column
+										{stateLabel}
 									</label>
 									<Select value={stateColumn} onValueChange={setStateColumn}>
 										<SelectTrigger className="bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white transition-all duration-200 hover:border-blue-500 focus:border-blue-500">
-											<SelectValue placeholder="State" />
+											<SelectValue placeholder={statePlaceholder} />
 										</SelectTrigger>
 										<SelectContent className="bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-700">
 											<SelectItem
@@ -802,7 +871,7 @@ export function GeocodingSection({
 									{stateColumn !== 'none' && (
 										<p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1 transition-all duration-200 animate-in fade-in-50 slide-in-from-bottom-1">
 											<span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-											Abbreviated state names
+											{abbrNote}
 										</p>
 									)}
 								</div>
