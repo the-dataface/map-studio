@@ -217,6 +217,7 @@ interface StudioState {
   stylingSettings: StylingSettings
   setStylingSettings: (value: Updater<StylingSettings>) => void
   resetDataStates: () => void
+  resetAll: () => void
 }
 
 export const useStudioStore = create<StudioState>((set) => ({
@@ -285,6 +286,33 @@ export const useStudioStore = create<StudioState>((set) => ({
       choroplethData: createEmptyDataState(),
       customData: createEmptyDataState(),
     }),
+
+  resetAll: () => {
+    // Keep saved styles from localStorage but reset active styling
+    const currentStyling = loadStylingSettings()
+    const defaultStyling = createDefaultStylingSettings()
+    
+    set({
+      symbolData: createEmptyDataState(),
+      choroplethData: createEmptyDataState(),
+      customData: createEmptyDataState(),
+      isGeocoding: false,
+      activeMapType: 'symbol',
+      selectedGeography: 'usa-states',
+      selectedProjection: 'albersUsa',
+      clipToCountry: false,
+      columnTypes: {},
+      columnFormats: {},
+      dimensionSettings: createDefaultDimensionSettings(),
+      stylingSettings: {
+        ...defaultStyling,
+        base: {
+          ...defaultStyling.base,
+          savedStyles: currentStyling.base.savedStyles, // Keep user's saved style presets
+        },
+      },
+    })
+  },
 }))
 
 export const emptyDataState = createEmptyDataState

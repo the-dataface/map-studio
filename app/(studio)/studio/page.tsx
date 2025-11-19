@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { DataInput } from '@/components/data-input';
 import { GeocodingSection } from '@/components/geocoding-section';
 import { DataPreview } from '@/components/data-preview';
@@ -10,6 +11,9 @@ import { MapPreview } from '@/components/map-preview';
 import { MapStyling } from '@/components/map-styling';
 import { MapProjectionSelection } from '@/components/map-projection-selection';
 import { FloatingActionButtons } from '@/components/floating-action-buttons';
+import { Button } from '@/components/ui/button';
+import { Save, Download } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 import React from 'react';
 import type {
 	ColumnFormat,
@@ -22,7 +26,7 @@ import type {
 	MapType,
 	ProjectionType,
 	StylingSettings,
-} from './types';
+} from '../types';
 import { emptyDataState, useStudioStore } from '@/state/studio-store';
 import { inferGeographyAndProjection } from '@/modules/data-ingest/inference';
 import { resolveActiveMapType } from '@/modules/data-ingest/map-type';
@@ -31,8 +35,14 @@ import {
 	mergeInferredTypes,
 	resetDimensionForMapType,
 } from '@/modules/data-ingest/dimension-schema';
+import { saveProject, getProject, exportProject, generatePreviewThumbnail, type SavedProject } from '@/lib/projects';
 
 export default function MapStudio() {
+	const router = useRouter();
+	const searchParams = useSearchParams();
+	const { toast } = useToast();
+	const projectId = searchParams.get('project');
+
 	const {
 		symbolData,
 		setSymbolData,
@@ -58,7 +68,9 @@ export default function MapStudio() {
 		setDimensionSettings,
 		stylingSettings,
 		setStylingSettings,
-		} = useStudioStore();
+		resetDataStates,
+		resetAll,
+	} = useStudioStore();
 
 	const [dataInputExpanded, setDataInputExpanded] = useState(true);
 	const [showGeocoding, setShowGeocoding] = useState(false);
@@ -69,6 +81,451 @@ export default function MapStudio() {
 	const [mapStylingExpanded, setMapStylingExpanded] = useState(true);
 	const [mapPreviewExpanded, setMapPreviewExpanded] = useState(true);
 	const [mapInView, setMapInView] = useState(false);
+	const [currentProjectId, setCurrentProjectId] = useState<string | null>(projectId);
+	const [projectName, setProjectName] = useState<string>('Untitled Project');
+	const [isSaving, setIsSaving] = useState(false);
+	const [isExporting, setIsExporting] = useState(false);
+	const svgRef = useRef<SVGSVGElement>(null);
+
+	// Reset to fresh state when no project ID is provided (new map)
+	useEffect(() => {
+		if (!projectId) {
+			resetAll();
+			setCurrentProjectId(null);
+			setProjectName('Untitled Project');
+			setDataInputExpanded(true);
+			setShowGeocoding(false);
+		}
+	}, [projectId, resetAll]);
+
+	// Load project on mount if projectId is provided
+	useEffect(() => {
+		if (projectId) {
+			try {
+				const project = getProject(projectId);
+				if (project) {
+					loadProject(project);
+					setCurrentProjectId(project.id);
+					setProjectName(project.name);
+				} else {
+					toast({
+						title: 'Project not found',
+						description: 'The requested project could not be found. It may have been deleted.',
+						variant: 'destructive',
+					});
+					// Redirect to studio without project ID
+					router.replace('/studio');
+				}
+			} catch (error) {
+				console.error('Failed to load project:', error);
+				toast({
+					title: 'Failed to load project',
+					description: error instanceof Error ? error.message : 'An error occurred while loading the project.',
+					variant: 'destructive',
+				});
+				router.replace('/studio');
+			}
+		}
+	}, [projectId, toast, router]);
+
+	// Generate thumbnail for projects that don't have one after map renders
+	useEffect(() => {
+		if (!currentProjectId || !hasAnyData()) {
+			console.log('⏭️ Skipping thumbnail generation:', { currentProjectId, hasData: hasAnyData() });
+			return;
+		}
+
+		const project = getProject(currentProjectId);
+		if (!project) {
+			console.log('⏭️ Project not found:', currentProjectId);
+			return;
+		}
+
+		if (project.preview) {
+			console.log('✅ Project already has thumbnail:', project.name);
+			return; // Skip if project has thumbnail
+		}
+
+		console.log('🔄 Starting thumbnail generation for project:', project.name);
+
+		// Ensure map preview is expanded so SVG renders
+		if (!mapPreviewExpanded) {
+			console.log('📂 Expanding map preview for thumbnail generation');
+			setMapPreviewExpanded(true);
+		}
+
+		// Function to check if SVG is ready and generate thumbnail
+		const tryGenerateThumbnail = () => {
+			if (!svgRef.current) {
+				return false;
+			}
+
+			const svg = svgRef.current;
+
+			// Check if SVG has a viewBox (indicates it's been configured)
+			if (!svg.getAttribute('viewBox')) {
+				return false;
+			}
+
+			// Check if SVG has content (children elements)
+			if (svg.children.length === 0) {
+				return false;
+			}
+
+			// Check if map has actually rendered - look for specific map elements
+			// For custom maps, look for #Map group
+			// For regular maps, look for #Nations, #States, or path elements with fill
+			const hasMapContent =
+				svg.querySelector('#Map') ||
+				svg.querySelector('#Nations') ||
+				svg.querySelector('#States') ||
+				svg.querySelector('#Countries') ||
+				svg.querySelector('path[fill]') ||
+				svg.querySelector('circle[fill]') ||
+				svg.querySelector('g[fill]') ||
+				svg.querySelector('g path');
+
+			if (!hasMapContent) {
+				return false;
+			}
+
+			// Additional validation: check if there are actually visible elements
+			// (some might be hidden or empty)
+			const visiblePaths = svg.querySelectorAll('path[fill]:not([fill="none"]), circle[fill]:not([fill="none"])');
+			if (visiblePaths.length === 0 && !svg.querySelector('#Map')) {
+				return false;
+			}
+
+			// Generate thumbnail (async)
+			const thumbnailResult = generatePreviewThumbnail(svgRef.current);
+			if (!thumbnailResult) {
+				return false;
+			}
+
+			// Handle Promise if returned
+			if (thumbnailResult instanceof Promise) {
+				thumbnailResult
+					.then((preview) => {
+						if (preview) {
+							try {
+								const updatedProject = { ...project, preview };
+								saveProject(updatedProject);
+								console.log('✅ Thumbnail generated and saved for project:', project.name);
+							} catch (error) {
+								console.warn('Failed to save thumbnail:', error);
+							}
+						}
+					})
+					.catch((error) => {
+						console.warn('Failed to generate thumbnail:', error);
+					});
+				// Return true to indicate we started the async process
+				return true;
+			} else {
+				// Synchronous result
+				if (thumbnailResult) {
+					try {
+						const updatedProject = { ...project, preview: thumbnailResult };
+						saveProject(updatedProject);
+						console.log('✅ Thumbnail generated and saved for project:', project.name);
+						return true;
+					} catch (error) {
+						console.warn('Failed to save thumbnail:', error);
+					}
+				}
+				return false;
+			}
+		};
+
+		// Try with increasing delays to account for async data loading
+		let intervalId: NodeJS.Timeout | null = null;
+		let timeoutId: NodeJS.Timeout | null = null;
+
+		// Start trying after map preview expansion and geo data loading delay
+		// For custom maps, we don't need geo data, so we can try sooner
+		const isCustomMap = customData.customMapData.length > 0;
+		const initialDelay = isCustomMap ? 1500 : 2000; // Custom maps render faster
+
+		timeoutId = setTimeout(() => {
+			if (tryGenerateThumbnail()) {
+				return;
+			}
+
+			// If not ready, try with intervals
+			let attempts = 0;
+			const maxAttempts = 20; // Try for up to 10 seconds
+			const attemptInterval = 500; // 500ms between attempts
+
+			intervalId = setInterval(() => {
+				attempts++;
+				const success = tryGenerateThumbnail();
+				if (success || attempts >= maxAttempts) {
+					if (intervalId) {
+						clearInterval(intervalId);
+						intervalId = null;
+					}
+					if (attempts >= maxAttempts && !success) {
+						console.warn('⚠️ Failed to generate thumbnail after max attempts for project:', project.name, {
+							svgExists: !!svgRef.current,
+							svgChildren: svgRef.current?.children.length || 0,
+							hasViewBox: !!svgRef.current?.getAttribute('viewBox'),
+						});
+					}
+				}
+			}, attemptInterval);
+		}, initialDelay);
+
+		return () => {
+			if (timeoutId) {
+				clearTimeout(timeoutId);
+			}
+			if (intervalId) {
+				clearInterval(intervalId);
+			}
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [
+		currentProjectId,
+		symbolData.parsedData.length,
+		choroplethData.parsedData.length,
+		customData.customMapData.length,
+		selectedGeography,
+		mapPreviewExpanded,
+	]);
+
+	// Load project data into store
+	const loadProject = useCallback(
+		(project: SavedProject) => {
+			setSymbolData(project.symbolData);
+			setChoroplethData(project.choroplethData);
+			setCustomData(project.customData);
+			setActiveMapType(project.activeMapType);
+			setSelectedGeography(project.selectedGeography);
+			setSelectedProjection(project.selectedProjection);
+			setClipToCountry(project.clipToCountry);
+			setColumnTypes(project.columnTypes as ColumnType);
+			setColumnFormats(project.columnFormats);
+			setDimensionSettings(project.dimensionSettings);
+			setStylingSettings(project.stylingSettings);
+			setShowGeocoding(project.symbolData.parsedData.length > 0);
+			setDataInputExpanded(false);
+		},
+		[
+			setSymbolData,
+			setChoroplethData,
+			setCustomData,
+			setActiveMapType,
+			setSelectedGeography,
+			setSelectedProjection,
+			setClipToCountry,
+			setColumnTypes,
+			setColumnFormats,
+			setDimensionSettings,
+			setStylingSettings,
+		]
+	);
+
+	// Check if any data exists at all
+	const hasAnyData = () => {
+		return hasDataForType('symbol') || hasDataForType('choropleth') || hasDataForType('custom');
+	};
+
+	// Save project
+	const handleSaveProject = useCallback(async () => {
+		if (!hasAnyData()) {
+			toast({
+				title: 'No data to save',
+				description: 'Please add some data before saving.',
+				variant: 'destructive',
+			});
+			return;
+		}
+
+		if (!projectName.trim()) {
+			toast({
+				title: 'Invalid project name',
+				description: 'Please enter a project name.',
+				variant: 'destructive',
+			});
+			return;
+		}
+
+		setIsSaving(true);
+
+		try {
+			// Add small delay to show loading state
+			await new Promise((resolve) => setTimeout(resolve, 100));
+
+			// Ensure map preview is expanded for thumbnail generation
+			if (!mapPreviewExpanded) {
+				setMapPreviewExpanded(true);
+				// Wait a bit for map to render
+				await new Promise((resolve) => setTimeout(resolve, 500));
+			}
+
+			// Generate preview thumbnail
+			let preview: string | undefined = undefined;
+			const thumbnailResult = generatePreviewThumbnail(svgRef.current);
+			if (thumbnailResult instanceof Promise) {
+				preview = await thumbnailResult;
+			} else {
+				preview = thumbnailResult;
+			}
+
+			const project: Omit<SavedProject, 'id' | 'createdAt' | 'updatedAt'> = {
+				name: projectName.trim(),
+				symbolData,
+				choroplethData,
+				customData,
+				activeMapType,
+				selectedGeography,
+				selectedProjection,
+				clipToCountry,
+				columnTypes,
+				columnFormats,
+				dimensionSettings,
+				stylingSettings,
+				preview,
+			};
+
+			const saved = saveProject(project);
+			setCurrentProjectId(saved.id);
+			setProjectName(saved.name);
+
+			// Check if thumbnail was saved
+			const hadThumbnail = !!preview;
+			const hasThumbnail = !!saved.preview;
+
+			if (hadThumbnail && !hasThumbnail) {
+				toast({
+					icon: <Save className="h-4 w-4" />,
+					description: `Project "${saved.name}" saved successfully. Note: Preview thumbnail was not saved due to storage limits.`,
+					duration: 5000,
+				});
+			} else {
+				toast({
+					icon: <Save className="h-4 w-4" />,
+					description: `Project "${saved.name}" saved successfully.`,
+				});
+			}
+		} catch (error) {
+			console.error('Failed to save project:', error);
+			let errorMessage = 'Failed to save project. Please try again.';
+
+			if (error instanceof Error) {
+				if (error.message.includes('QuotaExceededError') || error.message.includes('quota')) {
+					errorMessage =
+						'Storage quota exceeded. Please delete some projects or clear your browser storage. You can also export projects to save them as files.';
+				} else {
+					errorMessage = error.message;
+				}
+			}
+
+			toast({
+				title: 'Save failed',
+				description: errorMessage,
+				variant: 'destructive',
+				duration: 6000,
+			});
+		} finally {
+			setIsSaving(false);
+		}
+	}, [
+		hasAnyData,
+		projectName,
+		symbolData,
+		choroplethData,
+		customData,
+		activeMapType,
+		selectedGeography,
+		selectedProjection,
+		clipToCountry,
+		columnTypes,
+		columnFormats,
+		dimensionSettings,
+		stylingSettings,
+		toast,
+	]);
+
+	// Export project
+	const handleExportProject = useCallback(async () => {
+		if (!hasAnyData()) {
+			toast({
+				title: 'No data to export',
+				description: 'Please add some data before exporting.',
+				variant: 'destructive',
+			});
+			return;
+		}
+
+		setIsExporting(true);
+
+		try {
+			// Add small delay to show loading state
+			await new Promise((resolve) => setTimeout(resolve, 100));
+
+			// Generate preview thumbnail if not already saved
+			let preview: string | undefined = undefined;
+			const thumbnailResult = generatePreviewThumbnail(svgRef.current);
+			if (thumbnailResult instanceof Promise) {
+				preview = await thumbnailResult;
+			} else {
+				preview = thumbnailResult;
+			}
+
+			const project: SavedProject = {
+				id: currentProjectId || `temp_${Date.now()}`,
+				name: projectName.trim() || 'Untitled Project',
+				createdAt: Date.now(),
+				updatedAt: Date.now(),
+				symbolData,
+				choroplethData,
+				customData,
+				activeMapType,
+				selectedGeography,
+				selectedProjection,
+				clipToCountry,
+				columnTypes,
+				columnFormats,
+				dimensionSettings,
+				stylingSettings,
+				preview,
+			};
+
+			exportProject(project);
+
+			toast({
+				icon: <Download className="h-4 w-4" />,
+				description: `Project "${project.name}" exported successfully.`,
+			});
+		} catch (error) {
+			console.error('Failed to export project:', error);
+			const errorMessage = error instanceof Error ? error.message : 'Failed to export project. Please try again.';
+			toast({
+				title: 'Export failed',
+				description: errorMessage,
+				variant: 'destructive',
+			});
+		} finally {
+			setIsExporting(false);
+		}
+	}, [
+		hasAnyData,
+		currentProjectId,
+		projectName,
+		symbolData,
+		choroplethData,
+		customData,
+		activeMapType,
+		selectedGeography,
+		selectedProjection,
+		clipToCountry,
+		columnTypes,
+		columnFormats,
+		dimensionSettings,
+		stylingSettings,
+		toast,
+	]);
 
 	// Map Projection and Geography states
 	// Helpers to keep component API aligned with legacy props
@@ -128,11 +585,6 @@ export default function MapStudio() {
 		}
 	};
 
-	// Check if any data exists at all
-	const hasAnyData = () => {
-		return hasDataForType('symbol') || hasDataForType('choropleth') || hasDataForType('custom');
-	};
-
 	const onlyCustomDataLoaded = hasDataForType('custom') && !hasDataForType('symbol') && !hasDataForType('choropleth');
 
 	const handleDataLoad = (
@@ -151,17 +603,17 @@ export default function MapStudio() {
 		};
 
 		const nextMapType = resolveActiveMapType({
-		loadedType: mapType as MapType,
-		parsedDataLength: parsedData.length,
-		customMapData: customMapDataParam,
-		existingChoroplethData: choroplethData,
-		existingCustomData: customData,
-	});
+			loadedType: mapType as MapType,
+			parsedDataLength: parsedData.length,
+			customMapData: customMapDataParam,
+			existingChoroplethData: choroplethData,
+			existingCustomData: customData,
+		});
 
 		switch (mapType) {
 			case 'symbol':
 				setSymbolData(newDataState);
-			setShowGeocoding(parsedData.length > 0);
+				setShowGeocoding(parsedData.length > 0);
 				break;
 			case 'choropleth':
 				setChoroplethData(newDataState);
@@ -172,26 +624,26 @@ export default function MapStudio() {
 		}
 
 		if (parsedData.length > 0) {
-		const inferredTypes = inferColumnTypesFromData(parsedData);
-		setColumnTypes((prev) => mergeInferredTypes(prev, inferredTypes));
-	}
-
-	setActiveMapType(nextMapType);
-	setDataInputExpanded(false);
-	setDimensionSettings((prev) => resetDimensionForMapType(prev, nextMapType));
-
-	const { geography, projection } = inferGeographyAndProjection({
-		columns,
-		sampleRows: parsedData,
-	});
-
-	if (geography !== selectedGeography) {
-		updateSelectedGeography(geography);
+			const inferredTypes = inferColumnTypesFromData(parsedData);
+			setColumnTypes((prev) => mergeInferredTypes(prev, inferredTypes));
 		}
 
-	if (projection !== selectedProjection) {
-		setSelectedProjection(projection);
-	}
+		setActiveMapType(nextMapType);
+		setDataInputExpanded(false);
+		setDimensionSettings((prev) => resetDimensionForMapType(prev, nextMapType));
+
+		const { geography, projection } = inferGeographyAndProjection({
+			columns,
+			sampleRows: parsedData,
+		});
+
+		if (geography !== selectedGeography) {
+			updateSelectedGeography(geography);
+		}
+
+		if (projection !== selectedProjection) {
+			setSelectedProjection(projection);
+		}
 	};
 
 	const handleClearData = (mapType: MapType) => {
@@ -413,6 +865,30 @@ export default function MapStudio() {
 	return (
 		<>
 			<section className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+				{hasAnyData() && (
+					<div className="flex items-center justify-between mb-4">
+						<div className="flex items-center gap-2">
+							<input
+								type="text"
+								value={projectName}
+								onChange={(e) => setProjectName(e.target.value)}
+								className="text-lg font-semibold bg-transparent border-none outline-none focus:ring-2 focus:ring-primary rounded px-2 py-1"
+								placeholder="Project name"
+							/>
+						</div>
+						<div className="flex items-center gap-2">
+							<Button onClick={handleExportProject} variant="outline" size="sm" disabled={isExporting || isSaving}>
+								<Download className="h-4 w-4 mr-2" />
+								{isExporting ? 'Exporting...' : 'Export'}
+							</Button>
+							<Button onClick={handleSaveProject} variant="default" size="sm" disabled={isSaving || isExporting}>
+								<Save className="h-4 w-4 mr-2" />
+								{isSaving ? 'Saving...' : 'Save Project'}
+							</Button>
+						</div>
+					</div>
+				)}
+
 				<DataInput
 					onDataLoad={handleDataLoad}
 					isExpanded={dataInputExpanded}
@@ -522,6 +998,7 @@ export default function MapStudio() {
 								clipToCountry={clipToCountry}
 								isExpanded={mapPreviewExpanded}
 								setIsExpanded={setMapPreviewExpanded}
+								svgRef={svgRef}
 							/>
 						</div>
 					</>

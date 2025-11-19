@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import React, { useEffect, useRef } from 'react'
 import * as d3 from 'd3'
 
 import type {
@@ -57,6 +57,7 @@ export interface MapPreviewProps {
   clipToCountry: boolean
   isExpanded: boolean
   setIsExpanded: (expanded: boolean) => void
+  svgRef?: React.RefObject<SVGSVGElement>
 }
 
 const MAP_WIDTH = 975
@@ -78,8 +79,10 @@ export function MapPreview({
   clipToCountry,
 	isExpanded,
 	setIsExpanded,
+	svgRef: externalSvgRef,
 }: MapPreviewProps) {
-  const svgRef = useRef<SVGSVGElement>(null)
+  const internalSvgRef = useRef<SVGSVGElement>(null)
+  const svgRef = externalSvgRef || internalSvgRef
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
   const { geoAtlasData, isLoading } = useGeoAtlasData({
