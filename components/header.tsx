@@ -16,7 +16,7 @@ export function Header() {
               A mapping tool built for designers. Import and geocode data, map values to symbols or choropleths, and
               export directly to Figma.
             </p>
-            <p className="text-xs text-muted-foreground/80 mt-1 transition-colors duration-200">
+            <p className="text-xs text-muted-foreground mt-1 transition-colors duration-200">
               Brought to you by The DataFace.
             </p>
           </div>

@@ -118,6 +118,7 @@ async function fetchTopoJSON(urls: string[], expectedObjects: string[]): Promise
 
 // Mark route as dynamic
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
 export async function GET(request: NextRequest) {
   const startTime = Date.now()

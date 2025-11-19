@@ -37,6 +37,9 @@ import {
 } from '@/modules/data-ingest/dimension-schema';
 import { saveProject, getProject, exportProject, generatePreviewThumbnail, type SavedProject } from '@/lib/projects';
 
+// Mark page as dynamic to prevent static generation
+export const dynamic = 'force-dynamic';
+
 function MapStudioContent() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
