@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, react-hooks/exhaustive-deps, prefer-const */
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -6,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { ChevronDown, ChevronUp, MapPin, BarChart3, MapIcon, HelpCircle, CheckCircle, AlertCircle } from 'lucide-react';
-import type { DataRow } from '@/app/page';
+import type { DataRow } from '@/app/(studio)/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/use-toast'; // Import toast
 import {
@@ -18,6 +19,9 @@ import {
 	DialogTrigger,
 } from '@/components/ui/dialog';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { parseDelimitedText } from '@/modules/data-ingest/csv';
+import { CHOROPLETH_SAMPLE_DATA, SYMBOL_SAMPLE_DATA } from '@/modules/data-ingest/sample-data';
+import { ensurePathsClosedAndFormatSVG, validateCustomSVG } from '@/modules/data-ingest/svg';
 
 interface DataInputProps {
 	onDataLoad: (
@@ -43,270 +47,20 @@ export function DataInput({ onDataLoad, isExpanded, setIsExpanded, onClearData }
 	const [symbolPopoverOpen, setSymbolPopoverOpen] = useState(false);
 	const [choroplethPopoverOpen, setChoroplethPopoverOpen] = useState(false);
 
-	const ensurePathsClosedAndFormatSVG = (svgString: string): { formattedSvg: string; closedPathCount: number } => {
-		let closedCount = 0;
-		try {
-			const parser = new DOMParser();
-			const doc = parser.parseFromString(svgString, 'image/svg+xml');
-			const paths = doc.querySelectorAll('path');
-
-			paths.forEach((path) => {
-				const d = path.getAttribute('d');
-				if (d && !d.trim().endsWith('Z') && !d.trim().endsWith('z')) {
-					path.setAttribute('d', d.trim() + 'Z');
-					closedCount++;
-				}
-			});
-
-			const serializer = new XMLSerializer();
-			const modifiedSvgString = serializer.serializeToString(doc);
-
-			// Apply the existing formatting logic
-			let formatted = modifiedSvgString.trim().replace(/\s+/g, ' ');
-			formatted = formatted
-				.replace(/(<[^/][^>]*>)(?!<)/g, '$1\n')
-				.replace(/(<\/[^>]+>)/g, '\n$1\n')
-				.replace(/(<[^>]*\/>)/g, '$1\n')
-				.replace(/\n\s*\n/g, '\n')
-				.split('\n')
-				.map((line, index) => {
-					const trimmed = line.trim();
-					if (!trimmed) return '';
-
-					const openTags = (
-						modifiedSvgString.substring(0, modifiedSvgString.indexOf(trimmed)).match(/<[^/][^>]*>/g) || []
-					).length;
-					const closeTags = (
-						modifiedSvgString.substring(0, modifiedSvgString.indexOf(trimmed)).match(/<\/[^>]+>/g) || []
-					).length;
-					const selfClosing = (
-						modifiedSvgString.substring(0, modifiedSvgString.indexOf(trimmed)).match(/<[^>]*\/>/g) || []
-					).length;
-
-					let indent = Math.max(0, openTags - closeTags - selfClosing);
-
-					if (trimmed.startsWith('</')) {
-						indent = Math.max(0, indent - 1);
-					}
-
-					return '  '.repeat(indent) + trimmed;
-				})
-				.filter((line) => line.trim())
-				.join('\n');
-
-			return { formattedSvg: formatted, closedPathCount: closedCount };
-		} catch (e) {
-			console.error('Error in ensurePathsClosedAndFormatSVG:', e);
-			return {
-				formattedSvg: svgString
-					.replace(/></g, '>\n<')
-					.replace(/^\s+|\s+$/gm, '')
-					.split('\n')
-					.map((line) => line.trim())
-					.filter((line) => line)
-					.join('\n'),
-				closedPathCount: 0,
-			};
-		}
-	};
-
-	const parseCSVData = (csvText: string): { data: DataRow[]; columns: string[] } => {
-		if (!csvText.trim()) return { data: [], columns: [] };
-
-		const lines = csvText.trim().split('\n');
-		// Detect delimiter: if header contains tab, use tab; else use comma
-		const delimiter = lines[0].includes('\t') ? '\t' : ',';
-
-		// Helper for CSV: split line by comma, respecting quoted fields
-		function splitCSV(line: string): string[] {
-			const result: string[] = [];
-			let current = '';
-			let inQuotes = false;
-			for (let i = 0; i < line.length; i++) {
-				const char = line[i];
-				if (char === '"') {
-					if (inQuotes && line[i + 1] === '"') {
-						current += '"';
-						i++; // Escaped quote
-					} else {
-						inQuotes = !inQuotes;
-					}
-				} else if (char === ',' && !inQuotes) {
-					result.push(current);
-					current = '';
-				} else {
-					current += char;
-				}
-			}
-			result.push(current);
-			return result;
-		}
-
-		// Split headers
-		const headers =
-			delimiter === '\t'
-				? lines[0].split('\t').map((h) => h.trim().replace(/"/g, ''))
-				: splitCSV(lines[0]).map((h) => h.trim().replace(/"/g, ''));
-
-		// Split data lines
-		const data = lines.slice(1).map((line) => {
-			const values =
-				delimiter === '\t'
-					? line.split('\t').map((v) => v.trim().replace(/"/g, ''))
-					: splitCSV(line).map((v) => v.trim().replace(/"/g, ''));
-			const row: DataRow = {};
-			headers.forEach((header, index) => {
-				row[header] = values[index] || '';
-			});
-			return row;
-		});
-
-		return { data, columns: headers };
-	};
-
 	const loadSampleData = () => {
-		const sampleData = `Company,City,State,Employees,Revenue
-Tech Corp,San Francisco,CA,1200,45M
-Data Inc,New York,NY,800,32M
-Cloud Co,Seattle,WA,1500,67M
-AI Systems,Austin,TX,600,28M
-Web Solutions,Boston,MA,900,41M`;
-
 		if (activeTab === 'symbol') {
-			setSymbolRawData(sampleData);
+			setSymbolRawData(SYMBOL_SAMPLE_DATA);
 		}
 	};
 
 	const loadChoroplethSampleData = () => {
-		const sampleData = `State,Population_Density,Median_Income,Education_Rate,Region
-AL,97.9,52078,85.3,South
-AK,1.3,77640,92.1,West
-AZ,64.9,62055,87.5,West
-AR,58.4,48952,84.8,South
-CA,253.9,80440,83.6,West
-CO,56.4,77127,91.7,West
-CT,735.8,78444,90.8,Northeast
-DE,504.3,70176,90.1,South
-FL,397.2,59227,88.5,South
-GA,186.6,61980,86.7,South
-HI,219.9,83102,91.3,West
-ID,22.3,60999,90.2,West
-IL,230.8,65886,88.5,Midwest
-IN,188.1,57603,88.1,Midwest
-IA,56.9,61691,91.7,Midwest
-KS,35.9,62087,90.2,Midwest
-KY,113.0,50589,85.1,South
-LA,107.5,51073,84.0,South
-ME,43.6,58924,91.8,Northeast
-MD,626.6,86738,90.2,South
-MA,894.4,85843,91.2,Northeast
-MI,177.6,59584,90.1,Midwest
-MN,71.5,74593,93.0,Midwest
-MS,63.7,45792,83.4,South
-MO,89.5,57409,89.0,Midwest
-MT,7.4,57153,93.1,West
-NE,25.4,63229,91.4,Midwest
-NV,28.5,63276,86.1,West
-NH,153.8,77933,92.8,Northeast
-NJ,1263.0,85751,90.1,Northeast
-NM,17.5,51945,85.7,West
-NY,421.0,71117,86.7,Northeast
-NC,218.5,56642,87.7,South
-ND,11.0,63837,92.9,Midwest
-OH,287.5,58642,89.5,Midwest
-OK,57.7,54449,87.2,South
-OR,44.0,67058,91.1,West
-PA,290.5,63463,90.6,Northeast
-RI,1061.4,71169,85.7,Northeast
-SC,173.3,56227,87.3,South
-SD,11.9,59533,92.0,Midwest
-TN,167.2,56071,86.6,South
-TX,112.8,64034,84.7,South
-UT,39.9,75780,92.3,West
-VT,68.1,63001,92.6,Northeast
-VA,218.4,76456,88.9,South
-WA,117.4,78687,91.8,West
-WV,74.6,48850,86.0,South
-WI,108.0,64168,91.7,Midwest
-WY,6.0,65003,93.3,West`;
-
-		setChoroplethRawData(sampleData);
+		setChoroplethRawData(CHOROPLETH_SAMPLE_DATA);
 	};
 
 	// Add a validation function
-	const validateCustomSVG = (svgString: string): { isValid: boolean; message: string } => {
-		if (!svgString.trim()) {
-			return { isValid: false, message: 'SVG code cannot be empty.' };
-		}
-		try {
-			const parser = new DOMParser();
-			const doc = parser.parseFromString(svgString, 'image/svg+xml');
-
-			// Check for parsing errors
-			const errorNode = doc.querySelector('parsererror');
-			if (errorNode) {
-				return { isValid: false, message: `Invalid SVG format: ${errorNode.textContent}` };
-			}
-
-			const svgElement = doc.documentElement;
-			if (svgElement.tagName.toLowerCase() !== 'svg') {
-				return { isValid: false, message: 'Root element must be <svg>.' };
-			}
-
-			// Check for g#Map
-			const mapGroup = svgElement.querySelector('g#Map');
-			if (!mapGroup) {
-				return { isValid: false, message: "Missing required <g id='Map'> group." };
-			}
-
-			// Check for g#Nations or g#Countries
-			const nationsGroup = mapGroup.querySelector('g#Nations, g#Countries');
-			if (!nationsGroup) {
-				return {
-					isValid: false,
-					message: "Missing required <g id='Nations'> or <g id='Countries'> group inside #Map.",
-				};
-			}
-
-			// Check for g#States, g#Provinces, or g#Regions
-			const statesGroup = mapGroup.querySelector('g#States, g#Provinces, g#Regions');
-			if (!statesGroup) {
-				return {
-					isValid: false,
-					message: "Missing required <g id='States'>, <g id='Provinces'>, or <g id='Regions'> group inside #Map.",
-				};
-			}
-
-			// Check for Country-US or Nation-US path in Nations/Countries group
-			const countryUSPath = nationsGroup.querySelector('path#Country-US, path#Nation-US');
-			if (!countryUSPath) {
-				return {
-					isValid: false,
-					message: "Missing required <path id='Country-US'> or <path id='Nation-US'> inside Nations/Countries group.",
-				};
-			}
-
-			// Check for State-XX, Nation-XX, Country-XX, Province-XX, or Region-XX paths in States/Provinces/Regions group (at least one)
-			const statePaths = statesGroup.querySelectorAll(
-				"path[id^='State-'], path[id^='Nation-'], path[id^='Country-'], path[id^='Province-'], path[id^='Region-']"
-			);
-			if (statePaths.length === 0) {
-				return {
-					isValid: false,
-					message:
-						"No <path id='State-XX'>, <path id='Nation-XX'>, <path id='Country-XX'>, <path id='Province-XX'>, or <path id='Region-XX'> elements found inside States/Provinces/Regions group.",
-				};
-			}
-
-			return { isValid: true, message: 'SVG is valid.' };
-		} catch (e: any) {
-			return { isValid: false, message: `Error parsing SVG: ${e.message}` };
-		}
-	};
-
 	const handleLoadData = () => {
 		if (activeTab === 'symbol') {
-			const { data, columns } = parseCSVData(symbolRawData);
+			const { data, columns } = parseDelimitedText(symbolRawData);
 			if (data.length > 0) {
 				onDataLoad('symbol', data, columns, symbolRawData);
 				toast({
@@ -316,7 +70,7 @@ WY,6.0,65003,93.3,West`;
 				});
 			}
 		} else if (activeTab === 'choropleth') {
-			const { data, columns } = parseCSVData(choroplethRawData);
+			const { data, columns } = parseDelimitedText(choroplethRawData);
 			if (data.length > 0) {
 				onDataLoad('choropleth', data, columns, choroplethRawData);
 				toast({
@@ -432,7 +186,7 @@ WY,6.0,65003,93.3,West`;
 						error = 'JSON file must be an array of objects.';
 					}
 				} else {
-					const parsed = parseCSVData(text);
+					const parsed = parseDelimitedText(text);
 					data = parsed.data;
 					columns = parsed.columns;
 				}
@@ -591,7 +345,7 @@ WY,6.0,65003,93.3,West`;
 									className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
 									<div className="space-y-2">
 										<div className="flex items-center justify-between">
-											<label className="text-sm font-medium text-gray-900 dark:text-white transition-colors duration-200">
+											<label htmlFor="symbol-data-input" className="text-sm font-medium text-gray-900 dark:text-white transition-colors duration-200">
 												Paste CSV or TSV data
 											</label>
 											<div className="flex items-center gap-2">
@@ -609,6 +363,7 @@ WY,6.0,65003,93.3,West`;
 													accept=".csv,.tsv,.json,text/csv,text/tab-separated-values,application/json"
 													style={{ display: 'none' }}
 													onChange={handleFileUpload}
+													aria-label="Upload CSV or TSV file"
 												/>
 												<Popover open={symbolPopoverOpen} onOpenChange={setSymbolPopoverOpen}>
 													<PopoverTrigger asChild>
@@ -649,6 +404,7 @@ WY,6.0,65003,93.3,West`;
 											</div>
 										</div>
 										<Textarea
+											id="symbol-data-input"
 											placeholder={`Paste your data here...\nHeaders should be in the first row.\nSupports both comma-separated (CSV) and tab-separated (TSV) formats.`}
 											value={symbolRawData}
 											onChange={(e) => setSymbolRawData(e.target.value)}
@@ -662,7 +418,7 @@ WY,6.0,65003,93.3,West`;
 									className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
 									<div className="space-y-2">
 										<div className="flex items-center justify-between">
-											<label className="text-sm font-medium text-gray-900 dark:text-white transition-colors duration-200">
+											<label htmlFor="choropleth-data-input" className="text-sm font-medium text-gray-900 dark:text-white transition-colors duration-200">
 												Paste Choropleth data
 											</label>
 											<div className="flex items-center gap-2">
@@ -680,6 +436,7 @@ WY,6.0,65003,93.3,West`;
 													accept=".csv,.tsv,.json,text/csv,text/tab-separated-values,application/json"
 													style={{ display: 'none' }}
 													onChange={handleFileUpload}
+													aria-label="Upload CSV or TSV file"
 												/>
 												<Popover open={choroplethPopoverOpen} onOpenChange={setChoroplethPopoverOpen}>
 													<PopoverTrigger asChild>
@@ -720,6 +477,7 @@ WY,6.0,65003,93.3,West`;
 											</div>
 										</div>
 										<Textarea
+											id="choropleth-data-input"
 											placeholder={`Paste your choropleth data here...\nHeaders should be in the first row.\nSupports both comma-separated (CSV) and tab-separated (TSV) formats.`}
 											value={choroplethRawData}
 											onChange={(e) => setChoroplethRawData(e.target.value)}
@@ -733,7 +491,7 @@ WY,6.0,65003,93.3,West`;
 									className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
 									<div className="space-y-2">
 										<div className="flex items-center justify-between">
-											<label className="text-sm font-medium text-gray-900 dark:text-white transition-colors duration-200">
+											<label htmlFor="custom-svg-input" className="text-sm font-medium text-gray-900 dark:text-white transition-colors duration-200">
 												Paste SVG code
 											</label>
 											<Button
@@ -749,6 +507,7 @@ WY,6.0,65003,93.3,West`;
 											</Button>
 										</div>
 										<Textarea
+											id="custom-svg-input"
 											placeholder="Paste your SVG code here..."
 											value={customSVG}
 											onChange={handleCustomSVGChange}

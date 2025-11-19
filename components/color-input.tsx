@@ -6,18 +6,35 @@ import { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { ChromeColorPicker } from './chrome-color-picker';
 import { cn, normalizeColorInput } from '@/lib/utils';
+import { ColorContrastChecker } from './color-contrast-checker';
 
 interface ColorInputProps {
 	value: string;
 	onChange: (value: string) => void;
 	className?: string;
+	backgroundColor?: string; // Background color for contrast checking
+	showContrastCheck?: boolean; // Whether to show contrast checker
+	isLargeText?: boolean; // Whether this is large text (for contrast requirements)
 }
 
-export function ColorInput({ value, onChange, className }: ColorInputProps) {
+export function ColorInput({
+	value,
+	onChange,
+	className,
+	backgroundColor,
+	showContrastCheck = false,
+	isLargeText = false,
+}: ColorInputProps) {
 	const [inputValue, setInputValue] = useState(value);
 	const [isPickerOpen, setIsPickerOpen] = useState(false);
 	const [pickerPosition, setPickerPosition] = useState({ top: 0, left: 0 });
 	const buttonRef = useRef<HTMLButtonElement>(null);
+
+	// Handle suggested color selection
+	const handleSuggestedColorSelect = (color: string) => {
+		setInputValue(color);
+		onChange(color);
+	}
 
 	useEffect(() => {
 		setInputValue(value);
@@ -136,32 +153,43 @@ export function ColorInput({ value, onChange, className }: ColorInputProps) {
 
 	return (
 		<div className={cn('relative', className)}>
-			<Input
-				type="text"
-				value={inputValue}
-				onChange={handleInputChange}
-				onBlur={handleInputBlur}
-				className="pr-10"
-				placeholder="#RRGGBB"
-			/>
+			<div className="relative">
+				<Input
+					type="text"
+					value={inputValue}
+					onChange={handleInputChange}
+					onBlur={handleInputBlur}
+					className="pr-10"
+					placeholder="#RRGGBB"
+				/>
 
-			<button
-				ref={buttonRef}
-				type="button"
-				onClick={handleSwatchClick}
-				className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring hover:border-gray-400 dark:hover:border-gray-500 transition-colors cursor-pointer"
-				style={{ backgroundColor: displayColor }}
-				title="Click to open color picker">
-				<span className="sr-only">Open color picker</span>
-			</button>
+				<button
+					ref={buttonRef}
+					type="button"
+					onClick={handleSwatchClick}
+					className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring hover:border-gray-400 dark:hover:border-gray-500 transition-colors cursor-pointer"
+					style={{ backgroundColor: displayColor }}
+					title="Click to open color picker">
+					<span className="sr-only">Open color picker</span>
+				</button>
 
-			<ChromeColorPicker
-				isOpen={isPickerOpen}
-				onClose={handlePickerClose}
-				onColorChange={handleColorChange}
-				currentColor={displayColor}
-				position={pickerPosition}
-			/>
+				<ChromeColorPicker
+					isOpen={isPickerOpen}
+					onClose={handlePickerClose}
+					onColorChange={handleColorChange}
+					currentColor={displayColor}
+					position={pickerPosition}
+				/>
+			</div>
+
+			{showContrastCheck && backgroundColor && (
+				<ColorContrastChecker
+					foreground={inputValue}
+					background={backgroundColor}
+					isLargeText={isLargeText}
+					onColorSelect={handleSuggestedColorSelect}
+				/>
+			)}
 		</div>
 	);
 }

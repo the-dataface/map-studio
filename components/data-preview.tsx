@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, react-hooks/exhaustive-deps */
 'use client';
 
 import type React from 'react';
@@ -7,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { ChevronDown, ChevronUp, Download, Copy, Trash2 } from 'lucide-react';
-import type { DataRow, GeocodedRow } from '@/app/page';
+import type { DataRow, GeocodedRow } from '@/app/(studio)/types';
 import { MapPin, BarChart3, Hash, Type, Calendar, Flag, XCircle, Database, Loader2, Check } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from '@/components/ui/use-toast';

@@ -102,8 +102,9 @@ export function TextareaDebugPanel() {
 
           {/* Test Textarea */}
           <div>
-            <label className="block text-sm font-medium mb-2">Test Textarea</label>
+            <label htmlFor="test-textarea" className="block text-sm font-medium mb-2">Test Textarea</label>
             <Textarea
+              id="test-textarea"
               ref={textareaRef}
               value={value}
               onChange={(e) => setValue(e.target.value)}
