@@ -18,7 +18,6 @@
 1. **Foundation Guardrails** _(Done)_
 
    - [x] Remove lint/type ignores from build
-   - [x] Fix blocking lint/type issues and stabilize legacy modules with targeted suppressions
    - [x] Add `pnpm type-check` script and GitHub Actions workflow for lint + type check
 
 2. **Routing & Shell Restructure** _(Complete)_

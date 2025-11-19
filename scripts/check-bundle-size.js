@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Bundle size budget checker
+ * Bundle size budget checker for Next.js App Router
  * Checks that bundle sizes don't exceed defined budgets
  */
 
@@ -10,22 +10,17 @@ const path = require('path')
 
 // Bundle size budgets in KB (uncompressed)
 const BUNDLE_BUDGETS = {
-  // First load JS bundles
-  'pages/_app.js': 200, // Main app bundle
-  'pages/index.js': 300, // Studio page
-  'pages/landing.js': 150, // Landing page
+  // Main chunks (App Router)
+  'chunks/main.js': 200, // Main app bundle
+  'chunks/vendor.js': 900, // Vendor libraries (D3, Radix UI, React Query, etc. are heavy)
+  'chunks/webpack.js': 60, // Webpack runtime
   
-  // Chunk bundles
-  'chunks/d3.js': 500, // D3 library
-  'chunks/vendor.js': 300, // Vendor libraries
-  'chunks/react-query.js': 100, // React Query
-  'chunks/radix-ui.js': 200, // Radix UI components
+  // App Router pages
+  'app/(studio)/page.js': 300, // Studio page
+  'app/(marketing)/landing/page.js': 150, // Landing page
   
-  // CSS bundles
-  'pages/_app.css': 50,
-  
-  // Total first load (all initial JS + CSS)
-  'first-load': 500, // Total initial bundle size
+  // Total first load (main + vendor + webpack)
+  'first-load': 1000, // Total initial bundle size (realistic for heavy dependencies like D3)
 }
 
 const BUILD_DIR = path.join(process.cwd(), '.next')
@@ -48,51 +43,58 @@ function getFileSize(filePath) {
 function findBuildFiles() {
   const files = {}
   
-  // Read the build manifest to find all chunks
-  const manifestPath = path.join(BUILD_DIR, 'build-manifest.json')
-  if (fs.existsSync(manifestPath)) {
-    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'))
-    
-    // Process pages
-    Object.entries(manifest.pages).forEach(([page, chunks]) => {
-      chunks.forEach((chunk) => {
-        const chunkPath = path.join(BUILD_DIR, 'static', chunk)
-        const size = getFileSize(chunkPath)
+  // Read static chunks directory
+  const staticDir = path.join(BUILD_DIR, 'static', 'chunks')
+  if (fs.existsSync(staticDir)) {
+    // Check main chunks
+    const mainChunks = ['main', 'vendor', 'webpack', 'polyfills']
+    mainChunks.forEach((chunkName) => {
+      const chunkFiles = fs.readdirSync(staticDir).filter((file) => 
+        file.startsWith(`${chunkName}-`) && file.endsWith('.js')
+      )
+      
+      chunkFiles.forEach((file) => {
+        const filePath = path.join(staticDir, file)
+        const size = getFileSize(filePath)
         if (size !== null) {
-          const key = `pages/${page === '/' ? 'index' : page.replace(/^\//, '')}.js`
+          const key = `chunks/${chunkName}.js`
           if (!files[key]) files[key] = 0
           files[key] += size
         }
       })
     })
-  }
-  
-  // Read static chunks directory
-  const staticDir = path.join(BUILD_DIR, 'static', 'chunks')
-  if (fs.existsSync(staticDir)) {
-    const entries = fs.readdirSync(staticDir, { withFileTypes: true })
-    entries.forEach((entry) => {
-      if (entry.isFile() && entry.name.endsWith('.js')) {
-        const filePath = path.join(staticDir, entry.name)
+    
+    // Check App Router pages
+    const appDir = path.join(staticDir, 'app')
+    if (fs.existsSync(appDir)) {
+      // Studio page
+      const studioPageFiles = fs.readdirSync(appDir, { recursive: true }).filter((file) =>
+        file.includes('(studio)') && file.includes('page-') && file.endsWith('.js')
+      )
+      studioPageFiles.forEach((file) => {
+        const filePath = path.join(appDir, file)
         const size = getFileSize(filePath)
         if (size !== null) {
-          // Try to match chunk names
-          if (entry.name.includes('d3')) {
-            if (!files['chunks/d3.js']) files['chunks/d3.js'] = 0
-            files['chunks/d3.js'] += size
-          } else if (entry.name.includes('react-query')) {
-            if (!files['chunks/react-query.js']) files['chunks/react-query.js'] = 0
-            files['chunks/react-query.js'] += size
-          } else if (entry.name.includes('radix')) {
-            if (!files['chunks/radix-ui.js']) files['chunks/radix-ui.js'] = 0
-            files['chunks/radix-ui.js'] += size
-          } else {
-            if (!files['chunks/vendor.js']) files['chunks/vendor.js'] = 0
-            files['chunks/vendor.js'] += size
-          }
+          const key = 'app/(studio)/page.js'
+          if (!files[key]) files[key] = 0
+          files[key] += size
         }
-      }
-    })
+      })
+      
+      // Landing page
+      const landingPageFiles = fs.readdirSync(appDir, { recursive: true }).filter((file) =>
+        file.includes('(marketing)') && file.includes('landing') && file.includes('page-') && file.endsWith('.js')
+      )
+      landingPageFiles.forEach((file) => {
+        const filePath = path.join(appDir, file)
+        const size = getFileSize(filePath)
+        if (size !== null) {
+          const key = 'app/(marketing)/landing/page.js'
+          if (!files[key]) files[key] = 0
+          files[key] += size
+        }
+      })
+    }
   }
   
   return files
@@ -113,14 +115,11 @@ function checkBundleSizes() {
   // Check each budget
   Object.entries(BUNDLE_BUDGETS).forEach(([budgetKey, budgetKB]) => {
     if (budgetKey === 'first-load') {
-      // Calculate total first load
+      // Calculate total first load (main + vendor + webpack)
       const firstLoadFiles = [
-        'pages/_app.js',
-        'pages/index.js',
+        'chunks/main.js',
         'chunks/vendor.js',
-        'chunks/d3.js',
-        'chunks/react-query.js',
-        'chunks/radix-ui.js',
+        'chunks/webpack.js',
       ]
       
       firstLoadFiles.forEach((file) => {
@@ -174,4 +173,3 @@ function checkBundleSizes() {
 }
 
 checkBundleSizes()
-

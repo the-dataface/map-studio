@@ -35,12 +35,26 @@ test.describe('Accessibility', () => {
     await page.goto('/')
     await page.waitForLoadState('networkidle')
 
+    // Wait for the Data Input component to be visible
+    await page.waitForSelector('[role="tablist"]', { timeout: 10000 })
+
     // Check that textareas have associated labels
+    // Symbol tab is active by default
     const symbolTextarea = page.locator('#symbol-data-input')
     await expect(symbolTextarea).toBeVisible()
     
+    // Click on choropleth tab to make it visible
+    const choroplethTab = page.locator('button[role="tab"]:has-text("Choropleth")')
+    await choroplethTab.click()
+    await page.waitForTimeout(300) // Wait for tab transition
+    
     const choroplethTextarea = page.locator('#choropleth-data-input')
     await expect(choroplethTextarea).toBeVisible()
+
+    // Click on custom tab to make it visible
+    const customTab = page.locator('button[role="tab"]:has-text("Custom")')
+    await customTab.click()
+    await page.waitForTimeout(300) // Wait for tab transition
 
     const customTextarea = page.locator('#custom-svg-input')
     await expect(customTextarea).toBeVisible()
