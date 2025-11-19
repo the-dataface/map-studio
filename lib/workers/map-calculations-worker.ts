@@ -3,8 +3,8 @@
  * Uses a simpler approach compatible with Next.js
  */
 
-let worker: Worker | null = null
-let workerReady = false
+const worker: Worker | null = null
+const workerReady = false
 
 function getWorker(): Worker | null {
   if (typeof window === 'undefined') {
@@ -17,6 +17,9 @@ function getWorker(): Worker | null {
 
   try {
     // Create worker from inline blob for better compatibility
+    // Note: Currently using main thread fallback, but structure is ready for workers
+    // Uncomment when implementing actual worker:
+    /*
     const workerCode = `
       import * as d3 from 'd3';
 
@@ -72,6 +75,7 @@ function getWorker(): Worker | null {
         }
       });
     `
+    */
 
     // For now, we'll use a simpler approach - calculate on main thread
     // but structure code to allow easy migration to workers
@@ -136,6 +140,7 @@ function projectCoordinatesMainThread(
   payload: ProjectCoordinatesPayload
 ): Array<{ x: number; y: number }> {
   // Import d3 dynamically to avoid blocking
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const d3 = require('d3')
   const { projectionConfig, coordinates } = payload
 

@@ -246,12 +246,30 @@ export function ChromeColorPicker({ isOpen, onClose, onColorChange, currentColor
 				<div className="relative">
 					<div
 						ref={saturationRef}
+						role="slider"
+						tabIndex={0}
+						aria-label="Saturation and value picker"
+						aria-valuenow={hsv.s}
+						aria-valuemin={0}
+						aria-valuemax={100}
 						className="relative w-full h-40 cursor-crosshair rounded border border-gray-200 dark:border-gray-700 overflow-hidden"
 						style={{
 							background: `linear-gradient(to right, #fff, ${hueColor}), linear-gradient(to top, #000, transparent)`,
 							backgroundBlendMode: 'multiply, normal',
 						}}
-						onMouseDown={handleSaturationMouseDown}>
+						onMouseDown={handleSaturationMouseDown}
+						onKeyDown={(e) => {
+							if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+								e.preventDefault()
+								const delta = e.key === 'ArrowLeft' ? -5 : 5
+								updateColor({ ...hsv, s: Math.max(0, Math.min(100, hsv.s + delta)) })
+							}
+							if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+								e.preventDefault()
+								const delta = e.key === 'ArrowUp' ? 5 : -5
+								updateColor({ ...hsv, v: Math.max(0, Math.min(100, hsv.v + delta)) })
+							}
+						}}>
 						{/* Saturation/Value indicator */}
 						<div
 							className="absolute w-3 h-3 border-2 border-white rounded-full shadow-sm pointer-events-none"
@@ -276,12 +294,25 @@ export function ChromeColorPicker({ isOpen, onClose, onColorChange, currentColor
 					<div className="flex-1 relative">
 						<div
 							ref={hueRef}
+							role="slider"
+							tabIndex={0}
+							aria-label="Hue slider"
+							aria-valuenow={hsv.h}
+							aria-valuemin={0}
+							aria-valuemax={360}
 							className="w-full h-3 cursor-pointer rounded border border-gray-200 dark:border-gray-700 overflow-hidden"
 							style={{
 								background:
 									'linear-gradient(to right, #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%)',
 							}}
-							onMouseDown={handleHueMouseDown}>
+							onMouseDown={handleHueMouseDown}
+							onKeyDown={(e) => {
+								if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+									e.preventDefault()
+									const delta = e.key === 'ArrowLeft' ? -10 : 10
+									updateColor({ ...hsv, h: Math.max(0, Math.min(360, hsv.h + delta)) })
+								}
+							}}>
 							{/* Hue indicator */}
 							<div
 								className="absolute w-3 h-3 border-2 border-white rounded-full shadow-sm pointer-events-none"
