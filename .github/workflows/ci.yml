@@ -21,7 +21,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -30,9 +30,8 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
+        continue-on-error: false
         run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Run postinstall scripts
-        run: pnpm rebuild || true
 
       - name: Lint
         run: pnpm lint
@@ -51,7 +50,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -60,9 +59,8 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
+        continue-on-error: false
         run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Run postinstall scripts
-        run: pnpm rebuild || true
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
@@ -83,7 +81,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -92,9 +90,8 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
+        continue-on-error: false
         run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Run postinstall scripts
-        run: pnpm rebuild || true
 
       - name: Build application
         run: pnpm build
