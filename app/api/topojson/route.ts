@@ -116,6 +116,9 @@ async function fetchTopoJSON(urls: string[], expectedObjects: string[]): Promise
   throw new Error(`Failed to fetch TopoJSON from all sources. Errors: ${errorMessages}`)
 }
 
+// Mark route as dynamic
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   const startTime = Date.now()
 

@@ -160,10 +160,11 @@ export default function HomePage() {
           </div>
         </header>
 
+      <main>
       {/* Hero Section */}
       <section className="mx-auto flex min-h-[60vh] max-w-4xl flex-col items-start justify-center gap-6 px-6 py-16">
         <div>
-          <span className="rounded-full bg-muted px-3 py-1 text-xs uppercase tracking-wide text-muted-foreground">
+          <span className="rounded-full bg-muted px-3 py-1 text-xs uppercase tracking-wide text-foreground/70">
             Map Studio
           </span>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
@@ -289,6 +290,7 @@ export default function HomePage() {
           </div>
         )}
       </section>
+      </main>
       <Toaster />
     </div>
     </ThemeProvider>

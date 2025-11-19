@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, react-hooks/exhaustive-deps, react-hooks/rules-of-hooks */
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { DataInput } from '@/components/data-input';
 import { GeocodingSection } from '@/components/geocoding-section';
@@ -37,7 +37,7 @@ import {
 } from '@/modules/data-ingest/dimension-schema';
 import { saveProject, getProject, exportProject, generatePreviewThumbnail, type SavedProject } from '@/lib/projects';
 
-export default function MapStudio() {
+function MapStudioContent() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const { toast } = useToast();
@@ -1023,5 +1023,13 @@ export default function MapStudio() {
 				showJump={!mapInView || !mapPreviewExpanded}
 			/>
 		</>
+	);
+}
+
+export default function MapStudio() {
+	return (
+		<Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+			<MapStudioContent />
+		</Suspense>
 	);
 }

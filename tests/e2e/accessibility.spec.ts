@@ -18,7 +18,7 @@ test.describe('Accessibility', () => {
   })
 
   test('should not have any automatically detectable accessibility violations on studio page', async ({ page }) => {
-    await page.goto('/')
+    await page.goto('/studio')
 
     // Wait for the page to be fully loaded
     await page.waitForLoadState('networkidle')
@@ -32,7 +32,7 @@ test.describe('Accessibility', () => {
   })
 
   test('should have proper form label associations', async ({ page }) => {
-    await page.goto('/')
+    await page.goto('/studio')
     await page.waitForLoadState('networkidle')
 
     // Wait for the Data Input component to be visible
