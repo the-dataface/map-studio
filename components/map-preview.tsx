@@ -1,960 +1,70 @@
-'use client';
+'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import * as d3 from 'd3';
-import * as topojson from 'topojson-client';
-import type { DataRow, GeocodedRow } from '@/app/page';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp, Download, Copy } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useToast } from '@/components/ui/use-toast';
+import { useEffect, useRef } from 'react'
+import * as d3 from 'd3'
 
-interface MapPreviewProps {
-	symbolData: (DataRow | GeocodedRow)[];
-	choroplethData: (DataRow | GeocodedRow)[];
-	symbolColumns: string[];
-	choroplethColumns: string[];
-	mapType: 'symbol' | 'choropleth' | 'custom';
-	dimensionSettings: any;
-	stylingSettings: StylingSettings;
-	symbolDataExists: boolean;
-	choroplethDataExists: boolean;
-	columnTypes: ColumnType;
-	columnFormats: ColumnFormat;
-	customMapData: string;
-	selectedGeography: 'usa-states' | 'usa-counties' | 'usa-nation' | 'canada-provinces' | 'canada-nation' | 'world'; // New prop
-	selectedProjection: 'albersUsa' | 'mercator' | 'equalEarth' | 'albers'; // Added "albers"
-	clipToCountry: boolean; // New prop
-	isExpanded: boolean;
-	setIsExpanded: (expanded: boolean) => void;
+import type {
+  ColumnFormat,
+  ColumnType,
+  DataRow,
+  DimensionSettings,
+  GeocodedRow,
+  GeographyKey,
+  MapType,
+  ProjectionType,
+  StylingSettings,
+} from '@/app/(studio)/types'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { ChevronDown, ChevronUp, Download, Copy } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { useToast } from '@/components/ui/use-toast'
+import { formatLegendValue, renderLabelPreview } from '@/modules/data-ingest/formatting'
+import { useGeoAtlasData } from '@/modules/map-preview/use-geo-atlas'
+import { renderBaseMap } from '@/modules/map-preview/base-map'
+import { renderSymbols } from '@/modules/map-preview/symbols'
+import { applyChoroplethColors } from '@/modules/map-preview/choropleth'
+import { renderSymbolLabels, renderChoroplethLabels } from '@/modules/map-preview/labels'
+import { estimateLegendHeight, renderLegends } from '@/modules/map-preview/legends'
+import {
+  getNumericValue,
+  getUniqueValues,
+  getSymbolPathData,
+} from '@/modules/map-preview/helpers'
+import {
+  normalizeGeoIdentifier,
+  extractCandidateFromSVGId,
+  findCountryFeature,
+  getSubnationalLabel,
+} from '@/modules/map-preview/geography'
+import { generateMapDescription, generateMapSummary } from '@/lib/accessibility/map-description'
+
+type DataRecord = DataRow | GeocodedRow
+
+export interface MapPreviewProps {
+  symbolData: DataRecord[]
+  choroplethData: DataRecord[]
+  mapType: MapType
+  dimensionSettings: DimensionSettings
+  stylingSettings: StylingSettings
+  symbolDataExists: boolean
+  choroplethDataExists: boolean
+  columnTypes: ColumnType
+  columnFormats: ColumnFormat
+  customMapData: string
+  selectedGeography: GeographyKey
+  selectedProjection: ProjectionType
+  clipToCountry: boolean
+  isExpanded: boolean
+  setIsExpanded: (expanded: boolean) => void
 }
 
-interface TopoJSONData {
-	type: string;
-	objects: {
-		nation?: any;
-		states?: any; // states is optional for world map
-		countries?: any; // countries is optional for US map
-		counties?: any; // Add this
-		provinces?: any; // Add this
-		land?: any; // Added for world map fallback
-	};
-	arcs: any[];
-}
-
-interface ColumnType {
-	[key: string]: 'text' | 'number' | 'date' | 'coordinate' | 'state' | 'country';
-}
-
-interface ColumnFormat {
-	[key: string]: string;
-}
-
-interface StylingSettings {
-	activeTab: 'base' | 'symbol' | 'choropleth';
-	base: {
-		mapBackgroundColor: string;
-		nationFillColor: string;
-		nationStrokeColor: string;
-		nationStrokeWidth: number;
-		defaultStateFillColor: string;
-		defaultStateStrokeColor: string; // Corrected type to string
-		defaultStateStrokeWidth: number;
-		savedStyles: Array<{
-			id: string;
-			name: string;
-			type: 'preset' | 'user';
-			settings: {
-				mapBackgroundColor: string;
-				nationFillColor: string;
-				nationStrokeColor: string;
-				nationStrokeWidth: number;
-				defaultStateFillColor: string;
-				defaultStateStrokeColor: string;
-			};
-		}>;
-	};
-	symbol: {
-		symbolType: 'symbol' | 'spike' | 'arrow';
-		symbolShape:
-			| 'circle'
-			| 'square'
-			| 'diamond'
-			| 'triangle'
-			| 'triangle-down'
-			| 'hexagon'
-			| 'map-marker'
-			| 'custom-svg';
-		symbolFillColor: string;
-		symbolStrokeColor: string;
-		symbolSize: number;
-		symbolStrokeWidth: number;
-		symbolFillTransparency?: number;
-		symbolStrokeTransparency?: number;
-		labelFontFamily: string;
-		labelBold: boolean;
-		labelItalic: boolean;
-		labelUnderline: boolean;
-		labelStrikethrough: boolean;
-		labelColor: string;
-		labelOutlineColor: string;
-		labelFontSize: number;
-		labelOutlineThickness: number;
-		labelAlignment:
-			| 'auto'
-			| 'top-left'
-			| 'top-center'
-			| 'top-right'
-			| 'middle-left'
-			| 'center'
-			| 'middle-right'
-			| 'bottom-left'
-			| 'bottom-center'
-			| 'bottom-right';
-		customSvgPath?: string;
-	};
-	choropleth: {
-		labelFontFamily: string;
-		labelBold: boolean;
-		labelItalic: boolean;
-		labelUnderline: boolean;
-		labelStrikethrough: boolean;
-		labelColor: string;
-		labelOutlineColor: string;
-		labelFontSize: number;
-		labelOutlineThickness: number;
-	};
-}
-
-const stateMap: Record<string, string> = {
-	AL: 'Alabama',
-	AK: 'Alaska',
-	AZ: 'Arizona',
-	AR: 'Arkansas',
-	CA: 'California',
-	CO: 'Colorado',
-	CT: 'Connecticut',
-	DE: 'Delaware',
-	FL: 'Florida',
-	GA: 'Georgia',
-	HI: 'Hawaii',
-	ID: 'Idaho',
-	IL: 'Illinois',
-	IN: 'Indiana',
-	IA: 'Iowa',
-	KS: 'Kansas',
-	KY: 'Kentucky',
-	LA: 'Louisiana',
-	ME: 'Maine',
-	MD: 'Maryland',
-	MA: 'Massachusetts',
-	MI: 'Michigan',
-	MN: 'Minnesota',
-	MS: 'Mississippi',
-	MO: 'Missouri',
-	MT: 'Montana',
-	NE: 'Nebraska',
-	NV: 'Nevada',
-	NH: 'New Hampshire',
-	NJ: 'New Jersey',
-	NM: 'New Mexico',
-	NY: 'New York',
-	NC: 'North Carolina',
-	ND: 'North Dakota',
-	OH: 'Ohio',
-	OK: 'Oklahoma',
-	OR: 'Oregon',
-	PA: 'Pennsylvania',
-	RI: 'Rhode Island',
-	SC: 'South Carolina',
-	SD: 'South Dakota',
-	TN: 'Tennessee',
-	TX: 'Texas',
-	UT: 'Utah',
-	VT: 'Vermont',
-	VA: 'Virginia',
-	WA: 'Washington',
-	WV: 'West Virginia',
-	WI: 'Wisconsin',
-	WY: 'Wyoming',
-};
-
-const reverseStateMap: Record<string, string> = Object.fromEntries(
-	Object.entries(stateMap).map(([abbr, full]) => [full.toLowerCase(), abbr])
-);
-
-// Canadian Province Map
-const canadaProvinceMap: Record<string, string> = {
-	AB: 'Alberta',
-	BC: 'British Columbia',
-	MB: 'Manitoba',
-	NB: 'New Brunswick',
-	NL: 'Newfoundland and Labrador',
-	NS: 'Nova Scotia',
-	ON: 'Ontario',
-	PE: 'Prince Edward Island',
-	QC: 'Quebec',
-	SK: 'Saskatchewan',
-	NT: 'Northwest Territories',
-	NU: 'Nunavut',
-	YT: 'Yukon',
-};
-const reverseCanadaProvinceMap: Record<string, string> = Object.fromEntries(
-	Object.entries(canadaProvinceMap).map(([abbr, full]) => [full.toLowerCase(), abbr])
-);
-
-// FIPS to State Abbreviation Map
-const fipsToStateAbbrMap: Record<string, string> = {
-	'01': 'AL',
-	'02': 'AK',
-	'04': 'AZ',
-	'05': 'AR',
-	'06': 'CA',
-	'08': 'CO',
-	'09': 'CT',
-	'10': 'DE',
-	'11': 'DC',
-	'12': 'FL',
-	'13': 'GA',
-	'15': 'HI',
-	'16': 'ID',
-	'17': 'IL',
-	'18': 'IN',
-	'19': 'IA',
-	'20': 'KS',
-	'21': 'KY',
-	'22': 'LA',
-	'23': 'ME',
-	'24': 'MD',
-	'25': 'MA',
-	'26': 'MI',
-	'27': 'MN',
-	'28': 'MS',
-	'29': 'MO',
-	'30': 'MT',
-	'31': 'NE',
-	'32': 'NV',
-	'33': 'NH',
-	'34': 'NJ',
-	'35': 'NM',
-	'36': 'NY',
-	'37': 'NC',
-	'38': 'ND',
-	'39': 'OH',
-	'40': 'OK',
-	'41': 'OR',
-	'42': 'PA',
-	'44': 'RI',
-	'45': 'SC',
-	'46': 'SD',
-	'47': 'TN',
-	'48': 'TX',
-	'49': 'UT',
-	'50': 'VT',
-	'51': 'VA',
-	'53': 'WA',
-	'54': 'WV',
-	'55': 'WI',
-	'56': 'WY',
-	'60': 'AS',
-	'66': 'GU',
-	'69': 'MP',
-	'72': 'PR',
-	'78': 'VI',
-};
-
-const stripDiacritics = (str: string): string => str.normalize('NFD').replace(/\p{Diacritic}/gu, '');
-
-const normalizeGeoIdentifier = (
-	value: string,
-	geoType: 'usa-states' | 'usa-counties' | 'usa-nation' | 'canada-provinces' | 'canada-nation' | 'world'
-): string => {
-	if (!value) return '';
-
-	// Remove diacritics for robust matching
-	const trimmed = stripDiacritics(String(value).trim());
-
-	if (geoType.startsWith('usa-states')) {
-		// NEW: Check for 2-digit FIPS code first if applicable
-		if (trimmed.length === 2 && /^\d{2}$/.test(trimmed)) {
-			const abbr = fipsToStateAbbrMap[trimmed];
-			if (abbr) return abbr;
-		}
-		// US state logic (existing)
-		if (trimmed.length === 2 && stateMap[trimmed.toUpperCase()]) {
-			return trimmed.toUpperCase();
-		}
-		const lowerValue = trimmed.toLowerCase();
-		const abbreviation = reverseStateMap[lowerValue];
-		if (abbreviation) return abbreviation;
-		for (const [abbr, fullName] of Object.entries(stateMap)) {
-			if (fullName.toLowerCase() === lowerValue) return abbr;
-		}
-		return trimmed.toUpperCase(); // Fallback
-	} else if (geoType.startsWith('usa-counties')) {
-		// For US counties, assume data provides FIPS code directly (e.g., "01001")
-		// us-atlas county IDs are 5-digit FIPS codes
-		return trimmed;
-	} else if (geoType.startsWith('canada-provinces')) {
-		// For Canadian provinces
-		if (trimmed.length === 2 && canadaProvinceMap[trimmed.toUpperCase()]) {
-			return trimmed.toUpperCase();
-		}
-		const lowerValue = trimmed.toLowerCase();
-		const abbreviation = reverseCanadaProvinceMap[lowerValue];
-		if (abbreviation) return abbreviation;
-		for (const [abbr, fullName] of Object.entries(canadaProvinceMap)) {
-			if (stripDiacritics(fullName).toLowerCase() === lowerValue) return abbr;
-		}
-		return trimmed.toUpperCase(); // Fallback
-	} else if (geoType === 'world') {
-		// For world countries, use the value as is (expecting country name or ISO code)
-		return trimmed;
-	}
-	return trimmed; // Default fallback
-};
-
-// Replace the existing `extractStateFromSVGId` function definition with the following:
-const extractCandidateFromSVGId = (id: string): string | null => {
-	if (!id) return null;
-
-	// Prioritize direct matches first for clean IDs (e.g., "CA", "California", "06001", "06")
-	const directMatchPatterns = [
-		/^([A-Z]{2})$/, // Direct 2-letter abbreviation like "CA"
-		/^([a-zA-Z\s]+)$/, // Direct full name like "California", "New York"
-		/^(\d{5})$/, // Direct 5-digit FIPS (for counties)
-		/^(\d{2})$/, // Direct 2-digit FIPS (for states)
-	];
-
-	// Then try patterns with common prefixes and flexible separators
-	const prefixedPatterns = [
-		// Matches "State-California", "state_CA", "County-06001", "province AB", "country-USA"
-		// Allows for optional underscore, hyphen, or space after prefix.
-		// Captures alphanumeric, spaces, and periods (for complex IDs) in the identifier.
-		/^(?:state|province|country|county)[_\- ]?([a-zA-Z0-9.\s]+)$/i,
-	];
-
-	const allPatterns = [...directMatchPatterns, ...prefixedPatterns];
-
-	for (const pattern of allPatterns) {
-		const match = id.match(pattern);
-		if (match && match[1]) {
-			return match[1].trim();
-		}
-	}
-	return null;
-};
-
-const parseCompactNumber = (value: string): number | null => {
-	const match = value.match(/^(\d+(\.\d+)?)([KMB])$/i);
-	if (!match) return null;
-
-	let num = Number.parseFloat(match[1]);
-	const suffix = match[3].toUpperCase();
-
-	switch (suffix) {
-		case 'K':
-			num *= 1_000;
-			break;
-		case 'M':
-			num *= 1_000_000;
-			break;
-		case 'B':
-			num *= 1_000_000_000;
-			break;
-	}
-	return num;
-};
-
-const getNumericValue = (row: DataRow | GeocodedRow, column: string): number | null => {
-	const rawValue = String(row[column] || '').trim();
-	let parsedNum: number | null = parseCompactNumber(rawValue);
-
-	if (parsedNum === null) {
-		const cleanedValue = rawValue.replace(/[,$%]/g, '');
-		parsedNum = Number.parseFloat(cleanedValue);
-	}
-	return isNaN(parsedNum) ? null : parsedNum;
-};
-
-const getUniqueValues = (column: string, data: (DataRow | GeocodedRow)[]): any[] => {
-	const uniqueValues = new Set();
-	data.forEach((row) => {
-		const value = row[column];
-		uniqueValues.add(value);
-	});
-	return Array.from(uniqueValues);
-};
-
-const getSymbolPathData = (
-	type: StylingSettings['symbol']['symbolType'],
-	shape: StylingSettings['symbol']['symbolShape'],
-	size: number,
-	customSvgPath?: string
-) => {
-	const area = Math.PI * size * size;
-	let transform = '';
-
-	// Handle custom SVG path first
-	if (shape === 'custom-svg') {
-		if (customSvgPath && customSvgPath.trim() !== '') {
-			if (customSvgPath.trim().startsWith('M') || customSvgPath.trim().startsWith('m')) {
-				const scale = Math.sqrt(area) / 100; // Adjust scale as needed
-				return {
-					pathData: customSvgPath,
-					transform: `scale(${scale}) translate(-12, -12)`, // Scale and center from origin
-				};
-			} else {
-				console.warn('Invalid custom SVG path provided. Falling back to default circle symbol.');
-				return { pathData: d3.symbol().type(d3.symbolCircle).size(area)(), transform: '' };
-			}
-		} else {
-			console.warn('Custom SVG shape selected but no path provided. Falling back to default circle symbol.');
-			return { pathData: d3.symbol().type(d3.symbolCircle).size(area)(), transform: '' };
-		}
-	}
-
-	// For all other shapes, use d3.symbol
-	let pathGenerator: any = null;
-
-	if (type === 'symbol') {
-		switch (shape) {
-			case 'circle':
-				pathGenerator = d3.symbol().type(d3.symbolCircle).size(area);
-				break;
-			case 'square':
-				pathGenerator = d3.symbol().type(d3.symbolSquare).size(area);
-				break;
-			case 'diamond':
-				pathGenerator = d3.symbol().type(d3.symbolDiamond).size(area);
-				break;
-			case 'triangle':
-				pathGenerator = d3.symbol().type(d3.symbolTriangle).size(area);
-				break;
-			case 'triangle-down':
-				// Create upside-down triangle by using d3.symbolTriangle and rotating 180 degrees
-				pathGenerator = d3.symbol().type(d3.symbolTriangle).size(area);
-				transform = 'rotate(180)';
-				break;
-			case 'hexagon':
-				// Use d3's built-in star symbol for a star shape (5 points)
-				pathGenerator = d3.symbol().type(d3.symbolStar).size(area);
-				break;
-			case 'map-marker':
-				// Use the Lucide MapPin icon path, scaled appropriately with larger base scale
-				// Base viewport is 24px, so we use that as our reference
-				const baseSize = 24;
-				const targetSize = Math.max(size, 16); // Ensure minimum visible size of 16px
-				const scale = targetSize / baseSize; // Scale based on 24px viewport
-				// Compound path: outer marker and inner circle (hole)
-				// Use fill-rule="evenodd" when rendering
-				const outerPath = `M${12 * scale} ${2 * scale}C${8.13 * scale} ${2 * scale} ${5 * scale} ${5.13 * scale} ${
-					5 * scale
-				} ${9 * scale}C${5 * scale} ${14.25 * scale} ${12 * scale} ${22 * scale} ${12 * scale} ${22 * scale}C${
-					12 * scale
-				} ${22 * scale} ${19 * scale} ${14.25 * scale} ${19 * scale} ${9 * scale}C${19 * scale} ${5.13 * scale} ${
-					15.87 * scale
-				} ${2 * scale} ${12 * scale} ${2 * scale}Z`;
-				const holePath = `M${12 * scale} ${9 * scale}m${-3 * scale},0a${3 * scale},${3 * scale} 0 1,0 ${6 * scale},0a${
-					3 * scale
-				},${3 * scale} 0 1,0 -${6 * scale},0Z`;
-				return {
-					pathData: `${outerPath}${holePath}`,
-					transform: `translate(${-12 * scale}, ${-22 * scale})`,
-					fillRule: 'evenodd',
-				};
-			default:
-				pathGenerator = d3.symbol().type(d3.symbolCircle).size(area);
-		}
-	}
-
-	if (!pathGenerator) {
-		return { pathData: d3.symbol().type(d3.symbolCircle).size(area)(), transform: '' };
-	}
-
-	return { pathData: pathGenerator(), transform };
-};
-
-// Helper to get default format for a type
-const getDefaultFormat = (type: 'number' | 'date' | 'state' | 'coordinate'): string => {
-	switch (type) {
-		case 'number':
-			return 'raw';
-		case 'date':
-			return 'yyyy-mm-dd';
-		case 'state':
-			return 'abbreviated';
-		case 'coordinate':
-			return 'raw';
-		default:
-			return 'raw';
-	}
-};
-
-// Format a number value based on the selected format
-const formatNumber = (value: any, format: string): string => {
-	if (value === null || value === undefined || value === '') return '';
-
-	let num: number; // Declare num here
-
-	const strValue = String(value).trim();
-
-	const parsedNum: number | null = parseCompactNumber(strValue);
-	if (parsedNum !== null) {
-		num = parsedNum; // Assign num here
-	} else {
-		const cleanedValue = strValue.replace(/[,$%]/g, '');
-		num = Number.parseFloat(cleanedValue); // Assign num here
-	}
-
-	if (isNaN(num)) {
-		return strValue;
-	}
-
-	switch (format) {
-		case 'raw':
-			return num.toString();
-		case 'comma':
-			return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 20 });
-		case 'compact':
-			if (Math.abs(num) >= 1e9) return (num / 1e9).toFixed(1) + 'B';
-			if (Math.abs(num) >= 1e6) return (num / 1e6).toFixed(1) + 'M';
-			if (Math.abs(num) >= 1e3) return (num / 1e3).toFixed(1) + 'K';
-			return num.toString();
-		case 'currency':
-			return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num);
-		case 'percent':
-			return (num * 100).toFixed(0) + '%';
-		case '0-decimals':
-			return Math.round(num).toLocaleString('en-US');
-		case '1-decimal':
-			return num.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-		case '2-decimals':
-			return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-		default:
-			return num.toString();
-	}
-};
-
-// Format a date value based on the selected format
-const formatDate = (value: any, format: string): string => {
-	if (value === null || value === undefined || value === '') return '';
-
-	let date: Date;
-	if (value instanceof Date) {
-		date = value;
-	} else {
-		date = new Date(String(value));
-		if (isNaN(date.getTime())) return String(value);
-	}
-
-	switch (format) {
-		case 'yyyy-mm-dd':
-			return date.toISOString().split('T')[0];
-		case 'mm/dd/yyyy':
-			return date.toLocaleDateString('en-US');
-		case 'dd/mm/yyyy':
-			return date.toLocaleDateString('en-GB');
-		case 'mmm-dd-yyyy':
-			return date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
-		case 'mmmm-dd-yyyy':
-			return date.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' });
-		case 'dd-mmm-yyyy':
-			return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-		case 'yyyy':
-			return date.getFullYear().toString();
-		case 'mmm-yyyy':
-			return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-		case 'mm/dd/yy':
-			return date.toLocaleDateString('en-US', { year: '2-digit' });
-		case 'dd/mm/yy':
-			return date.toLocaleDateString('en-GB', { year: '2-digit' });
-		default:
-			return String(value);
-	}
-};
-
-// Format a state value based on the selected format
-const formatState = (value: any, format: string, geoType: string): string => {
-	if (value === null || value === undefined || value === '') return '';
-
-	const str = String(value).trim();
-
-	if (geoType.startsWith('usa-states')) {
-		switch (format) {
-			case 'abbreviated':
-				if (str.length === 2 && stateMap[str.toUpperCase()]) {
-					return str.toUpperCase();
-				}
-				const abbr = reverseStateMap[str.toLowerCase()];
-				return abbr || str;
-			case 'full':
-				if (str.length === 2) {
-					return stateMap[str.toUpperCase()] || str;
-				}
-				const fullName = Object.values(stateMap).find((state) => state.toLowerCase() === str.toLowerCase());
-				return fullName || str;
-			default:
-				return str;
-		}
-	} else if (geoType.startsWith('canada-provinces')) {
-		switch (format) {
-			case 'abbreviated':
-				if (str.length === 2 && canadaProvinceMap[str.toUpperCase()]) {
-					return str.toUpperCase();
-				}
-				const abbr = reverseCanadaProvinceMap[str.toLowerCase()];
-				return abbr || str;
-			case 'full':
-				if (str.length === 2) {
-					return canadaProvinceMap[str.toUpperCase()] || str;
-				}
-				const fullName = Object.values(canadaProvinceMap).find(
-					(province) => province.toLowerCase() === str.toLowerCase()
-				);
-				return fullName || str;
-			default:
-				return str;
-		}
-	}
-	// For counties or world, just return raw for now
-	return str;
-};
-
-// Helper function to format legend values based on column type and format
-const formatLegendValue = (
-	value: any,
-	column: string,
-	columnTypes: any,
-	columnFormats: any,
-	geoType: string
-): string => {
-	const type = columnTypes[column] || 'text';
-	const format = columnFormats[column] || getDefaultFormat(type as 'number' | 'date' | 'state' | 'coordinate');
-
-	if (type === 'number') {
-		return formatNumber(value, format);
-	}
-	if (type === 'date') {
-		return formatDate(value, format);
-	}
-	if (type === 'state') {
-		return formatState(value, format, geoType);
-	}
-	return String(value);
-};
-
-// Helper function to render the label preview with HTML tag support
-const renderLabelPreview = (
-	template: string,
-	dataRow: DataRow | GeocodedRow,
-	columnTypes: { [key: string]: 'text' | 'number' | 'date' | 'coordinate' | 'state' },
-	columnFormats: { [key: string]: string },
-	geoType: string
-): string => {
-	if (!template || !dataRow) {
-		return '';
-	}
-
-	const previewText = template.replace(/{([^}]+)}/g, (match, columnName) => {
-		const value = dataRow[columnName];
-		if (value === undefined || value === null) {
-			return '';
-		}
-		const type = columnTypes[columnName] || 'text';
-		const format = columnFormats[columnName] || getDefaultFormat(type as 'number' | 'date' | 'state' | 'coordinate');
-		return formatLegendValue(value, columnName, columnTypes, columnFormats, geoType);
-	});
-
-	return previewText;
-};
-
-// Helper function for intelligent auto-positioning
-const getAutoPosition = (
-	x: number,
-	y: number,
-	symbolSize: number,
-	labelWidth: number,
-	labelHeight: number,
-	svgWidth: number,
-	svgHeight: number
-) => {
-	const margin = Math.max(8, symbolSize * 0.3); // Increased scaling factor for better spacing
-	const edgeBuffer = 20;
-
-	// Preferred positions in order: right, left, bottom, top
-	const positions = [
-		{
-			dx: symbolSize / 2 + margin,
-			dy: 0,
-			anchor: 'start',
-			baseline: 'middle',
-			name: 'right',
-		},
-		{
-			dx: -(symbolSize / 2 + margin), // Removed labelWidth from calculation for tighter left spacing
-			dy: 0,
-			anchor: 'end', // Changed to "end" for proper right-aligned text
-			baseline: 'middle',
-			name: 'left',
-		},
-		{
-			dx: -labelWidth / 2,
-			dy: symbolSize / 2 + margin + labelHeight,
-			anchor: 'start',
-			baseline: 'hanging',
-			name: 'bottom',
-		},
-		{
-			dx: -labelWidth / 2,
-			dy: -(symbolSize / 2 + margin),
-			anchor: 'start',
-			baseline: 'baseline',
-			name: 'top',
-		},
-	];
-
-	// Check each position for validity
-	for (const pos of positions) {
-		const labelLeft = pos.anchor === 'end' ? x + pos.dx - labelWidth : x + pos.dx;
-		const labelRight = pos.anchor === 'end' ? x + pos.dx : x + pos.dx + labelWidth;
-		const labelTop = y + pos.dy - labelHeight / 2;
-		const labelBottom = y + pos.dy + labelHeight / 2;
-
-		// Check if label fits within SVG bounds
-		if (
-			labelLeft >= edgeBuffer &&
-			labelRight <= svgWidth - edgeBuffer &&
-			labelTop >= edgeBuffer &&
-			labelBottom <= svgHeight - edgeBuffer
-		) {
-			return pos;
-		}
-	}
-
-	// If no position fits perfectly, return the default (right)
-	return positions[0];
-};
-
-// Helper function to create formatted text with HTML tag support
-const createFormattedText = (
-	textElement: d3.Selection<SVGTextElement, any, any, any>,
-	labelText: string,
-	baseStyles: any
-) => {
-	// Clear existing content
-	textElement.selectAll('*').remove();
-	textElement.text('');
-
-	// Split by line breaks first and filter out empty lines
-	const lines = labelText.split(/\n|<br\s*\/?>/i).filter((line) => line.trim() !== '');
-
-	// Calculate vertical offset for centering multi-line text
-	const totalLines = lines.length;
-	const lineHeight = 1.2;
-	const verticalOffset = totalLines > 1 ? -((totalLines - 1) * lineHeight * 0.5) : 0;
-
-	lines.forEach((line, lineIndex) => {
-		// Parse HTML tags for each line
-		const parseAndCreateSpans = (text: string, parentElement: any, isFirstLine = false) => {
-			const htmlTagRegex = /<(\/?)([^>]+)>/g;
-			let lastIndex = 0;
-			let match;
-			const currentStyles = { ...baseStyles };
-			let hasAddedContent = false;
-
-			while ((match = htmlTagRegex.exec(text)) !== null) {
-				// Add text before the tag
-				if (match.index > lastIndex) {
-					const textContent = text.substring(lastIndex, match.index);
-					if (textContent) {
-						const tspan = parentElement.append('tspan').text(textContent);
-						if (isFirstLine && lineIndex === 0 && !hasAddedContent) {
-							tspan.attr('dy', `${verticalOffset}em`);
-						} else if (lineIndex > 0 && !hasAddedContent) {
-							tspan.attr('x', 0).attr('dy', `${lineHeight}em`);
-						}
-						applyStylesToTspan(tspan, currentStyles);
-						hasAddedContent = true;
-					}
-				}
-
-				const isClosing = match[1] === '/';
-				const tagName = match[2].toLowerCase();
-
-				if (!isClosing) {
-					// Opening tag - update current styles
-					switch (tagName) {
-						case 'b':
-						case 'strong':
-							currentStyles.fontWeight = 'bold';
-							break;
-						case 'i':
-						case 'em':
-							currentStyles.fontStyle = 'italic';
-							break;
-						case 'u':
-						case 's':
-						case 'strike':
-							currentStyles.textDecoration = (currentStyles.textDecoration || '') + ' line-through';
-							break;
-					}
-				} else {
-					// Closing tag - revert styles
-					switch (tagName) {
-						case 'b':
-						case 'strong':
-							currentStyles.fontWeight = baseStyles.fontWeight;
-							break;
-						case 'i':
-						case 'em':
-							currentStyles.fontStyle = baseStyles.fontStyle;
-							break;
-						case 'u':
-							currentStyles.textDecoration = (currentStyles.textDecoration || '').replace('underline', '').trim();
-							break;
-						case 's':
-							currentStyles.textDecoration = (currentStyles.textDecoration || '').replace('line-through', '').trim();
-							break;
-					}
-					if (currentStyles.textDecoration === '') delete currentStyles.textDecoration;
-				}
-
-				lastIndex = htmlTagRegex.lastIndex;
-			}
-
-			// Add remaining text after last tag
-			if (lastIndex < text.length) {
-				const textContent = text.substring(lastIndex);
-				if (textContent) {
-					const tspan = parentElement.append('tspan').text(textContent);
-					if (isFirstLine && lineIndex === 0) {
-						tspan.attr('dy', `${verticalOffset}em`);
-					} else if (lineIndex > 0) {
-						tspan.attr('x', 0).attr('dy', `${lineHeight}em`);
-					}
-					applyStylesToTspan(tspan, currentStyles);
-					hasAddedContent = true;
-				}
-			}
-
-			// If no HTML tags found and we have content, add the entire text as single tspan
-			if (lastIndex === 0 && text.trim() && !hasAddedContent) {
-				const tspan = parentElement.append('tspan').text(text);
-				if (isFirstLine && lineIndex === 0) {
-					tspan.attr('dy', `${verticalOffset}em`);
-				} else if (lineIndex > 0) {
-					tspan.attr('x', 0).attr('dy', `${lineHeight}em`);
-				}
-				applyStylesToTspan(tspan, currentStyles);
-				hasAddedContent = true;
-			}
-		};
-
-		const applyStylesToTspan = (tspan: any, styles: any) => {
-			if (styles.fontWeight) tspan.attr('font-weight', styles.fontWeight);
-			if (styles.fontStyle) tspan.attr('font-style', styles.fontStyle);
-			if (styles.textDecoration) tspan.attr('text-decoration', styles.textDecoration);
-		};
-
-		parseAndCreateSpans(line, textElement, lineIndex === 0);
-	});
-};
-
-/**
- * Canada topo files come with wildly different object names.
- * This inspects the object keys and aliases them so that
- *   data.objects.provinces   ⟶ provincial geometries (adm-1 level)
- *   data.objects.nation      ⟶ Canada outline
- */
-function normaliseCanadaObjects(data: TopoJSONData) {
-	const objects = data.objects ?? {};
-
-	// Detect a candidate for provinces (adm1)
-	const provincesKey = Object.keys(objects).find((k) => /prov|adm1|can_adm1|canada_provinces/i.test(k)) ?? null;
-
-	// Detect a candidate for the national outline
-	const nationKey = Object.keys(objects).find((k) => /nation|country|canada|can/i.test(k)) ?? null;
-
-	// Only alias when we actually find something
-	if (provincesKey && !objects.provinces) {
-		objects.provinces = objects[provincesKey];
-	}
-	if (nationKey && !objects.nation) {
-		objects.nation = objects[nationKey];
-	}
-
-	data.objects = objects;
-	return data;
-}
-
-/**
- * Try a list of candidate URLs until we find one that contains the
- * expected TopoJSON object(s).  Returns null if all attempts fail.
- */
-async function fetchTopoJSON(urls: string[], expected: string[]): Promise<TopoJSONData | null> {
-	for (const url of urls) {
-		try {
-			const res = await fetch(url);
-			if (!res.ok) continue;
-			const data = (await res.json()) as TopoJSONData;
-			console.log(`Fetched data from ${url}. Objects found:`, Object.keys(data.objects || {})); // Debugging
-			const ok = expected.every((k) => data.objects && data.objects[k] && Object.keys(data.objects[k]).length > 0); // Check if object exists and is not empty
-			if (ok) return data;
-		} catch (error) {
-			console.error(`Error fetching or parsing ${url}:`, error); // More detailed error logging
-			// ignore and try the next URL
-		}
-	}
-	return null;
-}
-
-// Utility to get subnational label based on geography
-function getSubnationalLabel(geo: string, plural = false) {
-	if (geo === 'usa-states') return plural ? 'States' : 'State';
-	if (geo === 'usa-counties') return plural ? 'Counties' : 'County';
-	if (geo === 'canada-provinces') return plural ? 'Provinces' : 'Province';
-	return plural ? 'Regions' : 'Region';
-}
-
-// Add ISO3 country code map (partial, for demo; should be expanded for full support)
-const countryNameToIso3: Record<string, string> = {
-	'United States': 'USA',
-	Canada: 'CAN',
-	Mexico: 'MEX',
-	Brazil: 'BRA',
-	China: 'CHN',
-	India: 'IND',
-	'United Kingdom': 'GBR',
-	France: 'FRA',
-	Germany: 'DEU',
-	Japan: 'JPN',
-	// ... add more as needed ...
-};
-const iso3ToCountryName: Record<string, string> = Object.fromEntries(
-	Object.entries(countryNameToIso3).map(([k, v]) => [v, k])
-);
-
-function formatCountry(value: any, format: string): string {
-	if (value === null || value === undefined || value === '') return '';
-	const str = String(value).trim();
-	if (format === 'default' || !format) return str;
-	if (format === 'iso3') {
-		if (str.length === 3 && iso3ToCountryName[str.toUpperCase()]) return str.toUpperCase();
-		return countryNameToIso3[str] || str;
-	} else if (format === 'full') {
-		if (str.length === 3 && iso3ToCountryName[str.toUpperCase()]) return iso3ToCountryName[str.toUpperCase()];
-		return str;
-	}
-	return str;
-}
+const MAP_WIDTH = 975
+const MAP_HEIGHT = 610
 
 export function MapPreview({
 	symbolData,
 	choroplethData,
-	symbolColumns,
-	choroplethColumns,
 	mapType,
 	dimensionSettings,
 	stylingSettings,
@@ -963,182 +73,29 @@ export function MapPreview({
 	columnTypes,
 	columnFormats,
 	customMapData,
-	selectedGeography, // Destructure new prop
-	selectedProjection, // Destructure new prop
-	clipToCountry, // Destructure new prop
+  selectedGeography,
+  selectedProjection,
+  clipToCountry,
 	isExpanded,
 	setIsExpanded,
 }: MapPreviewProps) {
-	console.log('=== MAP PREVIEW RENDER DEBUG ===');
-	console.log('Map type:', mapType);
-	console.log('Custom map data length:', customMapData?.length || 0);
-	console.log('Dimension settings:', dimensionSettings);
-	console.log('Selected Geography:', selectedGeography);
-	console.log('Selected Projection:', selectedProjection);
-	console.log('Clip to Country:', clipToCountry);
-
-	const [geoAtlasData, setGeoAtlasData] = useState<TopoJSONData | null>(null); // Renamed from usData
-	const [isLoading, setIsLoading] = useState(true);
-	const svgRef = useRef<SVGSVGElement>(null);
-	const mapContainerRef = useRef<HTMLDivElement>(null);
-	const { toast } = useToast();
-
-	// Load TopoJSON data based on selectedGeography
-	useEffect(() => {
-		const loadGeoData = async () => {
-			try {
-				setIsLoading(true);
-				setGeoAtlasData(null); // Clear previous data immediately
-
-				let data: TopoJSONData | null = null;
-
-				switch (selectedGeography) {
-					case 'usa-states':
-						data = await fetchTopoJSON(
-							[
-								// states file
-								'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json',
-								'https://unpkg.com/us-atlas@3/states-10m.json',
-							],
-							['nation', 'states']
-						);
-						break;
-
-					case 'usa-counties':
-						data = await fetchTopoJSON(
-							[
-								// counties file
-								'https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json',
-								'https://unpkg.com/us-atlas@3/counties-10m.json',
-							],
-							['nation', 'counties']
-						);
-						if (!data) {
-							toast({
-								title: 'Map data error',
-								description: "Couldn't load US county boundaries. Please retry or check your connection.",
-								variant: 'destructive',
-								duration: 4000,
-							});
-							return;
-						}
-						break;
-					case 'usa-nation':
-					case 'canada-nation':
-						// For single nation, load higher detail world-atlas
-						data = await fetchTopoJSON(
-							[
-								'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-10m.json', // Higher detail
-								'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json',
-								'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json',
-								'https://unpkg.com/world-atlas@2/countries-10m.json',
-							],
-							['countries'] // Always expect 'countries' for world-atlas
-						);
-						if (!data) {
-							toast({
-								title: 'Map data error',
-								description: "Couldn't load country boundaries. Please retry or check your connection.",
-								variant: 'destructive',
-								duration: 4000,
-							});
-							return;
-						}
-						break;
-					case 'world':
-						// For world, load lower detail world-atlas
-						data = await fetchTopoJSON(
-							[
-								'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json',
-								'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json',
-								'https://unpkg.com/world-atlas@2/countries-110m.json',
-							],
-							['countries'] // Always expect 'countries' for world-atlas
-						);
-						if (!data) {
-							toast({
-								title: 'Map data error',
-								description: "Couldn't load world country boundaries. Please retry or check your connection.",
-								variant: 'destructive',
-								duration: 4000,
-							});
-							return;
-						}
-						break;
-
-					case 'canada-provinces':
-						// This still loads Canada provinces atlas
-						data = await fetchTopoJSON(
-							[
-								'https://gist.githubusercontent.com/Brideau/2391df60938462571ca9/raw/f5a1f3b47ff671eaf2fb7e7b798bacfc6962606a/canadaprovtopo.json',
-								'https://raw.githubusercontent.com/deldersveld/topojson/master/countries/canada/canada-provinces.json',
-								'https://cdn.jsdelivr.net/gh/deldersveld/topojson@master/countries/canada/canada-provinces.json',
-							],
-							[] // Accept any objects, normalise below
-						);
-						if (!data) {
-							toast({
-								title: 'Map data error',
-								description: "Couldn't load Canadian province boundaries.",
-								variant: 'destructive',
-								duration: 4000,
-							});
-							setGeoAtlasData(null);
-							return;
-						}
-						data = normaliseCanadaObjects(data); // Normalise after fetching
-
-						// No longer return here if provinces are missing, allow fallback to nation outline
-						if (!data.objects?.provinces) {
-							console.warn(
-								'[map-studio] Canada topojson has no provincial shapes – falling back to nation view.',
-								Object.keys(data.objects ?? {})
-							);
-						}
-						break;
-
-					default:
-						setGeoAtlasData(null);
-						setIsLoading(false);
-						return;
-				}
-				setGeoAtlasData(data);
-			} catch (error) {
-				console.error('Error loading geo data:', error);
-				toast({
-					title: 'Map loading failed',
-					description: `Failed to load map data for ${selectedGeography}.`,
-					variant: 'destructive',
-					duration: 3000,
-				});
-				setGeoAtlasData(null);
-			} finally {
-				setIsLoading(false);
-			}
-		};
-		loadGeoData();
-	}, [selectedGeography, toast]); // Re-run when selectedGeography changes
+  const svgRef = useRef<SVGSVGElement>(null)
+  const mapContainerRef = useRef<HTMLDivElement>(null)
+  const { toast } = useToast()
+  const { geoAtlasData, isLoading } = useGeoAtlasData({
+    selectedGeography,
+    notify: (options) => {
+      toast(options as Parameters<typeof toast>[0])
+    },
+  })
 
 	useEffect(() => {
-		console.log('=== MAP PREVIEW USEEFFECT TRIGGERED ===');
-		console.log('Map type:', mapType);
-		console.log('Custom map data length:', customMapData?.length || 0);
-		console.log('Geo atlas data loaded:', !!geoAtlasData);
+    if (!svgRef.current || !mapContainerRef.current || !geoAtlasData) {
+      return
+    }
 
-		if (!svgRef.current || !mapContainerRef.current) {
-			console.log('SVG ref or container ref not ready');
-			return;
-		}
-
-		const svg = d3.select(svgRef.current);
-		svg.selectAll('*').remove();
-
-		const width = 975;
-
-		// Create scales that will be used by both symbols and legends
-		let sizeScale: any = null;
-		let symbolColorScale: any = null;
-		let choroplethColorScale: any = null;
+    const svg = d3.select(svgRef.current)
+    svg.selectAll('*').remove()
 
 		// Determine what should be rendered
 		const shouldRenderSymbols =
@@ -1146,1640 +103,175 @@ export function MapPreview({
 			dimensionSettings?.symbol?.latitude &&
 			dimensionSettings?.symbol?.longitude &&
 			symbolData.length > 0 &&
-			!customMapData;
+      !customMapData
 
 		const shouldRenderChoropleth =
 			choroplethDataExists &&
 			dimensionSettings?.choropleth?.stateColumn &&
 			dimensionSettings?.choropleth?.colorBy &&
-			choroplethData.length > 0;
+      choroplethData.length > 0
 
-		// Calculate dynamic height based on legends needed
-		let legendHeight = 0;
+    // Calculate legend flags
 		const shouldShowSymbolSizeLegend =
 			shouldRenderSymbols &&
 			dimensionSettings.symbol.sizeBy &&
-			dimensionSettings.symbol.sizeMinValue !== dimensionSettings.symbol.sizeMaxValue;
-		const shouldShowSymbolColorLegend = shouldRenderSymbols && dimensionSettings.symbol.colorBy;
-		const shouldShowChoroplethColorLegend = shouldRenderChoropleth && dimensionSettings.choropleth.colorBy;
+      dimensionSettings.symbol.sizeMinValue !== dimensionSettings.symbol.sizeMaxValue
 
-		if (shouldShowSymbolSizeLegend) legendHeight += 80;
-		if (shouldShowSymbolColorLegend) legendHeight += 80;
-		if (shouldShowChoroplethColorLegend) legendHeight += 80;
+    const shouldShowSymbolColorLegend = shouldRenderSymbols && dimensionSettings.symbol.colorBy
+    const shouldShowChoroplethColorLegend = shouldRenderChoropleth && dimensionSettings.choropleth.colorBy
 
-		const mapHeight = 610;
-		const height = mapHeight + legendHeight;
+    const legendHeight = estimateLegendHeight({
+      showSymbolSizeLegend: !!shouldShowSymbolSizeLegend,
+      showSymbolColorLegend: !!shouldShowSymbolColorLegend,
+      showChoroplethColorLegend: !!shouldShowChoroplethColorLegend,
+    })
 
-		mapContainerRef.current.style.backgroundColor = stylingSettings.base.mapBackgroundColor;
+    const totalHeight = MAP_HEIGHT + legendHeight
 
-		svg
-			.attr('viewBox', `0 0 ${width} ${height}`)
+    // Set container background
+    if (mapContainerRef.current) {
+      mapContainerRef.current.style.backgroundColor = stylingSettings.base.mapBackgroundColor
+    }
+
+    // Configure SVG
+    svg
+      .attr('viewBox', `0 0 ${MAP_WIDTH} ${totalHeight}`)
 			.attr('width', '100%')
 			.attr('height', '100%')
-			.attr('style', 'max-width: 100%; height: auto;');
+      .attr('style', 'max-width: 100%; height: auto;')
 
-		let projection: d3.GeoProjection;
-		if (selectedProjection === 'albersUsa') {
-			projection = d3
-				.geoAlbersUsa()
-				.scale(1300)
-				.translate([width / 2, mapHeight / 2]);
-			console.log(`Using Albers USA projection with scale: 1300, translate: [${width / 2}, ${mapHeight / 2}]`);
-		} else if (selectedProjection === 'albers') {
-			// Albers projection (suitable for single countries or continents)
-			projection = d3
-				.geoAlbers()
-				.scale(1300) // Default scale, will be adjusted by fitSize if clipping
-				.translate([width / 2, mapHeight / 2]);
-			console.log(`Using Albers projection with scale: 1300, translate: [${width / 2}, ${mapHeight / 2}]`);
-		} else if (selectedProjection === 'mercator') {
-			// Adjust scale for Mercator to fit the world
-			projection = d3
-				.geoMercator()
-				.scale(150)
-				.translate([width / 2, mapHeight / 2]);
-		} else if (selectedProjection === 'equalEarth') {
-			// Adjust scale for Equal Earth to fit the world
-			projection = d3
-				.geoEqualEarth()
-				.scale(150)
-				.translate([width / 2, mapHeight / 2]);
-		} else {
-			// Fallback to Albers USA
-			projection = d3
-				.geoAlbersUsa()
-				.scale(1300)
-				.translate([width / 2, mapHeight / 2]);
-		}
+    // Render base map (custom SVG or TopoJSON)
+    const { projection, path } = renderBaseMap({
+      svg,
+      width: MAP_WIDTH,
+      mapHeight: MAP_HEIGHT,
+      selectedProjection,
+      selectedGeography,
+      clipToCountry,
+      customMapData,
+      geoAtlasData,
+      stylingSettings,
+      toast,
+      findCountryFeature,
+    })
 
-		const path = d3.geoPath().projection(projection);
+    let symbolSizeScale: d3.ScaleLinear<number, number, never> | null = null
+    let symbolColorScale: ((value: unknown) => string) | null = null
+    let choroplethColorScale: ((value: unknown) => string) | null = null
 
-		// PRIORITY: Custom map takes precedence if custom map data exists
-		if (customMapData && customMapData.trim().length > 0) {
-			console.log('=== CUSTOM MAP RENDERING START ===');
-			console.log('Custom map data length:', customMapData.length);
-
-			try {
-				const parser = new DOMParser();
-				const doc = parser.parseFromString(customMapData, 'image/svg+xml');
-
-				const errorNode = doc.querySelector('parsererror');
-				if (errorNode) {
-					console.error('SVG parsing error:', errorNode.textContent);
-					toast({
-						title: 'Custom Map Error',
-						description: `SVG parsing error: ${errorNode.textContent}`,
-						variant: 'destructive',
-						duration: 5000,
-					});
-					return;
-				}
-
-				const customMapElement = doc.documentElement;
-				console.log('Parsed SVG element:', customMapElement.tagName);
-
-				// Try multiple approaches to import the custom map
-				const mapGroupToImport = d3.select(customMapElement).select('#Map');
-				if (!mapGroupToImport.empty()) {
-					const node = mapGroupToImport.node();
-					if (node) {
-						const importedMapGroup = document.importNode(node, true);
-						const svgNode = svg.node();
-						if (svgNode) {
-							svgNode.appendChild(importedMapGroup);
-							console.log('✅ Imported #Map group successfully');
-						}
-					}
-				} else {
-					console.log('No #Map group found, importing entire SVG content');
-					const mapGroup = svg.append('g').attr('id', 'Map');
-					const mapGroupNode = mapGroup.node();
-					if (mapGroupNode) {
-						Array.from(customMapElement.children).forEach((child) => {
-							const importedChild = document.importNode(child, true);
-							mapGroupNode.appendChild(importedChild);
-						});
-						console.log('✅ Imported', customMapElement.children.length, 'elements into new Map group');
-					}
-				}
-
-				// Look for Nations and States/Counties/Provinces groups
-				let nationsGroup = svg.select('#Nations');
-				let statesOrCountiesGroup = svg.select('#States');
-
-				if (nationsGroup.empty()) {
-					nationsGroup = svg.select('#Countries');
-				}
-				if (statesOrCountiesGroup.empty()) {
-					statesOrCountiesGroup = svg.select('#Counties, #Provinces, #Regions');
-				}
-
-				console.log('Nations group found:', !nationsGroup.empty(), 'Paths:', nationsGroup.selectAll('path').size());
-				console.log(
-					'States/Counties/Provinces group found:',
-					!statesOrCountiesGroup.empty(),
-					'Paths:',
-					statesOrCountiesGroup.selectAll('path').size()
-				);
-
-				// Apply styling
-				if (!nationsGroup.empty()) {
-					nationsGroup
-						.selectAll('path')
-						.attr('fill', stylingSettings.base.nationFillColor)
-						.attr('stroke', stylingSettings.base.nationStrokeColor)
-						.attr('stroke-width', stylingSettings.base.nationStrokeWidth);
-				}
-
-				if (!statesOrCountiesGroup.empty()) {
-					statesOrCountiesGroup
-						.selectAll('path')
-						.attr('fill', stylingSettings.base.defaultStateFillColor)
-						.attr('stroke', stylingSettings.base.defaultStateStrokeColor)
-						.attr('stroke-width', stylingSettings.base.defaultStateStrokeWidth);
-				}
-
-				console.log('=== CUSTOM MAP RENDERING COMPLETE ===');
-			} catch (error: any) {
-				console.error('Error processing custom map data:', error);
-				toast({
-					title: 'Custom Map Error',
-					description: `Error processing custom map data: ${error.message}`,
-					variant: 'destructive',
-					duration: 5000,
-				});
-			}
-		} else if (geoAtlasData) {
-			// Render standard US or World map
-			console.log('=== STANDARD MAP RENDERING START ===');
-
-			const mapGroup = svg.append('g').attr('id', 'Map');
-			const nationsGroup = mapGroup.append('g').attr('id', 'Nations');
-			const statesOrCountiesGroup = mapGroup.append('g').attr('id', 'StatesOrCounties'); // New group name
-
-			let geoFeatures: any[] = [];
-			let nationMesh: any = null;
-			let countryFeatureForClipping: any = null; // To store the feature for clipping
-
-			const { objects } = geoAtlasData as TopoJSONData;
-			if (!objects) {
-				console.error("TopoJSON file has no 'objects' property:", geoAtlasData);
-				toast({
-					title: 'Invalid TopoJSON',
-					description: 'The downloaded map file is missing required data.',
-					variant: 'destructive',
-				});
-				return;
-			}
-
-			// Utility ─ find a country feature by several possible identifiers
-			function findCountryFeature(features: any[], candidates: (string | number)[]) {
-				return features.find((f) => {
-					const props = f.properties ?? {};
-					return candidates.some((c) =>
-						[props.name, props.name_long, props.admin, props.iso_a3, String(f.id)]
-							.filter(Boolean)
-							.map((v) => v.toString().toLowerCase())
-							.includes(String(c).toLowerCase())
-					);
-				});
-			}
-
-			// Determine nation mesh and countryFeatureForClipping based on selectedGeography
-			if (selectedGeography === 'usa-states') {
-				// US States: use us-atlas with states + nation outline
-				if (!objects.nation || !objects.states) {
-					console.error("US atlas missing 'nation' or 'states' object:", objects);
-					toast({
-						title: 'Map data error',
-						description: 'US states map data is incomplete.',
-						variant: 'destructive',
-						duration: 4000,
-					});
-					return;
-				}
-				nationMesh = topojson.mesh(geoAtlasData, objects.nation);
-				countryFeatureForClipping = topojson.feature(geoAtlasData, objects.nation);
-				geoFeatures = topojson.feature(geoAtlasData, objects.states).features;
-			} else if (selectedGeography === 'usa-counties') {
-				// US Counties: use us-atlas with counties + nation outline
-				if (!objects.nation || !objects.counties) {
-					console.error("US atlas missing 'nation' or 'counties' object:", objects);
-					toast({
-						title: 'Map data error',
-						description: 'US counties map data is incomplete.',
-						variant: 'destructive',
-						duration: 4000,
-					});
-					return;
-				}
-				nationMesh = topojson.mesh(geoAtlasData, objects.nation);
-				countryFeatureForClipping = topojson.feature(geoAtlasData, objects.nation);
-				geoFeatures = topojson.feature(geoAtlasData, objects.counties).features;
-			} else if (selectedGeography === 'canada-provinces') {
-				// Canada Provinces: use canada-specific atlas
-				if (objects.provinces) {
-					// Has provinces - render them with nation outline
-					const nationSource = objects.nation || objects.countries;
-					if (nationSource) {
-						nationMesh = topojson.mesh(geoAtlasData, nationSource);
-						countryFeatureForClipping = topojson.feature(geoAtlasData, nationSource);
-					}
-					geoFeatures = topojson.feature(geoAtlasData, objects.provinces).features;
-				} else {
-					// No provinces - fall back to nation-only view using world atlas
-					console.warn('[map-studio] No provinces found, falling back to Canada nation view');
-					if (objects.countries) {
-						const allCountries = topojson.feature(geoAtlasData, objects.countries).features;
-						countryFeatureForClipping = findCountryFeature(allCountries, ['Canada', 'CAN', 124]);
-						if (countryFeatureForClipping) {
-							nationMesh = topojson.mesh(geoAtlasData, countryFeatureForClipping);
-						}
-					}
-					geoFeatures = [];
-				}
-			} else if (selectedGeography === 'usa-nation' || selectedGeography === 'canada-nation') {
-				// USA Nation or Canada Nation: use world atlas, find specific country
-				if (objects.countries) {
-					const allCountries = topojson.feature(geoAtlasData, objects.countries).features;
-					const targetCountryName = selectedGeography === 'usa-nation' ? 'United States' : 'Canada';
-					const specificCountryFeature = findCountryFeature(allCountries, [
-						targetCountryName,
-						targetCountryName === 'United States' ? 'USA' : 'CAN',
-						targetCountryName === 'United States' ? 840 : 124,
-					]);
-					if (specificCountryFeature) {
-						nationMesh = topojson.mesh(geoAtlasData, specificCountryFeature);
-						countryFeatureForClipping = specificCountryFeature; // Set for clipping
-						geoFeatures = [specificCountryFeature]; // Render this single feature
-					} else {
-						console.warn(`[map-studio] Could not find ${targetCountryName} in world atlas.`);
-						toast({
-							title: 'Map data error',
-							description: `Could not find ${targetCountryName} in the world map data.`,
-							variant: 'destructive',
-							duration: 4000,
-						});
-						// Fallback to rendering all countries if specific country not found
-						nationMesh = topojson.mesh(geoAtlasData, objects.countries);
-						geoFeatures = topojson.feature(geoAtlasData, objects.countries).features;
-					}
-				}
-			} else if (selectedGeography === 'world') {
-				// World: use world atlas, render all countries
-				const countriesSource = objects.countries || objects.land;
-				if (countriesSource) {
-					nationMesh = topojson.mesh(geoAtlasData, countriesSource, (a: any, b: any) => a !== b);
-					countryFeatureForClipping = topojson.feature(geoAtlasData, countriesSource);
-					geoFeatures = topojson.feature(geoAtlasData, countriesSource).features;
-				} else {
-					console.error("World atlas missing 'countries' or 'land' object:", objects);
-					toast({
-						title: 'Map data error',
-						description: 'The world map data is incomplete.',
-						variant: 'destructive',
-						duration: 4000,
-					});
-					return;
-				}
-			}
-
-			// Apply clipping and projection fitting
-			if (clipToCountry && countryFeatureForClipping && selectedProjection !== 'albersUsa') {
-				const clipPathId = 'clip-path-country';
-				const defs = svg.append('defs');
-				defs.append('clipPath').attr('id', clipPathId).append('path').attr('d', path(countryFeatureForClipping));
-				mapGroup.attr('clip-path', `url(#${clipPathId})`);
-
-				// Fit projection to the specific country/region
-				projection.fitSize([width, mapHeight], countryFeatureForClipping);
-				path.projection(projection); // Update path generator with new projection
-				console.log(
-					`Projection fitted to bounds. New scale: ${projection.scale()}, translate: ${projection.translate()}`
-				);
-			} else if (geoFeatures.length > 0 && selectedProjection !== 'albersUsa') {
-				// If no clipping but we have sub-features, fit to those bounds
-				const featureCollection = { type: 'FeatureCollection', features: geoFeatures };
-				projection.fitSize([width, mapHeight], featureCollection);
-				path.projection(projection);
-				console.log(
-					`Projection fitted to sub-features. New scale: ${projection.scale()}, translate: ${projection.translate()}`
-				);
-			} else {
-				mapGroup.attr('clip-path', null); // Remove clip path if not enabled
-				console.log('Using default projection scale and translate.');
-			}
-
-			// Only proceed if we have a nationMesh or geoFeatures to draw
-			if (!nationMesh && geoFeatures.length === 0) {
-				console.warn('No map features or nation mesh to render for selected geography.');
-				toast({
-					title: 'Map data unavailable',
-					description: `No map data found for ${selectedGeography}.`,
-					variant: 'destructive',
-					duration: 3000,
-				});
-				return;
-			}
-
-			// Render the main nation outline (or single country outline)
-			if (nationMesh) {
-				nationsGroup
-					.append('path')
-					.attr(
-						'id',
-						selectedGeography === 'usa-nation'
-							? 'Country-US'
-							: selectedGeography === 'canada-nation'
-							? 'Country-CA'
-							: 'World-Outline' // This ID might need to be more dynamic for world countries
-					)
-					.attr('fill', stylingSettings.base.nationFillColor)
-					.attr('stroke', stylingSettings.base.nationStrokeColor)
-					.attr('stroke-width', stylingSettings.base.nationStrokeWidth)
-					.attr('stroke-linejoin', 'round')
-					.attr('stroke-linecap', 'round')
-					.attr('d', path(nationMesh));
-				console.log(
-					`Nation mesh rendered with fill: ${stylingSettings.base.nationFillColor}, stroke: ${stylingSettings.base.nationStrokeColor}`
-				);
-			}
-
-			// Render sub-features (states, counties, provinces, or individual countries for world map)
-			console.log('=== SUB-FEATURE FEATURES DEBUG ===');
-			console.log('Number of features:', geoFeatures.length);
-			geoFeatures.slice(0, 5).forEach((feature, index) => {
-				console.log(`Feature ${index}:`, {
-					id: feature.id,
-					properties: feature.properties,
-					postal: feature.properties?.postal,
-					name: feature.properties?.name,
-				});
-			});
-
-			statesOrCountiesGroup
-				.selectAll('path')
-				.data(geoFeatures)
-				.join('path')
-				.attr('id', (d) => {
-					const identifier = d.properties?.postal || d.properties?.name || d.id;
-					let prefix = '';
-					if (selectedGeography === 'usa-states') prefix = 'State';
-					else if (selectedGeography === 'usa-counties') prefix = 'County';
-					else if (selectedGeography === 'canada-provinces') prefix = 'Province';
-					else if (
-						selectedGeography === 'world' ||
-						selectedGeography === 'usa-nation' ||
-						selectedGeography === 'canada-nation'
-					)
-						prefix = 'Country';
-					// Use dynamic label
-					prefix = getSubnationalLabel(selectedGeography, false);
-					const featureId = `${prefix}-${identifier || ''}`;
-					return featureId;
-				})
-				.attr('fill', (d) =>
-					selectedGeography === 'world' || selectedGeography === 'usa-nation' || selectedGeography === 'canada-nation'
-						? stylingSettings.base.nationFillColor
-						: stylingSettings.base.defaultStateFillColor
-				)
-				.attr('stroke', (d) =>
-					selectedGeography === 'world' || selectedGeography === 'usa-nation' || selectedGeography === 'canada-nation'
-						? stylingSettings.base.nationStrokeColor
-						: stylingSettings.base.defaultStateStrokeColor
-				)
-				.attr('stroke-width', (d) =>
-					selectedGeography === 'world' || selectedGeography === 'usa-nation' || selectedGeography === 'canada-nation'
-						? stylingSettings.base.nationStrokeWidth
-						: stylingSettings.base.defaultStateStrokeWidth
-				)
-				.attr('stroke-linejoin', 'round')
-				.attr('stroke-linecap', 'round')
-				.attr('d', path);
-
-			console.log('=== STANDARD MAP RENDERING COMPLETE ===');
-		}
-
-		// Apply choropleth data if available
-		console.log('=== CHOROPLETH RENDERING DEBUG ===');
-		console.log('Should render choropleth:', shouldRenderChoropleth);
-		console.log('Choropleth data exists:', choroplethDataExists);
-		console.log('State column:', dimensionSettings?.choropleth?.stateColumn);
-		console.log('Color by:', dimensionSettings?.choropleth?.colorBy);
-		console.log('Choropleth data length:', choroplethData.length);
-
-		if (shouldRenderChoropleth) {
-			// Build state data map
-			const geoDataMap = new Map();
-
-			console.log('=== Building geo data map for choropleth ===');
-			choroplethData.forEach((d, index) => {
-				const rawGeoValue = String(d[dimensionSettings.choropleth.stateColumn] || '');
-				if (!rawGeoValue.trim()) return;
-
-				// Normalize geo value based on selected geography
-				const normalizedKey = normalizeGeoIdentifier(rawGeoValue, selectedGeography);
-
-				const value =
-					dimensionSettings.choropleth.colorScale === 'linear'
-						? getNumericValue(d, dimensionSettings.choropleth.colorBy)
-						: String(d[dimensionSettings.choropleth.colorBy]);
-
-				if (
-					value !== null &&
-					(dimensionSettings.choropleth.colorScale === 'linear' ? !isNaN(value as number) : value)
-				) {
-					geoDataMap.set(normalizedKey, value);
-					console.log(`✓ Mapped ${rawGeoValue} → ${normalizedKey} = ${value}`);
-				}
-			});
-
-			console.log('Total mapped geos:', geoDataMap.size);
-			console.log('Geo data map:', Array.from(geoDataMap.entries()));
-
-			// Create color scale
-			if (dimensionSettings?.choropleth?.colorScale === 'linear') {
-				const domain = [dimensionSettings.choropleth.colorMinValue, dimensionSettings.choropleth.colorMaxValue];
-				const rangeColors = [
-					dimensionSettings.choropleth.colorMinColor || stylingSettings.base.defaultStateFillColor,
-					dimensionSettings.choropleth.colorMaxColor || stylingSettings.base.defaultStateFillColor,
-				];
-
-				if (dimensionSettings.choropleth.colorMidColor) {
-					domain.splice(1, 0, dimensionSettings.choropleth.colorMidValue);
-					rangeColors.splice(1, 0, dimensionSettings.choropleth.colorMidColor);
-				}
-				choroplethColorScale = d3.scaleLinear().domain(domain).range(rangeColors);
-				console.log('Created linear color scale with domain:', domain, 'range:', rangeColors);
-			} else {
-				const uniqueDataCategories = getUniqueValues(dimensionSettings.choropleth.colorBy, choroplethData);
-				const colorMap = new Map();
-				dimensionSettings?.choropleth?.categoricalColors?.forEach((item: any, index: number) => {
-					const dataCategory = uniqueDataCategories[index];
-					if (dataCategory !== undefined) {
-						colorMap.set(String(dataCategory), item.color);
-					}
-				});
-				choroplethColorScale = (value: any) =>
-					colorMap.get(String(value)) || stylingSettings.base.defaultStateFillColor;
-				console.log('Created categorical color scale with map:', Array.from(colorMap.entries()));
-			}
-
-			// Apply colors to state/country/county/province paths and groups
-			const mapGroup = svg.select('#Map');
-			if (!mapGroup.empty()) {
-				console.log('Found map group, applying choropleth colors...');
-				let featuresColored = 0;
-
-				mapGroup.selectAll('path, g').each(function (this: SVGElement) {
-					const element = d3.select(this);
-					const id = element.attr('id');
-					let featureKey: string | null = null;
-
-					// Determine the effective ID: prioritize element's own ID, then parent's ID if it's a path without ID
-					let effectiveId = id;
-					if (this.tagName === 'path' && !effectiveId && this.parentElement && this.parentElement.tagName === 'g') {
-						effectiveId = d3.select(this.parentElement).attr('id');
-					}
-
-					if (effectiveId) {
-						if (customMapData) {
-							const extractedCandidate = extractCandidateFromSVGId(effectiveId);
-							featureKey = normalizeGeoIdentifier(extractedCandidate || effectiveId, selectedGeography);
-						} else {
-							// For standard TopoJSON maps (which use d.id on paths)
-							const d = element.datum() as any; // Here, d.properties.name or d.id is valid for TopoJSON
-							if (selectedGeography.startsWith('usa-states')) {
-								featureKey = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null; // Use d.id for TopoJSON US states
-							} else if (selectedGeography.startsWith('usa-counties')) {
-								featureKey = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null; // Use d.id (FIPS) for US counties
-							} else if (selectedGeography.startsWith('canada-provinces')) {
-								// Try both abbreviation and full name
-								const abbrKey = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null;
-								const nameKey = d?.properties?.name
-									? normalizeGeoIdentifier(String(d.properties.name), selectedGeography)
-									: null;
-								// Add detailed logging
-								console.log('[Canada Choropleth Debug]', {
-									id: d?.id,
-									name: d?.properties?.name,
-									abbrKey,
-									nameKey,
-									abbrKeyFound: abbrKey && geoDataMap.has(abbrKey),
-									nameKeyFound: nameKey && geoDataMap.has(nameKey),
-									geoDataMapKeys: Array.from(geoDataMap.keys()),
-								});
-								// Prefer abbrKey, but fallback to nameKey if not found in geoDataMap
-								if (abbrKey && geoDataMap.has(abbrKey)) {
-									featureKey = abbrKey;
-								} else if (nameKey && geoDataMap.has(nameKey)) {
-									featureKey = nameKey;
-								} else {
-									featureKey = abbrKey || nameKey;
-								}
-							} else if (
-								selectedGeography === 'world' ||
-								selectedGeography === 'usa-nation' ||
-								selectedGeography === 'canada-nation'
-							) {
-								featureKey = d?.properties?.name || String(d?.id) || effectiveId; // For world maps, use name or ID directly
-							}
-						}
-					}
-
-					if (!featureKey) {
-						element.attr('fill', stylingSettings.base.defaultStateFillColor);
-						return;
-					}
-
-					const value = geoDataMap.get(featureKey);
-					if (value !== undefined) {
-						const color = choroplethColorScale(value);
-						element.attr('fill', color);
-						featuresColored++;
-						console.log(`✅ Applied color ${color} to feature ${featureKey} (value: ${value})`);
-					} else {
-						element.attr('fill', stylingSettings.base.defaultStateFillColor);
-						console.log(`No data found for feature: ${featureKey}, applying default fill.`);
-					}
-				});
-				console.log('Features actually colored:', featuresColored);
-			} else {
-				console.log('❌ No map group found for choropleth rendering');
-			}
-		}
-
-		// Render symbol data if available, and only if not using a custom map
-
-		console.log('=== SYMBOL RENDERING DEBUG ===');
-		console.log('Should render symbols:', shouldRenderSymbols);
-		console.log('Symbol data exists:', symbolDataExists);
-		console.log('Latitude column:', dimensionSettings?.symbol?.latitude);
-		console.log('Longitude column:', dimensionSettings?.symbol?.longitude);
-		console.log('Symbol data length:', symbolData.length);
-		console.log('Custom map data present (for symbol check):', !!customMapData);
-
+    // Render symbols if applicable
 		if (shouldRenderSymbols) {
-			console.log('=== Rendering symbol data ===');
-			console.log('Symbol data before filter:', symbolData.length);
-			console.log('Dimension settings for symbols:', dimensionSettings.symbol);
+      const symbolResult = renderSymbols({
+        svg,
+        projection,
+        symbolData,
+        dimensionSettings,
+        stylingSettings,
+        getNumericValue,
+        getUniqueValues,
+        getSymbolPathData,
+      })
+      symbolSizeScale = symbolResult.sizeScale
+      symbolColorScale = symbolResult.colorScale as ((value: unknown) => string) | null
 
-			// Create symbol group
-			const symbolGroup = svg.append('g').attr('id', 'Symbols');
-			const symbolLabelGroup = svg.append('g').attr('id', 'SymbolLabels');
-
-			// Filter data with valid coordinates
-			const validSymbolData = symbolData.filter((d) => {
-				const lat = Number(d[dimensionSettings.symbol.latitude]);
-				const lng = Number(d[dimensionSettings.symbol.longitude]);
-				const isValid = !isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
-				if (!isValid) {
-					console.log(`Invalid coordinates for row:`, { lat, lng, row: d });
-				}
-				return isValid;
-			});
-
-			// Create size scale if size dimension is mapped
-			if (dimensionSettings.symbol.sizeBy && validSymbolData.length > 0) {
-				const sizeValues = validSymbolData.map((d) => getNumericValue(d, dimensionSettings.symbol.sizeBy) || 0);
-				const minSize = Math.min(...sizeValues);
-				const maxSize = Math.max(...sizeValues);
-
-				if (minSize !== maxSize) {
-					sizeScale = d3
-						.scaleLinear()
-						.domain([dimensionSettings.symbol.sizeMinValue, dimensionSettings.symbol.sizeMaxValue])
-						.range([dimensionSettings.symbol.sizeMin, dimensionSettings.symbol.sizeMax]);
-					console.log('Created size scale:', {
-						domain: [dimensionSettings.symbol.sizeMinValue, dimensionSettings.symbol.sizeMaxValue],
-						range: [dimensionSettings.symbol.sizeMin, dimensionSettings.symbol.sizeMax],
-					});
-				}
-			}
-
-			// Create symbol color scale if color dimension is mapped
-			if (dimensionSettings.symbol.colorBy && validSymbolData.length > 0) {
-				if (dimensionSettings.symbol.colorScale === 'linear') {
-					const domain = [dimensionSettings.symbol.colorMinValue, dimensionSettings.symbol.colorMaxValue];
-					const rangeColors = [
-						dimensionSettings.symbol.colorMinColor || stylingSettings.symbol.symbolFillColor,
-						dimensionSettings.symbol.colorMaxColor || stylingSettings.symbol.symbolFillColor,
-					];
-
-					if (dimensionSettings.symbol.colorMidColor) {
-						domain.splice(1, 0, dimensionSettings.symbol.colorMidValue);
-						rangeColors.splice(1, 0, dimensionSettings.symbol.colorMidColor);
-					}
-					symbolColorScale = d3.scaleLinear().domain(domain).range(rangeColors);
-					console.log('Created linear symbol color scale with domain:', domain, 'range:', rangeColors);
-				} else {
-					const uniqueDataCategories = getUniqueValues(dimensionSettings.symbol.colorBy, validSymbolData);
-					const colorMap = new Map();
-					dimensionSettings.symbol.categoricalColors?.forEach((item: any, index: number) => {
-						const dataCategory = uniqueDataCategories[index];
-						if (dataCategory !== undefined) {
-							colorMap.set(String(dataCategory), item.color);
-						}
-					});
-					symbolColorScale = (value: any) => colorMap.get(String(value)) || stylingSettings.symbol.symbolFillColor;
-					console.log('Created categorical symbol color scale with map:', Array.from(colorMap.entries()));
-				}
-			}
-
-			// Render each symbol as a <g> so we can overlay a hollow center for map-marker
-			const symbolGroups = symbolGroup
-				.selectAll('g')
-				.data(validSymbolData)
-				.join('g')
-				.attr('transform', (d) => {
-					const lat = Number(d[dimensionSettings.symbol.latitude]);
-					const lng = Number(d[dimensionSettings.symbol.longitude]);
-					const projected = projection([lng, lat]);
-					if (!projected) return 'translate(0, 0)';
-					const size = sizeScale
-						? sizeScale(getNumericValue(d, dimensionSettings.symbol.sizeBy) || 0)
-						: stylingSettings.symbol.symbolSize;
-					const { transform: symbolTransform } = getSymbolPathData(
-						stylingSettings.symbol.symbolType,
-						stylingSettings.symbol.symbolShape,
-						size,
-						stylingSettings.symbol.customSvgPath
-					);
-					const baseTransform = `translate(${projected[0]}, ${projected[1]})`;
-					return symbolTransform ? `${baseTransform} ${symbolTransform}` : baseTransform;
-				});
-
-			symbolGroups.each(function (d) {
-				const group = d3.select(this);
-				const size = sizeScale
-					? sizeScale(getNumericValue(d, dimensionSettings.symbol.sizeBy) || 0)
-					: stylingSettings.symbol.symbolSize;
-				const { pathData, fillRule } = getSymbolPathData(
-					stylingSettings.symbol.symbolType,
-					stylingSettings.symbol.symbolShape,
-					size,
-					stylingSettings.symbol.customSvgPath
-				);
-				const path = group
-					.append('path')
-					.attr('d', pathData)
-					.attr(
-						'fill',
-						symbolColorScale && dimensionSettings.symbol.colorBy
-							? (() => {
-									const value =
-										dimensionSettings.symbol.colorScale === 'linear'
-											? getNumericValue(d, dimensionSettings.symbol.colorBy)
-											: String(d[dimensionSettings.symbol.colorBy]);
-									return symbolColorScale(value);
-							  })()
-							: stylingSettings.symbol.symbolFillColor
-					)
-					.attr('stroke', stylingSettings.symbol.symbolStrokeColor)
-					.attr('stroke-width', stylingSettings.symbol.symbolStrokeWidth)
-					.attr('fill-opacity', (stylingSettings.symbol.symbolFillTransparency || 80) / 100)
-					.attr('stroke-opacity', (stylingSettings.symbol.symbolStrokeTransparency || 100) / 100);
-				if (stylingSettings.symbol.symbolShape === 'map-marker') {
-					path.attr('fill-rule', 'evenodd');
-				}
-			});
-
-			console.log('Rendered', symbolGroups.size(), 'symbol groups');
-
-			// Render Symbol Labels with improved positioning and HTML tag support
-			if (dimensionSettings.symbol.labelTemplate) {
-				const symbolLabels = symbolLabelGroup
-					.selectAll('text')
-					.data(validSymbolData)
-					.join('text')
-					.each(function (d) {
-						const textElement = d3.select(this);
-						const lat = Number(d[dimensionSettings.symbol.latitude]);
-						const lng = Number(d[dimensionSettings.symbol.longitude]);
-						const projected = projection([lng, lat]);
-
-						if (!projected) return;
-
-						const labelText = renderLabelPreview(
-							dimensionSettings.symbol.labelTemplate,
-							d,
+      // Render symbol labels
+      renderSymbolLabels({
+        svg,
+        projection,
+        width: MAP_WIDTH,
+        height: MAP_HEIGHT,
+        symbolData: symbolResult.validSymbolData,
+        dimensionSettings,
+        stylingSettings,
 							columnTypes,
 							columnFormats,
-							selectedGeography
-						);
+        selectedGeography,
+        sizeScale: symbolSizeScale,
+        renderLabelPreview,
+        getSymbolPathData,
+      })
+    }
 
-						if (!labelText) return;
-
-						const symbolSize = sizeScale
-							? sizeScale(getNumericValue(d, dimensionSettings.symbol.sizeBy) || 0)
-							: stylingSettings.symbol.symbolSize;
-
-						// Create base styles object
-						const baseStyles = {
-							fontWeight: stylingSettings.symbol.labelBold ? 'bold' : 'normal',
-							fontStyle: stylingSettings.symbol.labelItalic ? 'italic' : 'normal',
-							textDecoration: (() => {
-								let decoration = '';
-								if (stylingSettings.symbol.labelUnderline) decoration += 'underline ';
-								if (stylingSettings.symbol.labelStrikethrough) decoration += 'line-through';
-								return decoration.trim();
-							})(),
-						};
-
-						// Set basic text properties
-						textElement
-							.attr('font-family', stylingSettings.symbol.labelFontFamily)
-							.attr('font-size', `${stylingSettings.symbol.labelFontSize}px`)
-							.attr('fill', stylingSettings.symbol.labelColor)
-							.attr('stroke', stylingSettings.symbol.labelOutlineColor)
-							.attr('stroke-width', stylingSettings.symbol.labelOutlineThickness)
-							.style('paint-order', 'stroke fill')
-							.style('pointer-events', 'none');
-
-						// Create formatted text with HTML support
-						createFormattedText(textElement, labelText, baseStyles);
-
-						// Position the label based on alignment setting
-						let position;
-						if (stylingSettings.symbol.labelAlignment === 'auto') {
-							// For auto positioning, estimate label dimensions
-							const estimatedWidth = labelText.length * (stylingSettings.symbol.labelFontSize * 0.6);
-							const estimatedHeight = stylingSettings.symbol.labelFontSize * 1.2;
-							position = getAutoPosition(
-								projected[0],
-								projected[1],
-								symbolSize,
-								estimatedWidth,
-								estimatedHeight,
-								width,
-								height
-							);
-						} else {
-							// Manual positioning based on symbol size
-							const offset = symbolSize / 2 + Math.max(8, symbolSize * 0.3); // Increased scaling factor
-							switch (stylingSettings.symbol.labelAlignment) {
-								case 'top-left':
-									position = { dx: -offset, dy: -offset, anchor: 'end', baseline: 'baseline' };
-									break;
-								case 'top-center':
-									position = { dx: 0, dy: -offset, anchor: 'middle', baseline: 'baseline' };
-									break;
-								case 'top-right':
-									position = { dx: offset, dy: -offset, anchor: 'start', baseline: 'baseline' };
-									break;
-								case 'middle-left':
-									position = { dx: -offset, dy: 0, anchor: 'end', baseline: 'middle' };
-									break;
-								case 'center':
-									position = { dx: 0, dy: 0, anchor: 'middle', baseline: 'middle' };
-									break;
-								case 'middle-right':
-									position = { dx: offset, dy: 0, anchor: 'start', baseline: 'middle' };
-									break;
-								case 'bottom-left':
-									position = { dx: -offset, dy: offset, anchor: 'end', baseline: 'hanging' };
-									break;
-								case 'bottom-center':
-									position = { dx: 0, dy: offset, anchor: 'middle', baseline: 'hanging' };
-									break;
-								case 'bottom-right':
-									position = { dx: offset, dy: offset, anchor: 'start', baseline: 'hanging' };
-									break;
-								default:
-									position = { dx: offset, dy: 0, anchor: 'start', baseline: 'middle' };
-									break;
-							}
-						}
-
-						textElement
-							.attr('x', projected[0] + position.dx)
-							.attr('y', projected[1] + position.dy)
-							.attr('text-anchor', position.anchor)
-							.attr('dominant-baseline', position.baseline);
-
-						// Fix tspan positioning to maintain proper text anchor
-						textElement.selectAll('tspan').each(function (d, i) {
-							const tspan = d3.select(this);
-							// Only set x position for non-first tspans to maintain text anchor
-							if (i > 0 || tspan.attr('x') === '0') {
-								tspan.attr('x', projected[0] + position.dx);
-							}
-						});
-					});
-
-				console.log('Rendered', symbolLabels.size(), 'symbol labels');
-			}
-		}
-
-		// Render Choropleth Labels
-		const shouldRenderChoroplethLabels =
-			choroplethDataExists &&
-			dimensionSettings?.choropleth?.stateColumn &&
-			dimensionSettings?.choropleth?.labelTemplate &&
-			choroplethData.length > 0;
-
-		console.log('=== CHOROPLETH LABELS DEBUG ===');
-		console.log('Should render choropleth labels:', shouldRenderChoroplethLabels);
-		console.log('Choropleth data exists:', choroplethDataExists);
-		console.log('State column:', dimensionSettings?.choropleth?.stateColumn);
-		console.log('Label template:', dimensionSettings?.choropleth?.labelTemplate);
-		console.log('Choropleth data length:', choroplethData.length);
-
-		if (shouldRenderChoroplethLabels) {
-			console.log('=== Rendering choropleth labels ===');
-			const choroplethLabelGroup = svg.append('g').attr('id', 'ChoroplethLabels');
-
-			// Create a single map for geo data, using normalized identifiers
-			const geoDataMap = new Map<string, DataRow | GeocodedRow>();
-
-			console.log('Sample choropleth data:', choroplethData.slice(0, 3));
-
-			choroplethData.forEach((d) => {
-				const rawGeoValue = String(d[dimensionSettings.choropleth.stateColumn] || '');
-				if (!rawGeoValue.trim()) return;
-
-				const normalizedKey = normalizeGeoIdentifier(rawGeoValue, selectedGeography);
-				geoDataMap.set(normalizedKey, d);
-			});
-
-			console.log('Geo data map size:', geoDataMap.size);
-
-			// Get state/country/county/province features from geoAtlasData or custom map paths
-			let featuresForLabels: any[] = [];
-			if (geoAtlasData && mapType !== 'custom') {
-				if (selectedGeography === 'usa-states' && geoAtlasData.objects.states) {
-					featuresForLabels = topojson.feature(geoAtlasData, geoAtlasData.objects.states).features;
-				} else if (selectedGeography === 'usa-counties' && geoAtlasData.objects.counties) {
-					featuresForLabels = topojson.feature(geoAtlasData, geoAtlasData.objects.counties).features;
-				} else if (selectedGeography === 'canada-provinces' && geoAtlasData.objects.provinces) {
-					featuresForLabels = topojson.feature(geoAtlasData, geoAtlasData.objects.provinces).features;
-				} else if (selectedGeography === 'world' && geoAtlasData.objects.countries) {
-					featuresForLabels = topojson.feature(geoAtlasData, geoAtlasData.objects.countries).features;
-				} else if (selectedGeography === 'usa-nation' || selectedGeography === 'canada-nation') {
-					// For single nation views, we need to get the specific country feature from the world atlas
-					const primaryFeatureSource = geoAtlasData.objects.countries || geoAtlasData.objects.nation;
-					if (primaryFeatureSource) {
-						const allFeatures = topojson.feature(geoAtlasData, primaryFeatureSource).features;
-						const targetCountryName = selectedGeography === 'usa-nation' ? 'United States' : 'Canada';
-						const specificCountryFeature = findCountryFeature(allFeatures, [
-							targetCountryName,
-							targetCountryName === 'United States' ? 'USA' : 'CAN',
-							targetCountryName === 'United States' ? 840 : 124,
-						]);
-						if (specificCountryFeature) {
-							featuresForLabels = [specificCountryFeature]; // Only this one feature for labels
-						}
-					}
-				}
-				console.log('Using geoAtlasData for labels, features count:', featuresForLabels.length);
-			} else if (customMapData) {
-				// For custom maps, iterate through all relevant elements (paths and groups)
-				// within the main #Map group that was imported/created.
-				const elementsToProcess: SVGElement[] = [];
-				const mapGroup = svg.select('#Map'); // This is the group where custom SVG content is imported
-
-				if (!mapGroup.empty()) {
-					mapGroup.selectAll('path, g').each(function (this: SVGElement) {
-						const element = d3.select(this);
-						const id = element.attr('id');
-						// Exclude the main container groups themselves if they are selected as 'g'
-						// We want the individual paths/sub-groups that represent regions.
-						if (
-							id !== 'Nations' &&
-							id !== 'States' &&
-							id !== 'Counties' &&
-							id !== 'Provinces' &&
-							id !== 'Regions' &&
-							id !== 'Countries'
-						) {
-							elementsToProcess.push(this);
-						}
-					});
-				}
-
-				// The existing logic for nationsOrCountriesGroup for world maps in custom SVG is still relevant
-				// if the custom SVG explicitly separates nations.
-				const nationsOrCountriesGroup = svg.select('#Nations') || svg.select('#Countries');
-				if (!nationsOrCountriesGroup.empty() && selectedGeography === 'world') {
-					nationsOrCountriesGroup.selectAll('path, g').each(function (this: SVGElement) {
-						const element = d3.select(this);
-						const id = element.attr('id');
-						if (id !== 'Nations' && id !== 'Countries') {
-							// Avoid adding the group itself again
-							elementsToProcess.push(this);
-						}
-					});
-				}
-
-				// Ensure uniqueness in elementsToProcess if there's overlap
-				const uniqueElements = Array.from(new Set(elementsToProcess));
-
-				uniqueElements.forEach((el) => {
-					const element = d3.select(el);
-					const id = element.attr('id');
-					let effectiveId = id;
-
-					// This part is still relevant for paths without direct IDs but within a named group
-					if (el.tagName === 'path' && !effectiveId && el.parentElement && el.parentElement.tagName === 'g') {
-						effectiveId = d3.select(el.parentElement).attr('id');
-					}
-
-					let featureIdCandidate = null;
-					if (effectiveId) {
-						featureIdCandidate = extractCandidateFromSVGId(effectiveId);
-					}
-
-					let normalizedFeatureId = null;
-					if (featureIdCandidate) {
-						normalizedFeatureId = normalizeGeoIdentifier(featureIdCandidate, selectedGeography);
-					} else {
-						normalizedFeatureId = normalizeGeoIdentifier(effectiveId, selectedGeography);
-					}
-
-					if (normalizedFeatureId && !featuresForLabels.some((f) => f.id === normalizedFeatureId)) {
-						featuresForLabels.push({
-							id: normalizedFeatureId,
-							properties: { postal: normalizedFeatureId, name: normalizedFeatureId }, // Mock properties for consistency
-							pathNode: el, // Store reference to the actual DOM node
-						});
-					}
-				});
-
-				console.log('Custom map features for labels count:', featuresForLabels.length);
-			}
-
-			const labelElements = choroplethLabelGroup
-				.selectAll('text')
-				.data(featuresForLabels)
-				.join('text')
-				.each(function (d) {
-					// Determine the identifier for lookup in geoDataMap
-					let featureIdentifier: string | null = null;
-					if (customMapData) {
-						featureIdentifier = d.id;
-					} else {
-						// For TopoJSON data, normalize based on selectedGeography
-						if (selectedGeography.startsWith('usa-states')) {
-							featureIdentifier = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null;
-						} else if (selectedGeography.startsWith('usa-counties')) {
-							featureIdentifier = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null;
-						} else if (selectedGeography.startsWith('canada-provinces')) {
-							// Try both abbreviation and full name
-							const abbrKey = d?.id ? normalizeGeoIdentifier(String(d.id), selectedGeography) : null;
-							const nameKey = d?.properties?.name
-								? normalizeGeoIdentifier(String(d.properties.name), selectedGeography)
-								: null;
-							// Prefer abbrKey, but fallback to nameKey if not found in geoDataMap
-							if (abbrKey && geoDataMap.has(abbrKey)) {
-								featureKey = abbrKey;
-							} else if (nameKey && geoDataMap.has(nameKey)) {
-								featureKey = nameKey;
-							} else {
-								featureKey = abbrKey || nameKey;
-							}
-						} else if (selectedGeography === 'world') {
-							// Try matching by multiple properties, accounting for diacritics and case
-							const candidates = [
-								d?.id,
-								d?.properties?.name,
-								d?.properties?.name_long,
-								d?.properties?.admin,
-								d?.properties?.iso_a3,
-							]
-								.filter(Boolean)
-								.map((v) => normalizeGeoIdentifier(stripDiacritics(String(v)), selectedGeography));
-							// Try exact match for each candidate
-							let debugMatchType = 'none';
-							featureKey = candidates.find((c) => geoDataMap.has(c)) || null;
-							if (featureKey) debugMatchType = 'exact';
-							// Fuzzy match: if no exact match, try includes/startsWith/endsWith
-							if (!featureKey) {
-								const geoKeys = Array.from(geoDataMap.keys());
-								featureKey =
-									geoKeys.find((k) =>
-										candidates.some(
-											(c) => k.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(k.toLowerCase())
-										)
-									) || null;
-								if (featureKey) debugMatchType = 'fuzzy';
-							}
-							// Debug logging
-							const geoKeys = Array.from(geoDataMap.keys());
-							console.log('[World Choropleth Debug]', {
-								id: d?.id,
-								name: d?.properties?.name,
-								candidates,
-								geoKeys,
-								exactMatches: candidates.map((c) => geoDataMap.has(c)),
-								fuzzyMatches: candidates.map((c) =>
-									geoKeys.some(
-										(k) => k.toLowerCase().includes(c.toLowerCase()) || c.toLowerCase().includes(k.toLowerCase())
-									)
-								),
-								selectedFeatureKey: featureKey,
-								matchType: debugMatchType,
-								valueFound: featureKey ? geoDataMap.has(featureKey) : false,
-							});
-						}
-					}
-
-					const dataRow = featureIdentifier ? geoDataMap.get(featureIdentifier) : undefined;
-
-					console.log(`Processing label for feature ID: ${featureIdentifier}, has data: ${!!dataRow}`);
-
-					const labelText = dataRow
-						? renderLabelPreview(
-								dimensionSettings.choropleth.labelTemplate,
-								dataRow,
+    // Apply choropleth colors if applicable
+    if (shouldRenderChoropleth) {
+      const choroplethScaleResult = applyChoroplethColors({
+        svg,
+        choroplethData,
+        dimensionSettings,
+        stylingSettings,
 								columnTypes,
 								columnFormats,
-								selectedGeography
-						  )
-						: '';
-
-					if (labelText) {
-						let centroid;
-						if (d.pathNode) {
-							// For custom maps, calculate centroid from the actual path or group element
-							const bbox = d.pathNode.getBBox();
-							centroid = [bbox.x + bbox.width / 2, bbox.y + bbox.height / 2];
+        selectedGeography,
+        customMapData,
+        normalizeGeoIdentifier,
+        extractCandidateFromSVGId,
+        getNumericValue,
+        getUniqueValues,
+      })
+      if (choroplethScaleResult) {
+        // Check if it's a categorical scale (function) or linear scale (d3 scale)
+        const isCategorical = 'domain' in choroplethScaleResult === false
+        if (isCategorical && typeof choroplethScaleResult === 'function') {
+          // Categorical scale
+          choroplethColorScale = choroplethScaleResult as (value: unknown) => string
 						} else {
-							// For TopoJSON data, use d3 path centroid
-							centroid = path.centroid(d);
-						}
-
-						if (centroid && !isNaN(centroid[0]) && !isNaN(centroid[1])) {
-							const textElement = d3.select(this);
-
-							// Create base styles object for choropleth labels
-							const baseStyles = {
-								fontWeight: stylingSettings.choropleth.labelBold ? 'bold' : 'normal',
-								fontStyle: stylingSettings.choropleth.labelItalic ? 'italic' : 'normal',
-								textDecoration: (() => {
-									let decoration = '';
-									if (stylingSettings.choropleth.labelUnderline) decoration += 'underline ';
-									if (stylingSettings.choropleth.labelStrikethrough) decoration += 'line-through';
-									return decoration.trim();
-								})(),
-							};
-
-							textElement
-								.attr('x', centroid[0])
-								.attr('y', centroid[1])
-								.attr('text-anchor', 'middle')
-								.attr('dominant-baseline', 'middle')
-								.attr('font-family', stylingSettings.choropleth.labelFontFamily)
-								.attr('font-size', `${stylingSettings.choropleth.labelFontSize}px`)
-								.attr('fill', stylingSettings.choropleth.labelColor)
-								.attr('stroke', stylingSettings.choropleth.labelOutlineColor)
-								.attr('stroke-width', stylingSettings.choropleth.labelOutlineThickness)
-								.style('paint-order', 'stroke fill')
-								.style('pointer-events', 'none');
-
-							// Create formatted text with HTML support
-							createFormattedText(textElement, labelText, baseStyles);
-
-							// Fix tspan positioning for choropleth labels to maintain center alignment
-							textElement.selectAll('tspan').each(function (d, i) {
-								const tspan = d3.select(this);
-								if (i > 0 || tspan.attr('x') === '0') {
-									tspan.attr('x', centroid[0]);
-								}
-							});
-
-							console.log(`✅ Rendered label for feature ID: ${featureIdentifier} at position:`, centroid);
+          // Linear scale - wrap it
+          const linearScale = choroplethScaleResult as d3.ScaleLinear<number, string, never>
+          choroplethColorScale = ((value: unknown) => {
+            const numValue = typeof value === 'number' ? value : Number(value)
+            if (!Number.isNaN(numValue)) {
+              return linearScale(numValue)
+            }
+            return String(value)
+          }) as (value: unknown) => string
+        }
 						} else {
-							console.log(`❌ Invalid centroid for feature ID: ${featureIdentifier}:`, centroid);
-							d3.select(this).remove();
-						}
-					} else {
-						console.log(`❌ No label text for feature ID: ${featureIdentifier}`);
-						d3.select(this).remove();
-					}
-				});
+        choroplethColorScale = null
+      }
 
-			console.log('Total choropleth labels rendered:', labelElements.size());
-		}
-
-		// Add Legends - positioned below the map
-		const legendGroup = svg.append('g').attr('id', 'Legends');
-		let currentLegendY = mapHeight + 20;
-
-		// Symbol Size Legend
-		if (shouldShowSymbolSizeLegend) {
-			console.log('=== Rendering Symbol Size Legend ===');
-
-			const sizeLegendGroup = legendGroup.append('g').attr('id', 'SizeLegend');
-
-			// More compact legend background
-			const legendWidth = 400;
-			const legendX = (width - legendWidth) / 2;
-
-			const legendBg = sizeLegendGroup
-				.append('rect')
-				.attr('x', legendX)
-				.attr('y', currentLegendY - 10)
-				.attr('width', legendWidth)
-				.attr('height', 60)
-				.attr('fill', 'rgba(255, 255, 255, 0.95)')
-				.attr('stroke', '#ddd')
-				.attr('stroke-width', 1)
-				.attr('rx', 6);
-
-			// Legend title
-			sizeLegendGroup
-				.append('text')
-				.attr('x', legendX + 15)
-				.attr('y', currentLegendY + 8)
-				.attr('font-family', 'Arial, sans-serif')
-				.attr('font-size', '14px')
-				.attr('font-weight', '600')
-				.attr('fill', '#333')
-				.text(`Size: ${dimensionSettings.symbol.sizeBy}`);
-
-			// Create size legend with two symbols and arrow - tighter spacing
-			// Use fixed sizes for legend display instead of data-driven sizes
-			const minLegendSize = 8; // Fixed small size for min symbol
-			const maxLegendSize = 20; // Fixed large size for max symbol
-
-			// Determine symbol color - use default if no color mapping, otherwise use nation colors
-			const symbolColor = dimensionSettings.symbol.colorBy
-				? stylingSettings.base.nationFillColor
-				: stylingSettings.symbol.symbolFillColor;
-			const symbolStroke = dimensionSettings.symbol.colorBy
-				? stylingSettings.base.nationStrokeColor
-				: stylingSettings.symbol.symbolStrokeColor;
-
-			const legendCenterX = width / 2;
-			const symbolY = currentLegendY + 35;
-
-			// Min value label (left) - moved much closer to symbol
-			sizeLegendGroup
-				.append('text')
-				.attr('x', legendCenterX - 45) // Moved closer (was -60)
-				.attr('y', symbolY + 5)
-				.attr('font-family', 'Arial, sans-serif')
-				.attr('font-size', '11px')
-				.attr('fill', '#666')
-				.attr('text-anchor', 'middle')
-				.text(
-					formatLegendValue(
-						dimensionSettings.symbol.sizeMinValue,
-						dimensionSettings.symbol.sizeBy,
+      // Render choropleth labels
+      renderChoroplethLabels({
+        svg,
+        path,
+        projection,
+        choroplethData,
+        dimensionSettings,
+        stylingSettings,
 						columnTypes,
 						columnFormats,
-						selectedGeography
-					)
-				);
+        selectedGeography,
+        mapType,
+        geoAtlasData,
+        customMapData,
+        normalizeGeoIdentifier,
+        extractCandidateFromSVGId,
+        getSubnationalLabel,
+        renderLabelPreview,
+        findCountryFeature,
+      })
+    }
 
-			// Min symbol - moved closer to center
-			const { pathData: minPathData } = getSymbolPathData(
-				stylingSettings.symbol.symbolType,
-				stylingSettings.symbol.symbolShape,
-				minLegendSize,
-				stylingSettings.symbol.customSvgPath
-			);
-
-			sizeLegendGroup
-				.append('path')
-				.attr('d', minPathData)
-				.attr('transform', `translate(${legendCenterX - 20}, ${symbolY})`) // Moved closer (was -25)
-				.attr('fill', symbolColor)
-				.attr('stroke', symbolStroke)
-				.attr('stroke-width', 1);
-
-			// Arrow - moved closer to min symbol
-			sizeLegendGroup
-				.append('path')
-				.attr('d', 'M-6,0 L6,0 M3,-2 L6,0 L3,2') // Shorter and moved closer
-				.attr('transform', `translate(${legendCenterX - 5}, ${symbolY})`) // Moved closer (was 0)
-				.attr('fill', 'none')
-				.attr('stroke', '#666')
-				.attr('stroke-width', 1.5);
-
-			// Max symbol - closer to center, using fixed large size
-			const { pathData: maxPathData } = getSymbolPathData(
-				stylingSettings.symbol.symbolType,
-				stylingSettings.symbol.symbolShape,
-				maxLegendSize, // Use fixed size instead of sizeScale(dimensionSettings.symbol.sizeMaxValue)
-				stylingSettings.symbol.customSvgPath
-			);
-
-			sizeLegendGroup
-				.append('path')
-				.attr('d', maxPathData)
-				.attr('transform', `translate(${legendCenterX + 25}, ${symbolY})`) // Moved closer (was +40)
-				.attr('fill', symbolColor)
-				.attr('stroke', symbolStroke)
-				.attr('stroke-width', 1);
-
-			// Max value label (right) - closer to symbol
-			sizeLegendGroup
-				.append('text')
-				.attr('x', legendCenterX + 60) // Moved closer (was +80)
-				.attr('y', symbolY + 5)
-				.attr('font-family', 'Arial, sans-serif')
-				.attr('font-size', '11px')
-				.attr('fill', '#666')
-				.attr('text-anchor', 'middle')
-				.text(
-					formatLegendValue(
-						dimensionSettings.symbol.sizeMaxValue,
-						dimensionSettings.symbol.sizeBy,
-						columnTypes,
-						columnFormats,
-						selectedGeography
-					)
-				);
-
-			currentLegendY += 80;
-		}
-
-		// Symbol Color Legend
-		if (shouldShowSymbolColorLegend) {
-			console.log('=== Rendering Symbol Color Legend ===');
-
-			const colorLegendGroup = legendGroup.append('g').attr('id', 'SymbolColorLegend');
-
-			if (dimensionSettings.symbol.colorScale === 'linear') {
-				// Linear color legend with wide gradient
-				const legendBg = colorLegendGroup
-					.append('rect')
-					.attr('x', 20)
-					.attr('y', currentLegendY - 10)
-					.attr('width', width - 40)
-					.attr('height', 60)
-					.attr('fill', 'rgba(255, 255, 255, 0.95)')
-					.attr('stroke', '#ddd')
-					.attr('stroke-width', 1)
-					.attr('rx', 6);
-
-				// Legend title
-				colorLegendGroup
-					.append('text')
-					.attr('x', 35)
-					.attr('y', currentLegendY + 8)
-					.attr('font-family', 'Arial, sans-serif')
-					.attr('font-size', '14px')
-					.attr('font-weight', '600')
-					.attr('fill', '#333')
-					.text(`Color: ${dimensionSettings.symbol.colorBy}`);
-
-				// Create gradient
-				const gradient = svg
-					.append('defs')
-					.append('linearGradient')
-					.attr('id', 'symbolColorGradient')
-					.attr('x1', '0%')
-					.attr('x2', '100%')
-					.attr('y1', '0%')
-					.attr('y2', '0%');
-
-				const domain = [dimensionSettings.symbol.colorMinValue, dimensionSettings.symbol.colorMaxValue];
-				const rangeColors = [
-					dimensionSettings.symbol.colorMinColor || stylingSettings.symbol.symbolFillColor,
-					stylingSettings.symbol.colorMaxColor || stylingSettings.symbol.symbolFillColor,
-				];
-
-				if (dimensionSettings.symbol.colorMidColor) {
-					domain.splice(1, 0, dimensionSettings.symbol.colorMidValue);
-					rangeColors.splice(1, 0, dimensionSettings.symbol.colorMidColor);
-				}
-
-				rangeColors.forEach((color, index) => {
-					gradient
-						.append('stop')
-						.attr('offset', `${(index / (rangeColors.length - 1)) * 100}%`)
-						.attr('stop-color', color);
-				});
-
-				// Wide gradient bar
-				const gradientWidth = width - 200;
-				const gradientX = (width - gradientWidth) / 2;
-
-				colorLegendGroup
-					.append('rect')
-					.attr('x', gradientX)
-					.attr('y', currentLegendY + 25)
-					.attr('width', gradientWidth)
-					.attr('height', 12)
-					.attr('fill', 'url(#symbolColorGradient)')
-					.attr('stroke', '#ccc')
-					.attr('stroke-width', 1)
-					.attr('rx', 2);
-
-				// Min label (left)
-				colorLegendGroup
-					.append('text')
-					.attr('x', gradientX - 10)
-					.attr('y', currentLegendY + 33)
-					.attr('font-family', 'Arial, sans-serif')
-					.attr('font-size', '11px')
-					.attr('fill', '#666')
-					.attr('text-anchor', 'end')
-					.text(
-						formatLegendValue(
-							domain[0],
-							dimensionSettings.symbol.colorBy,
-							columnTypes,
-							columnFormats,
-							selectedGeography
-						)
-					);
-
-				// Max label (right)
-				colorLegendGroup
-					.append('text')
-					.attr('x', gradientX + gradientWidth + 10)
-					.attr('y', currentLegendY + 33)
-					.attr('font-family', 'Arial, sans-serif')
-					.attr('font-size', '11px')
-					.attr('fill', '#666')
-					.attr('text-anchor', 'start')
-					.text(
-						formatLegendValue(
-							domain[domain.length - 1],
-							dimensionSettings.symbol.colorBy,
-							columnTypes,
-							columnFormats,
-							selectedGeography
-						)
-					);
-			} else {
-				// Categorical color legend with horizontal swatches
-				const uniqueValues = getUniqueValues(dimensionSettings.symbol.colorBy, symbolData);
-				const maxItems = Math.min(uniqueValues.length, 10);
-
-				// Calculate legend width based on content
-				const estimatedLegendWidth = Math.min(700, maxItems * 90 + 100);
-				const legendX = (width - estimatedLegendWidth) / 2;
-
-				const legendBg = colorLegendGroup
-					.append('rect')
-					.attr('x', legendX)
-					.attr('y', currentLegendY - 10)
-					.attr('width', estimatedLegendWidth)
-					.attr('height', 60)
-					.attr('fill', 'rgba(255, 255, 255, 0.95)')
-					.attr('stroke', '#ddd')
-					.attr('stroke-width', 1)
-					.attr('rx', 6);
-
-				// Legend title
-				colorLegendGroup
-					.append('text')
-					.attr('x', legendX + 15)
-					.attr('y', currentLegendY + 8)
-					.attr('font-family', 'Arial, sans-serif')
-					.attr('font-size', '14px')
-					.attr('font-weight', '600')
-					.attr('fill', '#333')
-					.text(`Color: ${dimensionSettings.symbol.colorBy}`);
-
-				// Calculate spacing for horizontal layout
-				let currentX = legendX + 25;
-				const swatchY = currentLegendY + 30;
-
-				uniqueValues.slice(0, maxItems).forEach((value, index) => {
-					const color = symbolColorScale(value);
-					const labelText = formatLegendValue(
-						value,
-						dimensionSettings.symbol.colorBy,
-						columnTypes,
-						columnFormats,
-						selectedGeography
-					);
-
-					// Create smaller fixed-size symbol swatch for categorical legend
-					const fixedLegendSize = 12; // Smaller size for better proportion
-					const { pathData } = getSymbolPathData(
-						stylingSettings.symbol.symbolType,
-						stylingSettings.symbol.symbolShape,
-						fixedLegendSize,
-						stylingSettings.symbol.customSvgPath
-					);
-
-					colorLegendGroup
-						.append('path')
-						.attr('d', pathData)
-						.attr('transform', `translate(${currentX}, ${swatchY})`)
-						.attr('fill', color)
-						.attr('stroke', '#666')
-						.append('path')
-						.attr('d', pathData)
-						.attr('transform', `translate(${currentX}, ${swatchY})`)
-						.attr('fill', color)
-						.attr('stroke', '#666')
-						.attr('stroke-width', 1);
-
-					// Label positioned to the right of swatch, vertically centered
-					colorLegendGroup
-						.append('text')
-						.attr('x', currentX + 15) // Position to the right of swatch
-						.attr('y', swatchY + 3) // Vertically centered with swatch
-						.attr('font-family', 'Arial, sans-serif')
-						.attr('font-size', '10px')
-						.attr('fill', '#666')
-						.attr('text-anchor', 'start') // Left-aligned text
-						.text(labelText);
-
-					// Calculate next position based on label width with tighter spacing
-					const labelWidth = Math.max(60, labelText.length * 6 + 35); // Account for swatch + spacing
-					currentX += labelWidth;
-				});
-			}
-
-			currentLegendY += 80;
-		}
-
-		// Choropleth Color Legend
-		if (shouldShowChoroplethColorLegend) {
-			console.log('=== Rendering Choropleth Color Legend ===');
-
-			const choroplethColorLegendGroup = legendGroup.append('g').attr('id', 'ChoroplethColorLegend');
-
-			if (dimensionSettings.choropleth.colorScale === 'linear') {
-				// Linear color legend with wide gradient
-				const legendBg = choroplethColorLegendGroup
-					.append('rect')
-					.attr('x', 20)
-					.attr('y', currentLegendY - 10)
-					.attr('width', width - 40)
-					.attr('height', 60)
-					.attr('fill', 'rgba(255, 255, 255, 0.95)')
-					.attr('stroke', '#ddd')
-					.attr('stroke-width', 1)
-					.attr('rx', 6);
-
-				// Legend title
-				choroplethColorLegendGroup
-					.append('text')
-					.attr('x', 35)
-					.attr('y', currentLegendY + 8)
-					.attr('font-family', 'Arial, sans-serif')
-					.attr('font-size', '14px')
-					.attr('font-weight', '600')
-					.attr('fill', '#333')
-					.text(`Color: ${dimensionSettings.choropleth.colorBy}`);
-
-				// Create gradient
-				const gradient = svg
-					.append('defs')
-					.append('linearGradient')
-					.attr('id', 'choroplethColorGradient')
-					.attr('x1', '0%')
-					.attr('x2', '100%')
-					.attr('y1', '0%')
-					.attr('y2', '0%');
-
-				const domain = [dimensionSettings.choropleth.colorMinValue, dimensionSettings.choropleth.colorMaxValue];
-				const rangeColors = [
-					dimensionSettings.choropleth.colorMinColor || stylingSettings.base.defaultStateFillColor,
-					dimensionSettings.choropleth.colorMaxColor || stylingSettings.base.defaultStateFillColor,
-				];
-
-				if (dimensionSettings.choropleth.colorMidColor) {
-					domain.splice(1, 0, dimensionSettings.choropleth.colorMidValue);
-					rangeColors.splice(1, 0, dimensionSettings.choropleth.colorMidColor);
-				}
-
-				rangeColors.forEach((color, index) => {
-					gradient
-						.append('stop')
-						.attr('offset', `${(index / (rangeColors.length - 1)) * 100}%`)
-						.attr('stop-color', color);
-				});
-
-				// Wide gradient bar
-				const gradientWidth = width - 200;
-				const gradientX = (width - gradientWidth) / 2;
-
-				choroplethColorLegendGroup
-					.append('rect')
-					.attr('x', gradientX)
-					.attr('y', currentLegendY + 25)
-					.attr('width', gradientWidth)
-					.attr('height', 12)
-					.attr('fill', 'url(#choroplethColorGradient)')
-					.attr('stroke', '#ccc')
-					.attr('stroke-width', 1)
-					.attr('rx', 2);
-
-				// Min label (left)
-				choroplethColorLegendGroup
-					.append('text')
-					.attr('x', gradientX - 10)
-					.attr('y', currentLegendY + 33)
-					.attr('font-family', 'Arial, sans-serif')
-					.attr('font-size', '11px')
-					.attr('fill', '#666')
-					.attr('text-anchor', 'end')
-					.text(
-						formatLegendValue(
-							domain[0],
-							dimensionSettings.choropleth.colorBy,
-							columnTypes,
-							columnFormats,
-							selectedGeography
-						)
-					);
-
-				// Max label (right)
-				choroplethColorLegendGroup
-					.append('text')
-					.attr('x', gradientX + gradientWidth + 10)
-					.attr('y', currentLegendY + 33)
-					.attr('font-family', 'Arial, sans-serif')
-					.attr('font-size', '11px')
-					.attr('fill', '#666')
-					.attr('text-anchor', 'start')
-					.text(
-						formatLegendValue(
-							domain[domain.length - 1],
-							dimensionSettings.choropleth.colorBy,
-							columnTypes,
-							columnFormats,
-							selectedGeography
-						)
-					);
-			} else {
-				// Categorical color legend with horizontal square swatches
-				const uniqueValues = getUniqueValues(dimensionSettings.choropleth.colorBy, choroplethData);
-				const maxItems = Math.min(uniqueValues.length, 10);
-
-				// Calculate legend width based on content
-				const estimatedLegendWidth = Math.min(700, maxItems * 90 + 100);
-				const legendX = (width - estimatedLegendWidth) / 2;
-
-				const legendBg = choroplethColorLegendGroup
-					.append('rect')
-					.attr('x', legendX)
-					.attr('y', currentLegendY - 10)
-					.attr('width', estimatedLegendWidth)
-					.attr('height', 60)
-					.attr('fill', 'rgba(255, 255, 255, 0.95)')
-					.attr('stroke', '#ddd')
-					.attr('stroke-width', 1)
-					.attr('rx', 6);
-
-				// Legend title
-				choroplethColorLegendGroup
-					.append('text')
-					.attr('x', legendX + 15)
-					.attr('y', currentLegendY + 8)
-					.attr('font-family', 'Arial, sans-serif')
-					.attr('font-size', '14px')
-					.attr('font-weight', '600')
-					.attr('fill', '#333')
-					.text(`Color: ${dimensionSettings.choropleth.colorBy}`);
-
-				// Calculate spacing for horizontal layout
-				let currentX = legendX + 25;
-				const swatchY = currentLegendY + 25;
-
-				uniqueValues.slice(0, maxItems).forEach((value, index) => {
-					const color = choroplethColorScale(value);
-					const labelText = formatLegendValue(
-						value,
-						dimensionSettings.choropleth.colorBy,
-						columnTypes,
-						columnFormats,
-						selectedGeography
-					);
-
-					// Smaller square swatch for choropleth categorical
-					choroplethColorLegendGroup
-						.append('rect')
-						.attr('x', currentX - 6) // Smaller 12x12 square
-						.attr('y', swatchY - 6)
-						.attr('width', 12)
-						.attr('height', 12)
-						.attr('fill', color)
-						.attr('stroke', '#666')
-						.attr('stroke-width', 1)
-						.attr('rx', 2);
-
-					// Label positioned to the right of swatch, vertically centered
-					choroplethColorLegendGroup
-						.append('text')
-						.attr('x', currentX + 15) // Position to the right of swatch
-						.attr('y', swatchY + 3) // Vertically centered with swatch
-						.attr('font-family', 'Arial, sans-serif')
-						.attr('font-size', '10px')
-						.attr('fill', '#666')
-						.attr('text-anchor', 'start') // Left-aligned text
-						.text(labelText);
-
-					// Calculate next position based on label width with tighter spacing
-					const labelWidth = Math.max(60, labelText.length * 6 + 35); // Account for swatch + spacing
-					currentX += labelWidth;
-				});
-			}
-
-			currentLegendY += 80;
-		}
-
-		console.log('=== MAP PREVIEW RENDER COMPLETE ===');
+    // Render legends
+    renderLegends({
+      svg,
+      width: MAP_WIDTH,
+      mapHeight: MAP_HEIGHT,
+      showSymbolSizeLegend: !!shouldShowSymbolSizeLegend,
+      showSymbolColorLegend: !!shouldShowSymbolColorLegend,
+      showChoroplethColorLegend: !!shouldShowChoroplethColorLegend,
+		dimensionSettings,
+		stylingSettings,
+		columnTypes,
+		columnFormats,
+		selectedGeography,
+      symbolData: shouldRenderSymbols ? symbolData : [],
+      choroplethData: shouldRenderChoropleth ? choroplethData : [],
+      symbolColorScale,
+      choroplethColorScale,
+      getUniqueValues,
+      formatLegendValue,
+      getSymbolPathData,
+    })
 	}, [
 		geoAtlasData,
 		symbolData,
@@ -2791,103 +283,106 @@ export function MapPreview({
 		choroplethDataExists,
 		columnTypes,
 		columnFormats,
-		customMapData,
+    customMapData,
 		selectedGeography,
 		selectedProjection,
-		clipToCountry, // Added to dependencies
+    clipToCountry,
 		toast,
-	]);
+  ])
 
 	useEffect(() => {
-		const handler = () => setIsExpanded(false);
-		window.addEventListener('collapse-all-panels', handler);
-		return () => window.removeEventListener('collapse-all-panels', handler);
-	}, []);
-
-	const renderMap = useCallback(() => {
-		console.log('renderMap useCallback triggered');
-	}, [
-		geoAtlasData,
-		symbolData,
-		choroplethData,
-		mapType,
-		dimensionSettings,
-		stylingSettings,
-		symbolDataExists,
-		choroplethDataExists,
-		columnTypes,
-		columnFormats,
-		selectedGeography,
-		selectedProjection,
-		clipToCountry, // Added to dependencies
-		toast,
-	]);
-
-	useEffect(() => {
-		renderMap();
-	}, [renderMap]);
+    const handler = () => setIsExpanded(false)
+    window.addEventListener('collapse-all-panels', handler)
+    return () => window.removeEventListener('collapse-all-panels', handler)
+  }, [setIsExpanded])
 
 	const handleDownloadSVG = () => {
-		if (!svgRef.current) return;
+    if (!svgRef.current) return
 
-		try {
-			const svgElement = svgRef.current;
-			const serializer = new XMLSerializer();
-			const svgString = serializer.serializeToString(svgElement);
+    try {
+      const svgElement = svgRef.current
+      const serializer = new XMLSerializer()
+      const svgString = serializer.serializeToString(svgElement)
 
-			const blob = new Blob([svgString], { type: 'image/svg+xml' });
-			const url = URL.createObjectURL(blob);
+      const blob = new Blob([svgString], { type: 'image/svg+xml' })
+      const url = URL.createObjectURL(blob)
 
-			const link = document.createElement('a');
-			link.href = url;
-			link.download = 'map.svg';
-			document.body.appendChild(link);
-			link.click();
-			document.body.removeChild(link);
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'map.svg'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
 
-			URL.revokeObjectURL(url);
+      URL.revokeObjectURL(url)
 
 			toast({
 				icon: <Download className="h-4 w-4" />,
 				description: 'SVG downloaded successfully.',
 				duration: 3000,
-			});
+      })
 		} catch (error) {
-			console.error('Error downloading SVG:', error);
+      console.error('Error downloading SVG:', error)
 			toast({
 				title: 'Download failed',
 				description: 'Failed to download SVG file',
 				variant: 'destructive',
 				duration: 3000,
-			});
+      })
 		}
-	};
+  }
 
 	const handleCopySVG = async () => {
-		if (!svgRef.current) return;
+    if (!svgRef.current) return
 
-		try {
-			const svgElement = svgRef.current;
-			const serializer = new XMLSerializer();
-			const svgString = serializer.serializeToString(svgElement);
+    try {
+      const svgElement = svgRef.current
+      const serializer = new XMLSerializer()
+      const svgString = serializer.serializeToString(svgElement)
 
-			await navigator.clipboard.writeText(svgString);
+      await navigator.clipboard.writeText(svgString)
 
 			toast({
 				icon: <Copy className="h-4 w-4" />,
 				description: 'SVG copied to clipboard.',
 				duration: 3000,
-			});
+      })
 		} catch (error) {
-			console.error('Error copying SVG:', error);
+      console.error('Error copying SVG:', error)
 			toast({
 				title: 'Copy failed',
 				description: 'Failed to copy SVG to clipboard',
 				variant: 'destructive',
 				duration: 3000,
-			});
+      })
 		}
-	};
+  }
+
+	// Generate accessible map description
+	const mapDescription = generateMapDescription({
+		mapType,
+		geography: selectedGeography,
+		symbolDataCount: symbolData.length,
+		choroplethDataCount: choroplethData.length,
+		hasSymbolSizeMapping: !!dimensionSettings.symbol.sizeBy,
+		hasSymbolColorMapping: !!dimensionSettings.symbol.colorBy,
+		hasChoroplethColorMapping: !!dimensionSettings.choropleth.colorBy,
+		symbolSizeColumn: dimensionSettings.symbol.sizeBy,
+		symbolColorColumn: dimensionSettings.symbol.colorBy,
+		choroplethColorColumn: dimensionSettings.choropleth.colorBy,
+	})
+
+	const mapSummary = generateMapSummary({
+		mapType,
+		geography: selectedGeography,
+		symbolDataCount: symbolData.length,
+		choroplethDataCount: choroplethData.length,
+		hasSymbolSizeMapping: !!dimensionSettings.symbol.sizeBy,
+		hasSymbolColorMapping: !!dimensionSettings.symbol.colorBy,
+		hasChoroplethColorMapping: !!dimensionSettings.choropleth.colorBy,
+	})
+
+	const mapId = `map-preview-${selectedGeography}`
 
 	if (isLoading) {
 		return (
@@ -2896,24 +391,35 @@ export function MapPreview({
 					<CardTitle>Map Preview</CardTitle>
 				</CardHeader>
 				<CardContent>
-					<div className="flex items-center justify-center h-64">
+					<div className="flex items-center justify-center h-64" role="status" aria-live="polite">
 						<div className="text-muted-foreground">Loading map data...</div>
 					</div>
 				</CardContent>
 			</Card>
-		);
+    )
 	}
 
 	return (
 		<Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
 			<CardHeader
 				className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-4 px-6 rounded-t-xl relative"
-				onClick={() => setIsExpanded(!isExpanded)}>
+				onClick={() => setIsExpanded(!isExpanded)}
+				onKeyDown={(e) => {
+					if (e.key === 'Enter' || e.key === ' ') {
+						e.preventDefault()
+						setIsExpanded(!isExpanded)
+					}
+				}}
+				role="button"
+				tabIndex={0}
+				aria-expanded={isExpanded}
+				aria-controls={mapId}>
 				<div className="flex items-center justify-between">
 					<div className="flex items-center gap-2">
-						<CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">Map preview</CardTitle>
+            <CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">
+              Map preview
+            </CardTitle>
 					</div>
-					{/* Right side: Download and Copy buttons (with stopPropagation) */}
 					<div className="flex items-center gap-2">
 						<Button
 							variant="outline"
@@ -2923,11 +429,13 @@ export function MapPreview({
 								'group'
 							)}
 							onClick={(e) => {
-								e.stopPropagation();
-								handleCopySVG();
-							}}>
-							<Copy className="h-3 w-3 transition-transform duration-300 group-hover:translate-x-1" />
-							Copy to Figma
+                e.stopPropagation()
+                handleCopySVG()
+							}}
+							aria-label="Copy SVG to clipboard for use in Figma">
+							<Copy className="h-3 w-3 transition-transform duration-300 group-hover:translate-x-1" aria-hidden="true" />
+							<span className="sr-only">Copy to Figma</span>
+							<span aria-hidden="true">Copy to Figma</span>
 						</Button>
 						<Button
 							variant="outline"
@@ -2937,26 +445,44 @@ export function MapPreview({
 								'group'
 							)}
 							onClick={(e) => {
-								e.stopPropagation();
-								handleDownloadSVG();
-							}}>
-							<Download className="h-3 w-3 transition-transform duration-300 group-hover:translate-y-1" />
-							Download SVG
+                e.stopPropagation()
+                handleDownloadSVG()
+							}}
+							aria-label="Download map as SVG file">
+							<Download className="h-3 w-3 transition-transform duration-300 group-hover:translate-y-1" aria-hidden="true" />
+							<span className="sr-only">Download SVG</span>
+							<span aria-hidden="true">Download SVG</span>
 						</Button>
-						{isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+						{isExpanded ? (
+							<ChevronUp className="h-4 w-4" aria-hidden="true" />
+						) : (
+							<ChevronDown className="h-4 w-4" aria-hidden="true" />
+						)}
 					</div>
 				</div>
 			</CardHeader>
-			<CardContent className={cn('transition-all duration-200', isExpanded ? 'pb-6 pt-2' : 'pb-0 h-0 overflow-hidden')}>
+      <CardContent
+        className={cn('transition-all duration-200', isExpanded ? 'pb-6 pt-2' : 'pb-0 h-0 overflow-hidden')}
+				id={mapId}
+				aria-hidden={!isExpanded}>
 				<div
 					ref={mapContainerRef}
 					className="w-full border rounded-lg overflow-hidden"
 					style={{
 						backgroundColor: stylingSettings.base.mapBackgroundColor,
 					}}>
-					<svg ref={svgRef} className="w-full h-full" />
+					<svg
+						ref={svgRef}
+						className="w-full h-full"
+						role="img"
+						aria-label={mapSummary}
+						aria-describedby={`${mapId}-description`}
+					/>
+					<div id={`${mapId}-description`} className="sr-only">
+						{mapDescription}
+					</div>
 				</div>
 			</CardContent>
 		</Card>
-	);
+  )
 }

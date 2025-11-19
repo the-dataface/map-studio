@@ -3,10 +3,10 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
-export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
+export type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement>
 
 // Debug logging utility
-const debugLog = (message: string, data?: any) => {
+const debugLog = (message: string, data?: unknown) => {
   if (typeof window !== "undefined" && window.location.hostname === "localhost") {
     console.log(`[Textarea Debug] ${message}`, data || "")
   }
@@ -58,7 +58,7 @@ const createSyntheticChangeEvent = (
         ...originalEvent.currentTarget,
         value: newValue,
       },
-    } as React.ChangeEvent<HTMLTextAreaElement>
+    } as unknown as React.ChangeEvent<HTMLTextAreaElement>
 
     debugLog("✅ Synthetic event created successfully")
     return syntheticEvent
@@ -195,6 +195,7 @@ const applyFormatting = (
 }
 
 const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({ className, ...props }, ref) => {
+  const { onChange, onKeyDown, ...rest } = props
   // Debug component mount/unmount
   React.useEffect(() => {
     debugLog("🚀 Textarea component mounted")
@@ -260,7 +261,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({ classNa
       }
 
       // Apply formatting
-      const success = applyFormatting(textarea!, tagOpen, tagClose, e, props.onChange)
+      const success = applyFormatting(textarea!, tagOpen, tagClose, e, onChange)
 
       if (success) {
         debugLog("🎉 Keyboard shortcut handled successfully")
@@ -269,16 +270,16 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({ classNa
       }
 
       // Call original onKeyDown if provided
-      if (props.onKeyDown) {
+      if (onKeyDown) {
         debugLog("🔄 Calling original onKeyDown handler")
         try {
-          props.onKeyDown(e)
+          onKeyDown(e)
         } catch (error) {
           debugLog("❌ Error in original onKeyDown handler", error)
         }
       }
     },
-    [ref, props.onChange, props.onKeyDown],
+    [ref, onChange, onKeyDown],
   )
 
   return (
@@ -289,7 +290,8 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({ classNa
       )}
       ref={ref}
       onKeyDown={handleKeyDown}
-      {...props}
+      onChange={onChange}
+      {...rest}
     />
   )
 })

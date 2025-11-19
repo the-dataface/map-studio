@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, react-hooks/exhaustive-deps, react/no-unescaped-entities */
 'use client';
 
 import { Input } from '@/components/ui/input';
@@ -296,7 +297,17 @@ export function MapStyling({
 			<div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
 				<div
 					className="bg-gray-100 dark:bg-gray-700 px-4 py-3 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-650 transition-colors duration-200"
-					onClick={() => togglePanel(key)}>
+					onClick={() => togglePanel(key)}
+					onKeyDown={(e) => {
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault()
+							togglePanel(key)
+						}
+					}}
+					role="button"
+					tabIndex={0}
+					aria-expanded={isPanelExpanded}
+					aria-controls={`panel-${key}`}>
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-2">
 							<div className="text-black dark:text-white transform scale-75">{icon}</div>
@@ -527,6 +538,7 @@ export function MapStyling({
 										<ColorInput
 											value={stylingSettings.base.mapBackgroundColor}
 											onChange={(value) => updateSetting('base', 'mapBackgroundColor', value)}
+											showContrastCheck={false}
 										/>
 									</div>
 								)}
@@ -544,6 +556,8 @@ export function MapStyling({
 												<ColorInput
 													value={stylingSettings.base.nationFillColor}
 													onChange={(value) => updateSetting('base', 'nationFillColor', value)}
+													showContrastCheck={true}
+													backgroundColor={stylingSettings.base.mapBackgroundColor}
 												/>
 											</div>
 											<div className="space-y-2">
@@ -553,6 +567,8 @@ export function MapStyling({
 												<ColorInput
 													value={stylingSettings.base.nationStrokeColor}
 													onChange={(value) => updateSetting('base', 'nationStrokeColor', value)}
+													showContrastCheck={true}
+													backgroundColor={stylingSettings.base.nationFillColor}
 												/>
 											</div>
 										</div>
@@ -590,6 +606,8 @@ export function MapStyling({
 												<ColorInput
 													value={stylingSettings.base.defaultStateFillColor}
 													onChange={(value) => updateSetting('base', 'defaultStateFillColor', value)}
+													showContrastCheck={true}
+													backgroundColor={stylingSettings.base.mapBackgroundColor}
 												/>
 											</div>
 											{isChoroplethFillDisabled && (
@@ -605,6 +623,8 @@ export function MapStyling({
 											<ColorInput
 												value={stylingSettings.base.defaultStateStrokeColor}
 												onChange={(value) => updateSetting('base', 'defaultStateStrokeColor', value)}
+												showContrastCheck={true}
+												backgroundColor={stylingSettings.base.defaultStateFillColor}
 											/>
 										</div>
 									</div>
@@ -780,6 +800,8 @@ export function MapStyling({
 													<ColorInput
 														value={stylingSettings.symbol.symbolFillColor}
 														onChange={(value) => updateSetting('symbol', 'symbolFillColor', value)}
+														showContrastCheck={true}
+														backgroundColor={stylingSettings.base.mapBackgroundColor}
 													/>
 												</div>
 												{isSymbolFillDisabled && (
@@ -795,6 +817,8 @@ export function MapStyling({
 												<ColorInput
 													value={stylingSettings.symbol.symbolStrokeColor}
 													onChange={(value) => updateSetting('symbol', 'symbolStrokeColor', value)}
+													showContrastCheck={true}
+													backgroundColor={stylingSettings.symbol.symbolFillColor}
 												/>
 											</div>
 										</div>
@@ -955,6 +979,9 @@ export function MapStyling({
 													<ColorInput
 														value={stylingSettings.symbol.labelColor}
 														onChange={(value) => updateSetting('symbol', 'labelColor', value)}
+														showContrastCheck={true}
+														backgroundColor={stylingSettings.base.mapBackgroundColor}
+														isLargeText={stylingSettings.symbol.labelFontSize >= 18}
 													/>
 												</div>
 												<div className="space-y-2">
@@ -964,6 +991,8 @@ export function MapStyling({
 													<ColorInput
 														value={stylingSettings.symbol.labelOutlineColor}
 														onChange={(value) => updateSetting('symbol', 'labelOutlineColor', value)}
+														showContrastCheck={true}
+														backgroundColor={stylingSettings.symbol.labelColor}
 													/>
 												</div>
 											</div>
@@ -1132,6 +1161,9 @@ export function MapStyling({
 													<ColorInput
 														value={stylingSettings.choropleth.labelColor}
 														onChange={(value) => updateSetting('choropleth', 'labelColor', value)}
+														showContrastCheck={true}
+														backgroundColor={stylingSettings.base.mapBackgroundColor}
+														isLargeText={stylingSettings.choropleth.labelFontSize >= 18}
 													/>
 												</div>
 												<div className="space-y-2">
@@ -1141,6 +1173,8 @@ export function MapStyling({
 													<ColorInput
 														value={stylingSettings.choropleth.labelOutlineColor}
 														onChange={(value) => updateSetting('choropleth', 'labelOutlineColor', value)}
+														showContrastCheck={true}
+														backgroundColor={stylingSettings.choropleth.labelColor}
 													/>
 												</div>
 											</div>

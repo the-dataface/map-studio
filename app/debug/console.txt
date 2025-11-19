@@ -1,0 +1,39 @@
+vendor.css?v=1763499297244:5 Uncaught SyntaxError: Invalid or unexpected token (at vendor.css?v=1763499297244:5:1)
+textarea.tsx:11 [Textarea Debug] 🚀 Textarea component mounted 
+textarea.tsx:11 [Textarea Debug] 🔚 Textarea component unmounted 
+textarea.tsx:11 [Textarea Debug] 🚀 Textarea component mounted 
+favicon.ico:1  GET http://localhost:3000/favicon.ico 404 (Not Found)
+dimension-mapping.tsx:151 Current symbol size range: 5 - 20
+installHook.js:1 Current symbol size range: 5 - 20
+map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'canada-provinces'}
+map-styling.tsx:348 isSymbolFillDisabled: false
+map-styling.tsx:349 isSymbolSizeDisabled: false
+map-styling.tsx:350 isChoroplethFillDisabled: false
+map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'canada-provinces'}
+installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'canada-provinces'}
+installHook.js:1 isSymbolFillDisabled: false
+installHook.js:1 isSymbolSizeDisabled: false
+installHook.js:1 isChoroplethFillDisabled: false
+installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'canada-provinces'}
+data-preview.tsx:243 Initializing column formats
+textarea.tsx:11 [Textarea Debug] 🚀 Textarea component mounted 
+textarea.tsx:11 [Textarea Debug] 🔚 Textarea component unmounted 
+data-preview.tsx:243 Initializing column formats
+textarea.tsx:11 [Textarea Debug] 🚀 Textarea component mounted 
+dimension-mapping.tsx:151 Current symbol size range: 5 - 20
+installHook.js:1 Current symbol size range: 5 - 20
+map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'canada-provinces'}
+map-styling.tsx:348 isSymbolFillDisabled: false
+map-styling.tsx:349 isSymbolSizeDisabled: false
+map-styling.tsx:350 isChoroplethFillDisabled: false
+map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'canada-provinces'}
+installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'canada-provinces'}
+installHook.js:1 isSymbolFillDisabled: false
+installHook.js:1 isSymbolSizeDisabled: false
+installHook.js:1 isChoroplethFillDisabled: false
+installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'canada-provinces'}
+data-preview.tsx:243 Initializing column formats
+dimension-mapping.tsx:151 Current symbol size range: 5 - 20
+installHook.js:1 Current symbol size range: 5 - 20
+use-geo-atlas.ts:59 [NORMALIZE] Before: (2) ['countries', 'land'] After: (2) ['countries', 'land'] Has provinces: false
+base-map.ts:264 [RENDER] canada-provinces - objects keys: (2) ['countries', 'land'] Has provinces: false provinces value: missing
