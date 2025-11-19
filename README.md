@@ -8,6 +8,42 @@
 
 Map Studio is a tool for quickly visualizing geospatial data. It allows users to upload their own datasets, map data dimensions to visual properties like color and size, and preview their custom-styled maps. The tool can produce choropleth and symbol maps and works with custom designed SVG maps.
 
+## Architecture & Modernization
+
+Map Studio has undergone significant modernization to improve maintainability, performance, and accessibility:
+
+### 🏗️ Modular Architecture
+- **83% code reduction** in main map preview component (from 2,579 to 436 lines)
+- Extracted reusable modules for map rendering, data processing, and utilities
+- Type-safe throughout with comprehensive TypeScript coverage
+- Clear separation between marketing (SSR) and studio (client) routes
+
+### ⚡ Performance Optimizations
+- **Bundle size budgets** enforced in CI with Next.js analyzer
+- **Lazy loading** for heavy components (DataPreview, DimensionMapping, MapStyling, MapPreview)
+- **Code splitting** for D3, React Query, and Radix UI chunks
+- **Web Worker infrastructure** ready for offloading expensive D3 calculations
+- **Lighthouse CI** ensuring performance scores ≥95
+
+### 🚀 Data Fetching & Caching
+- **Server-side API proxies** for geocoding and TopoJSON with rate limiting
+- **Vercel KV/Redis caching** with graceful in-memory fallback
+- **Request deduplication** to prevent redundant API calls
+- **TanStack Query** for client-side cache management and revalidation
+- **Suspense boundaries** for optimal loading states
+
+### ♿ Accessibility (WCAG AA Compliant)
+- **Keyboard navigation** support throughout the interface
+- **Screen reader** optimizations with ARIA labels and descriptions
+- **Color contrast validation** with accessible color suggestions
+- **Color-blind accessibility** checks for categorical color schemes
+- **Automated testing** with Axe and Playwright in CI
+
+### 🎨 SEO & Server-Side Rendering
+- **Marketing pages** fully server-rendered for optimal SEO
+- **Comprehensive metadata** (OpenGraph, Twitter cards) for social sharing
+- **Fast initial page load** with SSR for critical paths
+
 ## Features and Functionality
 
 - **Data Input**: Paste CSV or TSV data containing US states or locations, with or without geographic coordinates (latitude and longitude).
@@ -54,6 +90,67 @@ Map Studio is a tool for quickly visualizing geospatial data. It allows users to
 6.  **Preview**: Observe your customized map in the "Map Preview" area. Export or copy the SVG map using the buttons in the panel header.
 
 For more detailed instructions and guidelines, please refer to the [GitHub Wiki](https://github.com/sams-teams-projects/v0-map-studio/wiki) (coming soon!).
+
+## Development
+
+### Tech Stack
+
+- **Next.js 14+** with App Router and Server Components
+- **TypeScript** for type safety
+- **React 18** with hooks and Suspense
+- **TanStack Query** for data fetching and caching
+- **Zustand** for state management
+- **D3.js** for map rendering and projections
+- **Tailwind CSS** + **Radix UI** for styling
+- **Vercel KV** for production caching (with in-memory fallback)
+
+### Key Scripts
+
+```bash
+# Development
+pnpm dev
+
+# Type checking
+pnpm type-check
+
+# Linting
+pnpm lint
+
+# Build
+pnpm build
+
+# Bundle analysis
+pnpm build:analyze
+
+# Bundle size check
+pnpm check:bundle
+
+# Lighthouse audit
+pnpm lighthouse
+
+# Accessibility tests
+pnpm test:a11y
+```
+
+### Project Structure
+
+```
+├── app/
+│   ├── (marketing)/          # SSR marketing pages
+│   ├── (studio)/             # Client-heavy studio editor
+│   └── api/                  # API routes (geocode, topojson, metrics)
+├── components/                # React components
+├── modules/                   # Extracted business logic
+│   ├── data-ingest/          # Data parsing, validation, color schemes
+│   └── map-preview/          # Map rendering modules
+├── lib/                      # Utilities
+│   ├── accessibility/        # Contrast, color-blind checks
+│   ├── cache/                # Caching utilities (KV, deduplication)
+│   └── workers/              # Web Worker infrastructure
+└── state/                     # Zustand stores
+```
+
+For detailed architecture documentation, see `PROGRESS.md` and `TECH_STACK.md`.
 
 ## Credits
 Designed and built by Sam Vickars of [The DataFace](https://thedataface.com), using v0 and Cursor.
