@@ -1,5 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
+import { GeistSans } from "geist/font/sans"
+import { GeistMono } from "geist/font/mono"
 import {
   Inter,
   Roboto,
@@ -15,7 +17,11 @@ import {
 } from "next/font/google"
 import "./globals.css"
 
-// Load Google Fonts
+// Load Geist fonts for UI (already configured font objects)
+const geistSans = GeistSans
+const geistMono = GeistMono
+
+// Load Google Fonts for map customization options
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
 const roboto = Roboto({ subsets: ["latin"], weight: ["400", "700"], variable: "--font-roboto" })
 const openSans = Open_Sans({ subsets: ["latin"], variable: "--font-open-sans" })
@@ -42,7 +48,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${inter.variable} ${roboto.variable} ${openSans.variable} ${lato.variable} ${montserrat.variable} ${oswald.variable} ${playfairDisplay.variable} ${merriweather.variable} ${raleway.variable} ${poppins.variable} ${sourceSansPro.variable} font-sans`}
+        className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${roboto.variable} ${openSans.variable} ${lato.variable} ${montserrat.variable} ${oswald.variable} ${playfairDisplay.variable} ${merriweather.variable} ${raleway.variable} ${poppins.variable} ${sourceSansPro.variable} font-sans`}
       >
         {children}
       </body>

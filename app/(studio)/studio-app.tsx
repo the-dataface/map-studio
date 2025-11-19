@@ -37,7 +37,7 @@ import {
 
 function MapPreviewFallback() {
   return (
-    <div className="mt-6 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-12 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+    <div className="mt-6 rounded-xl border border-dashed border-border bg-muted/30 p-12 text-center text-sm text-muted-foreground">
       Loading map data…
     </div>
   )
@@ -45,7 +45,7 @@ function MapPreviewFallback() {
 
 function PanelFallback() {
   return (
-    <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+    <div className="rounded-xl border border-dashed border-border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
       Loading…
     </div>
   )
@@ -288,7 +288,7 @@ export default function StudioApp() {
   const hasData = hasSymbolData || hasChoroplethData || hasCustomData
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col gap-6 pb-24">
+    <div className="relative flex min-h-screen w-full flex-col gap-6 pb-24 bg-pattern">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4">
         <DataInput
           onDataLoad={handleDataLoad}

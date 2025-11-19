@@ -124,7 +124,7 @@ const createDefaultStylingSettings = (): StylingSettings => ({
     symbolStrokeColor: '#ffffff',
     symbolSize: 5,
     symbolStrokeWidth: 1,
-    labelFontFamily: 'Inter',
+    labelFontFamily: 'Geist Sans',
     labelBold: false,
     labelItalic: false,
     labelUnderline: false,
@@ -137,7 +137,7 @@ const createDefaultStylingSettings = (): StylingSettings => ({
     customSvgPath: '',
   },
   choropleth: {
-    labelFontFamily: 'Inter',
+    labelFontFamily: 'Geist Sans',
     labelBold: false,
     labelItalic: false,
     labelUnderline: false,
