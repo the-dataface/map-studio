@@ -160,12 +160,12 @@ export default function StudioApp() {
 
     if (parsedData.length > 0) {
       const inferredTypes = inferColumnTypesFromData(parsedData)
-      setColumnTypes((prev) => mergeInferredTypes(prev, inferredTypes))
+      setColumnTypes((prev: ColumnType) => mergeInferredTypes(prev, inferredTypes))
     }
 
     setActiveMapType(nextMapType)
     setDataInputExpanded(false)
-    setDimensionSettings((prev) => resetDimensionForMapType(prev, nextMapType))
+    setDimensionSettings((prev: DimensionSettings) => resetDimensionForMapType(prev, nextMapType))
 
     const { geography, projection } = inferGeographyAndProjection({
       columns,
@@ -174,7 +174,7 @@ export default function StudioApp() {
 
     if (geography !== selectedGeography) {
       setSelectedGeography(geography)
-      setDimensionSettings((prev) => ({ ...prev, selectedGeography: geography }))
+      setDimensionSettings((prev: DimensionSettings) => ({ ...prev, selectedGeography: geography }))
     }
 
     if (projection !== selectedProjection) {
@@ -196,7 +196,7 @@ export default function StudioApp() {
         break
     }
 
-    setDimensionSettings((prev) => resetDimensionForMapType(prev, mapType))
+    setDimensionSettings((prev: DimensionSettings) => resetDimensionForMapType(prev, mapType))
 
     const hasSymbol = mapType !== 'symbol' ? hasDataForType('symbol') : false
     const hasChoropleth = mapType !== 'choropleth' ? hasDataForType('choropleth') : false
@@ -232,7 +232,7 @@ export default function StudioApp() {
       if (!newColumns.find((col) => latNames.includes(col))) ensureColumn('Latitude')
       if (!newColumns.find((col) => lngNames.includes(col))) ensureColumn('Longitude')
 
-      const updatedRows: GeocodedRow[] = symbolData.parsedData.map((row, index) => {
+      const updatedRows: GeocodedRow[] = symbolData.parsedData.map((row: DataRow, index: number) => {
         const geocode = geocodedData[index]
         if (!geocode) return row
 
@@ -252,7 +252,7 @@ export default function StudioApp() {
       })
 
       const inferred = inferColumnTypesFromData(updatedRows)
-      setColumnTypes((prev) => mergeInferredTypes(prev, inferred))
+      setColumnTypes((prev: ColumnType) => mergeInferredTypes(prev, inferred))
     }
   }
 

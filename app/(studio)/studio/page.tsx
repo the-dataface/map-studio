@@ -563,7 +563,7 @@ function MapStudioContent() {
 	// Map Projection and Geography states
 	// Helpers to keep component API aligned with legacy props
 	const updateDimensionSettings = (newSettings: Pick<DimensionSettings, 'symbol' | 'choropleth'>) => {
-		setDimensionSettings((prev) => ({
+		setDimensionSettings((prev: DimensionSettings) => ({
 			...prev,
 			symbol: newSettings.symbol,
 			choropleth: newSettings.choropleth,
@@ -589,7 +589,7 @@ function MapStudioContent() {
 	// NEW: Function to update selectedGeography in both places
 	const updateSelectedGeography = (newGeography: GeographyKey) => {
 		setSelectedGeography(newGeography);
-		setDimensionSettings((prev) => ({
+		setDimensionSettings((prev: DimensionSettings) => ({
 			...prev,
 			selectedGeography: newGeography,
 		}));
@@ -664,12 +664,12 @@ function MapStudioContent() {
 
 		if (parsedData.length > 0) {
 			const inferredTypes = inferColumnTypesFromData(parsedData);
-			setColumnTypes((prev) => mergeInferredTypes(prev, inferredTypes));
+			setColumnTypes((prev: ColumnType) => mergeInferredTypes(prev, inferredTypes));
 		}
 
 		setActiveMapType(nextMapType);
 		setDataInputExpanded(false);
-		setDimensionSettings((prev) => resetDimensionForMapType(prev, nextMapType));
+		setDimensionSettings((prev: DimensionSettings) => resetDimensionForMapType(prev, nextMapType));
 
 		const { geography, projection } = inferGeographyAndProjection({
 			columns,
@@ -702,7 +702,7 @@ function MapStudioContent() {
 				break;
 		}
 
-		setDimensionSettings((prev) => resetDimensionForMapType(prev, mapType));
+		setDimensionSettings((prev: DimensionSettings) => resetDimensionForMapType(prev, mapType));
 
 		const hasSymbol = mapType !== 'symbol' ? hasDataForType('symbol') : false;
 		const hasChoropleth = mapType !== 'choropleth' ? hasDataForType('choropleth') : false;
@@ -773,7 +773,7 @@ function MapStudioContent() {
 			}));
 
 			// Directly update dimension settings for symbol map with chosen columns
-			setDimensionSettings((prevSettings) => ({
+			setDimensionSettings((prevSettings: DimensionSettings) => ({
 				...prevSettings,
 				symbol: {
 					...prevSettings.symbol,
@@ -831,7 +831,7 @@ function MapStudioContent() {
 
 		return rows
 			.slice(0, 10)
-			.map((r) => Object.values(r).map((v) => (typeof v === 'string' || typeof v === 'number' ? v : '')));
+			.map((r: DataRow) => Object.values(r).map((v) => (typeof v === 'string' || typeof v === 'number' ? v : '')));
 	}, [activeMapType, symbolData.parsedData, choroplethData.parsedData]);
 
 	useEffect(() => {

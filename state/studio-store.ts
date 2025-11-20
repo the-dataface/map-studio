@@ -300,7 +300,7 @@ interface StudioState {
   clearHistory: () => void
 }
 
-export const useStudioStore = create<StudioState>((set) => ({
+export const useStudioStore = create<StudioState>()((set) => ({
   symbolData: createEmptyDataState(),
   setSymbolData: (value) =>
     set((state) => ({
@@ -455,12 +455,12 @@ export const useStudioStore = create<StudioState>((set) => ({
     }),
   
   canUndo: () => {
-    const state = useStudioStore.getState()
+    const state = useStudioStore.getState() as StudioState
     return state.historyIndex > 0
   },
   
   canRedo: () => {
-    const state = useStudioStore.getState()
+    const state = useStudioStore.getState() as StudioState
     return state.historyIndex < state.history.length - 1
   },
   

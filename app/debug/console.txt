@@ -1,5 +1,4 @@
 *VERCEL*
-
 13:51:59.005 Running build in Washington, D.C., USA (East) – iad1
 13:51:59.005 Build machine configuration: 2 cores, 8 GB
 13:51:59.134 Cloning github.com/the-dataface/map-studio (Branch: main, Commit: 23ffea8)
@@ -58,6 +57,10 @@
 
 *BUNDLE SIZE CHECK*
 Run pnpm build
+  pnpm build
+  shell: /usr/bin/bash -e {0}
+  env:
+    PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
 
 > my-v0-project@0.1.0 build /home/runner/work/map-studio/map-studio
 > next build
@@ -74,93 +77,118 @@ https://nextjs.org/telemetry
  ✓ Compiled successfully
    Linting and checking validity of types ...
 
-Failed to compile.
-
-./components/label-editor-toolbar.tsx
-133:42  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-
 ./components/map-preview.tsx
-97:9  Error: 'labelEditorPosition' is assigned a value but never used.  @typescript-eslint/no-unused-vars
-271:3  Warning: React Hook useCallback has a missing dependency: 'svgRef'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
-288:5  Warning: React Hook useCallback has a missing dependency: 'svgRef'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
-352:7  Error: 'localCurrentPath' is assigned a value but never used.  @typescript-eslint/no-unused-vars
-584:5  Warning: React Hook useEffect has missing dependencies: 'svgRef' and 'toast'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
-1007:5  Warning: React Hook useEffect has missing dependencies: 'handlePathPositionUpdate' and 'svgRef'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
-1254:5  Warning: Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.  jsx-a11y/no-static-element-interactions
-
-./components/map-tooltip.tsx
-3:38  Error: 'useRef' is defined but never used.  @typescript-eslint/no-unused-vars
+273:5  Warning: React Hook useCallback has a missing dependency: 'svgRef'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+563:5  Warning: React Hook useEffect has missing dependencies: 'svgRef' and 'toast'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+986:5  Warning: React Hook useEffect has missing dependencies: 'handlePathPositionUpdate' and 'svgRef'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+1233:5  Warning: Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.  jsx-a11y/no-static-element-interactions
 
 info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules
- ELIFECYCLE  Command failed with exit code 1.
-Error: Process completed with exit code 1.
-
-*LIGHTHOUSE*
-Run pnpm build
-
-> my-v0-project@0.1.0 build /home/runner/work/map-studio/map-studio
-> next build
-
-⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
-Attention: Next.js now collects completely anonymous telemetry regarding usage.
-This information is used to shape Next.js' roadmap and prioritize features.
-You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
-https://nextjs.org/telemetry
-
-  ▲ Next.js 14.2.16
-
-   Creating an optimized production build ...
- ✓ Compiled successfully
-   Linting and checking validity of types ...
-
 Failed to compile.
 
-./components/label-editor-toolbar.tsx
-133:42  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+./app/(studio)/studio-app.tsx:163:23
+Type error: Parameter 'prev' implicitly has an 'any' type.
 
-./components/map-preview.tsx
-97:9  Error: 'labelEditorPosition' is assigned a value but never used.  @typescript-eslint/no-unused-vars
-271:3  Warning: React Hook useCallback has a missing dependency: 'svgRef'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
-288:5  Warning: React Hook useCallback has a missing dependency: 'svgRef'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
-352:7  Error: 'localCurrentPath' is assigned a value but never used.  @typescript-eslint/no-unused-vars
-584:5  Warning: React Hook useEffect has missing dependencies: 'svgRef' and 'toast'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
-1007:5  Warning: React Hook useEffect has missing dependencies: 'handlePathPositionUpdate' and 'svgRef'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
-1254:5  Warning: Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.  jsx-a11y/no-static-element-interactions
-
-./components/map-tooltip.tsx
-3:38  Error: 'useRef' is defined but never used.  @typescript-eslint/no-unused-vars
-
-info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules
+  161 |     if (parsedData.length > 0) {
+  162 |       const inferredTypes = inferColumnTypesFromData(parsedData)
+> 163 |       setColumnTypes((prev) => mergeInferredTypes(prev, inferredTypes))
+      |                       ^
+  164 |     }
+  165 |
+  166 |     setActiveMapType(nextMapType)
  ELIFECYCLE  Command failed with exit code 1.
 Error: Process completed with exit code 1.
 
 *LINT AND TYPE CHECK*
-Run pnpm lint
+Run pnpm type-check
+  pnpm type-check
+  shell: /usr/bin/bash -e {0}
+  env:
+    PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
 
-> my-v0-project@0.1.0 lint /home/runner/work/map-studio/map-studio
-> next lint
+> my-v0-project@0.1.0 type-check /home/runner/work/map-studio/map-studio
+> tsc --noEmit
 
+Error: app/(studio)/studio-app.tsx(163,23): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+Error: app/(studio)/studio-app.tsx(168,27): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+Error: app/(studio)/studio-app.tsx(177,29): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+Error: app/(studio)/studio-app.tsx(199,27): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+Error: app/(studio)/studio-app.tsx(235,69): error TS7006: Parameter 'row' implicitly has an 'any' type.
+Error: app/(studio)/studio-app.tsx(235,74): error TS7006: Parameter 'index' implicitly has an 'any' type.
+Error: app/(studio)/studio-app.tsx(255,23): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+Error: app/(studio)/studio/page.tsx(566,25): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+Error: app/(studio)/studio/page.tsx(592,25): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+Error: app/(studio)/studio/page.tsx(667,20): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+Error: app/(studio)/studio/page.tsx(672,25): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+Error: app/(studio)/studio/page.tsx(705,25): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+Error: app/(studio)/studio/page.tsx(769,19): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+Error: app/(studio)/studio/page.tsx(776,26): error TS7006: Parameter 'prevSettings' implicitly has an 'any' type.
+Error: app/(studio)/studio/page.tsx(834,10): error TS7006: Parameter 'r' implicitly has an 'any' type.
+Error: modules/map-preview/paths.ts(87,4): error TS2339: Property 'attr' does not exist on type 'string | Selection<BaseType, unknown, null, undefined>'.
+  Property 'attr' does not exist on type 'string'.
+Error: modules/map-preview/paths.ts(93,19): error TS2345: Argument of type '"*"' is not assignable to parameter of type 'null | undefined'.
+Error: modules/map-preview/paths.ts(211,14): error TS2558: Expected 0 type arguments, but got 2.
+Error: modules/map-preview/paths.ts(212,9): error TS2554: Expected 0 arguments, but got 2.
+Error: modules/map-preview/paths.ts(212,22): error TS7006: Parameter 'd' implicitly has an 'any' type.
+Error: modules/map-preview/paths.ts(215,8): error TS2339: Property 'exit' does not exist on type 'undefined[]'.
+Error: modules/map-preview/paths.ts(219,4): error TS2339: Property 'enter' does not exist on type 'undefined[]'.
+Error: modules/map-preview/paths.ts(222,26): error TS7006: Parameter 'd' implicitly has an 'any' type.
+Error: modules/map-preview/paths.ts(225,30): error TS2339: Property 'merge' does not exist on type 'undefined[]'.
+Error: modules/map-preview/paths.ts(228,31): error TS7006: Parameter 'd' implicitly has an 'any' type.
+Error: modules/map-preview/paths.ts(229,27): error TS2683: 'this' implicitly has type 'any' because it does not have a type annotation.
+Error: modules/map-preview/paths.ts(309,20): error TS7006: Parameter 'point' implicitly has an 'any' type.
+Error: modules/map-preview/paths.ts(309,27): error TS7006: Parameter 'index' implicitly has an 'any' type.
+Error: modules/map-preview/paths.ts(317,24): error TS18046: 'd' is of type 'unknown'.
+Error: modules/map-preview/paths.ts(318,24): error TS18046: 'd' is of type 'unknown'.
+Error: modules/map-preview/paths.ts(389,35): error TS18046: 'd' is of type 'unknown'.
+Error: modules/map-preview/paths.ts(389,64): error TS18046: 'd' is of type 'unknown'.
+Error: modules/map-preview/paths.ts(404,71): error TS7006: Parameter 'event' implicitly has an 'any' type.
+Error: modules/map-preview/paths.ts(406,29): error TS2683: 'this' implicitly has type 'any' because it does not have a type annotation.
+Error: state/studio-store.ts(303,14): error TS7022: 'useStudioStore' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.
+Error: state/studio-store.ts(458,11): error TS7022: 'state' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.
+ ELIFECYCLE  Command failed with exit code 2.
+Error: Process completed with exit code 2.
+
+*LIGHTHOUSE*
+Run pnpm build
+  pnpm build
+  shell: /usr/bin/bash -e {0}
+  env:
+    PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+
+> my-v0-project@0.1.0 build /home/runner/work/map-studio/map-studio
+> next build
+
+⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
 Attention: Next.js now collects completely anonymous telemetry regarding usage.
 This information is used to shape Next.js' roadmap and prioritize features.
 You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
 https://nextjs.org/telemetry
 
+  ▲ Next.js 14.2.16
 
-./components/label-editor-toolbar.tsx
-133:42  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
 
 ./components/map-preview.tsx
-97:9  Error: 'labelEditorPosition' is assigned a value but never used.  @typescript-eslint/no-unused-vars
-271:3  Warning: React Hook useCallback has a missing dependency: 'svgRef'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
-288:5  Warning: React Hook useCallback has a missing dependency: 'svgRef'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
-352:7  Error: 'localCurrentPath' is assigned a value but never used.  @typescript-eslint/no-unused-vars
-584:5  Warning: React Hook useEffect has missing dependencies: 'svgRef' and 'toast'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
-1007:5  Warning: React Hook useEffect has missing dependencies: 'handlePathPositionUpdate' and 'svgRef'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
-1254:5  Warning: Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.  jsx-a11y/no-static-element-interactions
-
-./components/map-tooltip.tsx
-3:38  Error: 'useRef' is defined but never used.  @typescript-eslint/no-unused-vars
+273:5  Warning: React Hook useCallback has a missing dependency: 'svgRef'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+563:5  Warning: React Hook useEffect has missing dependencies: 'svgRef' and 'toast'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+986:5  Warning: React Hook useEffect has missing dependencies: 'handlePathPositionUpdate' and 'svgRef'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+1233:5  Warning: Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.  jsx-a11y/no-static-element-interactions
 
 info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules
+Failed to compile.
+
+./app/(studio)/studio-app.tsx:163:23
+Type error: Parameter 'prev' implicitly has an 'any' type.
+
+  161 |     if (parsedData.length > 0) {
+  162 |       const inferredTypes = inferColumnTypesFromData(parsedData)
+> 163 |       setColumnTypes((prev) => mergeInferredTypes(prev, inferredTypes))
+      |                       ^
+  164 |     }
+  165 |
+  166 |     setActiveMapType(nextMapType)
  ELIFECYCLE  Command failed with exit code 1.
 Error: Process completed with exit code 1.
