@@ -94,7 +94,6 @@ export function MapPreview({
 	const [activeTool, setActiveTool] = useState<MapTool>('inspect');
 	const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
 	const [selectedPathId, setSelectedPathId] = useState<string | null>(null);
-	const [labelEditorPosition, setLabelEditorPosition] = useState<{ x: number; y: number } | undefined>(undefined);
 	const [isDrawing, setIsDrawing] = useState(false);
 	const [currentPath, setCurrentPath] = useState<PathPoint[]>([]);
 	const [isDragging, setIsDragging] = useState(false);
@@ -251,21 +250,7 @@ export function MapPreview({
 			if (activeTool === 'select') {
 				setSelectedLabelId(labelId);
 
-				// Use setTimeout to ensure DOM is updated before querying
-				setTimeout(() => {
-					if (svgRef.current && mapContainerRef.current) {
-						const labelElement = svgRef.current.querySelector(`[data-label-id="${labelId}"]`) as SVGTextElement;
-						if (labelElement) {
-							const rect = labelElement.getBoundingClientRect();
-							const containerRect = mapContainerRef.current.getBoundingClientRect();
-							const position = {
-								x: rect.left - containerRect.left + rect.width / 2,
-								y: rect.top - containerRect.top,
-							};
-							setLabelEditorPosition(position);
-						}
-					}
-				}, 0);
+				// Label editor will be shown via selectedLabelId state
 			}
 		},
 		[activeTool]
@@ -349,7 +334,6 @@ export function MapPreview({
 		let localIsDrawing = isDrawing;
 		let localIsDragging = isDragging;
 		let localDragStartPoint = dragStartPoint;
-		let localCurrentPath = currentPath;
 
 		const handleMouseDown = (e: MouseEvent) => {
 			if (e.button !== 0) return; // Only left mouse button
@@ -364,7 +348,6 @@ export function MapPreview({
 				localIsDrawing = true;
 				setIsDrawing(true);
 				const newPath: PathPoint[] = [{ x: coords.x, y: coords.y, type: 'line' as const }];
-				localCurrentPath = newPath;
 				setCurrentPath(newPath);
 				setMousePosition(coords);
 
@@ -393,7 +376,6 @@ export function MapPreview({
 				setCurrentPath((prevPath) => {
 					if (prevPath.length === 0) {
 						const newPath: PathPoint[] = [{ x: coords.x, y: coords.y, type: 'line' as const }];
-						localCurrentPath = newPath;
 						return newPath;
 					}
 
@@ -409,7 +391,6 @@ export function MapPreview({
 					}
 
 					const updatedPath = [...prevPath, newPoint];
-					localCurrentPath = updatedPath;
 					return updatedPath;
 				});
 				setMousePosition(coords);
@@ -435,7 +416,6 @@ export function MapPreview({
 
 			setCurrentPath((prevPath) => {
 				if (prevPath.length === 0) {
-					localCurrentPath = prevPath;
 					return prevPath;
 				}
 
@@ -502,7 +482,6 @@ export function MapPreview({
 					};
 				}
 
-				localCurrentPath = updated;
 				return updated;
 			});
 		};
@@ -1293,7 +1272,6 @@ export function MapPreview({
 							labelId={selectedLabelId}
 							onClose={() => {
 								setSelectedLabelId(null);
-								setLabelEditorPosition(undefined);
 							}}
 							stylingSettings={stylingSettings}
 							onUpdateStylingSettings={onUpdateStylingSettings || (() => {})}

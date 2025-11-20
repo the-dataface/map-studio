@@ -130,7 +130,7 @@ export const LabelEditorToolbar: React.FC<LabelEditorToolbarProps> = ({
 		}
 		// Convert from labelAlignment if it's a symbol label
 		if (mapType === 'symbol' && 'labelAlignment' in defaultSettings) {
-			const alignment = (defaultSettings as any).labelAlignment;
+			const alignment = (defaultSettings as { labelAlignment?: string }).labelAlignment;
 			if (!alignment || alignment === 'auto')
 				return { textAnchor: 'start' as const, dominantBaseline: 'middle' as const };
 			const parts = String(alignment).split('-');

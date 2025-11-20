@@ -1,1016 +1,166 @@
-vendor.css?v=1763673468767:5 Uncaught SyntaxError: Invalid or unexpected token (at vendor.css?v=1763673468767:5:1)
-favicon.ico:1  GET http://localhost:3001/favicon.ico 404 (Not Found)
-textarea.tsx:11 [Textarea Debug] 🚀 Textarea component mounted 
-page.tsx:167 ⏭️ Skipping thumbnail generation: {currentProjectId: 'project_1763608700435_2ik5w38ot', hasData: false}
-textarea.tsx:11 [Textarea Debug] 🔚 Textarea component unmounted 
-textarea.tsx:11 [Textarea Debug] 🚀 Textarea component mounted 
-page.tsx:167 ⏭️ Skipping thumbnail generation: {currentProjectId: 'project_1763608700435_2ik5w38ot', hasData: false}
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-data-preview.tsx:243 Initializing column formats
-textarea.tsx:11 [Textarea Debug] 🚀 Textarea component mounted 
-page.tsx:178 ✅ Project already has thumbnail: US Regions
-textarea.tsx:11 [Textarea Debug] 🔚 Textarea component unmounted 
-data-preview.tsx:243 Initializing column formats
-textarea.tsx:11 [Textarea Debug] 🚀 Textarea component mounted 
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-data-preview.tsx:243 Initializing column formats
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-index.mjs:256 New axe issues
-index.mjs:276 serious: ARIA input fields must have an accessible name https://dequeuniversity.com/rules/axe/4.11/aria-input-field-name?application=axeAPI
-index.mjs:276 serious: Elements must only use permitted ARIA attributes https://dequeuniversity.com/rules/axe/4.11/aria-prohibited-attr?application=axeAPI
-index.mjs:276 critical: ARIA attributes must conform to valid values https://dequeuniversity.com/rules/axe/4.11/aria-valid-attr-value?application=axeAPI
-index.mjs:276 critical: Buttons must have discernible text https://dequeuniversity.com/rules/axe/4.11/button-name?application=axeAPI
-index.mjs:276 serious: Elements must meet minimum color contrast ratio thresholds https://dequeuniversity.com/rules/axe/4.11/color-contrast?application=axeAPI
-index.mjs:276 minor: Table header text should not be empty https://dequeuniversity.com/rules/axe/4.11/empty-table-header?application=axeAPI
-index.mjs:276 serious: Interactive controls must not be nested https://dequeuniversity.com/rules/axe/4.11/nested-interactive?application=axeAPI
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-hot-reloader-client.js:187 [Fast Refresh] rebuilding
-hot-reloader-client.js:44 [Fast Refresh] done in 3534ms
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-hot-reloader-client.js:187 [Fast Refresh] rebuilding
-hot-reloader-client.js:44 [Fast Refresh] done in 2369ms
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-hot-reloader-client.js:187 [Fast Refresh] rebuilding
-hot-reloader-client.js:44 [Fast Refresh] done in 820ms
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-hot-reloader-client.js:187 [Fast Refresh] rebuilding
-hot-reloader-client.js:44 [Fast Refresh] done in 664ms
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-hot-reloader-client.js:187 [Fast Refresh] rebuilding
-hot-reloader-client.js:44 [Fast Refresh] done in 825ms
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-hot-reloader-client.js:187 [Fast Refresh] rebuilding
-hot-reloader-client.js:44 [Fast Refresh] done in 804ms
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-hot-reloader-client.js:187 [Fast Refresh] rebuilding
-hot-reloader-client.js:44 [Fast Refresh] done in 805ms
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-hot-reloader-client.js:187 [Fast Refresh] rebuilding
-hot-reloader-client.js:44 [Fast Refresh] done in 816ms
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-hot-reloader-client.js:187 [Fast Refresh] rebuilding
-hot-reloader-client.js:44 [Fast Refresh] done in 770ms
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-hot-reloader-client.js:187 [Fast Refresh] rebuilding
-hot-reloader-client.js:44 [Fast Refresh] done in 816ms
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-hot-reloader-client.js:187 [Fast Refresh] rebuilding
-hot-reloader-client.js:44 [Fast Refresh] done in 627ms
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-hot-reloader-client.js:187 [Fast Refresh] rebuilding
-hot-reloader-client.js:44 [Fast Refresh] done in 628ms
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-hot-reloader-client.js:187 [Fast Refresh] rebuilding
-hot-reloader-client.js:44 [Fast Refresh] done in 378ms
-hot-reloader-client.js:187 [Fast Refresh] rebuilding
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-hot-reloader-client.js:44 [Fast Refresh] done in 955ms
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-hot-reloader-client.js:187 [Fast Refresh] rebuilding
-hot-reloader-client.js:44 [Fast Refresh] done in 3630ms
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-map-styling.tsx:347 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-map-styling.tsx:348 isSymbolFillDisabled: false
-map-styling.tsx:349 isSymbolSizeDisabled: false
-map-styling.tsx:350 isChoroplethFillDisabled: true
-map-styling.tsx:403 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 MapStyling received dimensionSettings: {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-installHook.js:1 isSymbolFillDisabled: false
-installHook.js:1 isSymbolSizeDisabled: false
-installHook.js:1 isChoroplethFillDisabled: true
-installHook.js:1 HERE true {symbol: {…}, choropleth: {…}, custom: {…}, selectedGeography: 'usa-states'}
-dimension-mapping.tsx:151 Current symbol size range: 5 - 20
-installHook.js:1 Current symbol size range: 5 - 20
-paths.ts:219 Uncaught TypeError: Cannot assign to read only property 'subject' of object '#<DragEvent>'
-    at SVGPathElement.eval (paths.ts:219:20)
-    at Dispatch.call (dispatch.js:58:72)
-    at gesture (drag.js:159:16)
-    at SVGPathElement.mousedowned (drag.js:73:5)
-    at SVGPathElement.eval (on.js:7:14)
-eval @ paths.ts:219
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousedowned @ drag.js:73
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
-paths.ts:234 Uncaught TypeError: Cannot read properties of undefined (reading 'map')
-    at SVGPathElement.eval (paths.ts:234:53)
-    at Dispatch.call (dispatch.js:58:72)
-    at Object.gesture [as mouse] (drag.js:159:16)
-    at mousemoved (drag.js:82:14)
-    at eval (on.js:7:14)
-eval @ paths.ts:234
-call @ dispatch.js:58
-gesture @ drag.js:159
-mousemoved @ drag.js:82
-eval @ on.js:7
+*VERCEL*
+
+13:51:59.005 Running build in Washington, D.C., USA (East) – iad1
+13:51:59.005 Build machine configuration: 2 cores, 8 GB
+13:51:59.134 Cloning github.com/the-dataface/map-studio (Branch: main, Commit: 23ffea8)
+13:51:59.665 Cloning completed: 531.000ms
+13:52:01.007 Restored build cache from previous deployment (EivmqsZ9EbhSsAeYna6vqvLLbtCx)
+13:52:02.083 Running "vercel build"
+13:52:02.475 Vercel CLI 48.10.3
+13:52:02.931 Detected `pnpm-lock.yaml` 9 which may be generated by pnpm@9.x or pnpm@10.x
+13:52:02.932 Using pnpm@10.x based on project creation date
+13:52:02.932 To use pnpm@9.x, manually opt in using corepack (https://vercel.com/docs/deployments/configure-a-build#corepack)
+13:52:02.960 Installing dependencies...
+13:52:04.149 Lockfile is up to date, resolution step is skipped
+13:52:04.320 Already up to date
+13:52:04.880 
+13:52:04.881 ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+13:52:04.881 │                                                                              │
+13:52:04.881 │   Ignored build scripts: esbuild, rollup, unrs-resolver.                     │
+13:52:04.882 │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+13:52:04.882 │   to run scripts.                                                            │
+13:52:04.882 │                                                                              │
+13:52:04.882 ╰──────────────────────────────────────────────────────────────────────────────╯
+13:52:04.882 
+13:52:04.916 Done in 1.8s using pnpm v10.21.0
+13:52:04.927 Detected Next.js version: 14.2.16
+13:52:04.952 Running "pnpm run build"
+13:52:05.236 
+13:52:05.239 > my-v0-project@0.1.0 build /vercel/path0
+13:52:05.240 > next build
+13:52:05.240 
+13:52:05.923   ▲ Next.js 14.2.16
+13:52:05.924 
+13:52:05.983    Creating an optimized production build ...
+13:52:24.081  ✓ Compiled successfully
+13:52:24.082    Linting and checking validity of types ...
+13:52:34.678 
+13:52:34.678 Failed to compile.
+13:52:34.678 
+13:52:34.678 ./components/label-editor-toolbar.tsx
+13:52:34.678 133:42  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+13:52:34.678 
+13:52:34.678 ./components/map-preview.tsx
+13:52:34.678 97:9  Error: 'labelEditorPosition' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+13:52:34.681 271:3  Warning: React Hook useCallback has a missing dependency: 'svgRef'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+13:52:34.681 288:5  Warning: React Hook useCallback has a missing dependency: 'svgRef'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+13:52:34.681 352:7  Error: 'localCurrentPath' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+13:52:34.681 584:5  Warning: React Hook useEffect has missing dependencies: 'svgRef' and 'toast'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+13:52:34.681 1007:5  Warning: React Hook useEffect has missing dependencies: 'handlePathPositionUpdate' and 'svgRef'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+13:52:34.682 1254:5  Warning: Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.  jsx-a11y/no-static-element-interactions
+13:52:34.682 
+13:52:34.682 ./components/map-tooltip.tsx
+13:52:34.682 3:38  Error: 'useRef' is defined but never used.  @typescript-eslint/no-unused-vars
+13:52:34.682 
+13:52:34.682 info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules
+13:52:34.836  ELIFECYCLE  Command failed with exit code 1.
+13:52:34.871 Error: Command "pnpm run build" exited with 1
+
+*BUNDLE SIZE CHECK*
+Run pnpm build
+
+> my-v0-project@0.1.0 build /home/runner/work/map-studio/map-studio
+> next build
+
+⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+  ▲ Next.js 14.2.16
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+
+Failed to compile.
+
+./components/label-editor-toolbar.tsx
+133:42  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./components/map-preview.tsx
+97:9  Error: 'labelEditorPosition' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+271:3  Warning: React Hook useCallback has a missing dependency: 'svgRef'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+288:5  Warning: React Hook useCallback has a missing dependency: 'svgRef'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+352:7  Error: 'localCurrentPath' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+584:5  Warning: React Hook useEffect has missing dependencies: 'svgRef' and 'toast'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+1007:5  Warning: React Hook useEffect has missing dependencies: 'handlePathPositionUpdate' and 'svgRef'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+1254:5  Warning: Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.  jsx-a11y/no-static-element-interactions
+
+./components/map-tooltip.tsx
+3:38  Error: 'useRef' is defined but never used.  @typescript-eslint/no-unused-vars
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules
+ ELIFECYCLE  Command failed with exit code 1.
+Error: Process completed with exit code 1.
+
+*LIGHTHOUSE*
+Run pnpm build
+
+> my-v0-project@0.1.0 build /home/runner/work/map-studio/map-studio
+> next build
+
+⚠ No build cache found. Please configure build caching for faster rebuilds. Read more: https://nextjs.org/docs/messages/no-cache
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+  ▲ Next.js 14.2.16
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Linting and checking validity of types ...
+
+Failed to compile.
+
+./components/label-editor-toolbar.tsx
+133:42  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./components/map-preview.tsx
+97:9  Error: 'labelEditorPosition' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+271:3  Warning: React Hook useCallback has a missing dependency: 'svgRef'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+288:5  Warning: React Hook useCallback has a missing dependency: 'svgRef'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+352:7  Error: 'localCurrentPath' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+584:5  Warning: React Hook useEffect has missing dependencies: 'svgRef' and 'toast'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+1007:5  Warning: React Hook useEffect has missing dependencies: 'handlePathPositionUpdate' and 'svgRef'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+1254:5  Warning: Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.  jsx-a11y/no-static-element-interactions
+
+./components/map-tooltip.tsx
+3:38  Error: 'useRef' is defined but never used.  @typescript-eslint/no-unused-vars
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules
+ ELIFECYCLE  Command failed with exit code 1.
+Error: Process completed with exit code 1.
+
+*LINT AND TYPE CHECK*
+Run pnpm lint
+
+> my-v0-project@0.1.0 lint /home/runner/work/map-studio/map-studio
+> next lint
+
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+
+./components/label-editor-toolbar.tsx
+133:42  Error: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./components/map-preview.tsx
+97:9  Error: 'labelEditorPosition' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+271:3  Warning: React Hook useCallback has a missing dependency: 'svgRef'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+288:5  Warning: React Hook useCallback has a missing dependency: 'svgRef'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+352:7  Error: 'localCurrentPath' is assigned a value but never used.  @typescript-eslint/no-unused-vars
+584:5  Warning: React Hook useEffect has missing dependencies: 'svgRef' and 'toast'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+1007:5  Warning: React Hook useEffect has missing dependencies: 'handlePathPositionUpdate' and 'svgRef'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+1254:5  Warning: Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element.  jsx-a11y/no-static-element-interactions
+
+./components/map-tooltip.tsx
+3:38  Error: 'useRef' is defined but never used.  @typescript-eslint/no-unused-vars
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules
+ ELIFECYCLE  Command failed with exit code 1.
+Error: Process completed with exit code 1.
