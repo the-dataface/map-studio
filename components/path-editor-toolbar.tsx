@@ -7,17 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { ColorInput } from '@/components/color-input';
-import {
-	X,
-	RotateCcw,
-	ArrowRight,
-	ArrowLeft,
-	Square,
-	Circle,
-	ArrowUpDown,
-	Copy,
-	Minus,
-} from 'lucide-react';
+import { X, RotateCcw, ArrowRight, ArrowLeft, Square, Circle, ArrowUpDown, Copy, Minus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { StylingSettings, DrawnPath, PathMarkerType } from '@/app/(studio)/types';
 
@@ -43,16 +33,37 @@ export const PathEditorToolbar: React.FC<PathEditorToolbarProps> = ({
 		}, 300); // Match animation duration
 	}, [onClose]);
 
-	// Handle ESC key to close panel
+	const handleDelete = useCallback(() => {
+		const currentPaths = stylingSettings.drawnPaths || [];
+		const updatedPaths = currentPaths.filter((p) => p.id !== pathId);
+
+		onUpdateStylingSettings({
+			...stylingSettings,
+			drawnPaths: updatedPaths,
+		});
+
+		// Close the panel after deletion
+		handleClose();
+	}, [pathId, stylingSettings, onUpdateStylingSettings, handleClose]);
+
+	// Handle ESC key to close panel and Delete key to delete path
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
+			// Don't trigger if user is typing in an input, textarea, or contenteditable element
+			const target = e.target as HTMLElement;
+			const isInputElement = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+			if (isInputElement) return;
+
 			if (e.key === 'Escape') {
 				handleClose();
+			} else if (e.key === 'Delete' || e.key === 'Backspace') {
+				handleDelete();
 			}
 		};
 		window.addEventListener('keydown', handleKeyDown);
 		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [handleClose]);
+	}, [handleClose, handleDelete]);
 
 	if (!pathId) return null;
 
@@ -161,7 +172,11 @@ export const PathEditorToolbar: React.FC<PathEditorToolbarProps> = ({
 			case 'line-arrow':
 				return isStart ? <ArrowLeft className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />;
 			case 'triangle-arrow':
-				return isStart ? <ArrowLeft className="h-4 w-4 fill-current" /> : <ArrowRight className="h-4 w-4 fill-current" />;
+				return isStart ? (
+					<ArrowLeft className="h-4 w-4 fill-current" />
+				) : (
+					<ArrowRight className="h-4 w-4 fill-current" />
+				);
 			case 'open-circle':
 				return <Circle className="h-4 w-4" />;
 			case 'closed-circle':
@@ -199,6 +214,14 @@ export const PathEditorToolbar: React.FC<PathEditorToolbarProps> = ({
 						<Button
 							variant="secondary"
 							size="icon"
+							onClick={handleDelete}
+							className="h-8 w-8 rounded-full bg-destructive/10 hover:bg-destructive/20 text-destructive hover:text-destructive"
+							title="Delete path (Del)">
+							<Trash2 className="h-4 w-4" />
+						</Button>
+						<Button
+							variant="secondary"
+							size="icon"
 							onClick={handleClose}
 							className="h-8 w-8 rounded-full bg-muted hover:bg-muted/80">
 							<X className="h-4 w-4" />
@@ -221,11 +244,7 @@ export const PathEditorToolbar: React.FC<PathEditorToolbarProps> = ({
 					<Label htmlFor="path-stroke-color" className="text-sm">
 						Stroke color
 					</Label>
-					<ColorInput
-						value={stroke}
-						onChange={(value) => updatePath({ stroke: value })}
-						showContrastCheck={false}
-					/>
+					<ColorInput value={stroke} onChange={(value) => updatePath({ stroke: value })} showContrastCheck={false} />
 				</div>
 
 				{/* Stroke Width */}
@@ -335,9 +354,7 @@ export const PathEditorToolbar: React.FC<PathEditorToolbarProps> = ({
 					<Label htmlFor="path-start-marker" className="text-sm">
 						Start marker
 					</Label>
-					<Select
-						value={startMarker}
-						onValueChange={(value) => updatePath({ startMarker: value as PathMarkerType })}>
+					<Select value={startMarker} onValueChange={(value) => updatePath({ startMarker: value as PathMarkerType })}>
 						<SelectTrigger id="path-start-marker" className="flex items-center gap-2">
 							<SelectValue>
 								<div className="flex items-center gap-2">
@@ -409,9 +426,7 @@ export const PathEditorToolbar: React.FC<PathEditorToolbarProps> = ({
 							Swap
 						</Button>
 					</div>
-					<Select
-						value={endMarker}
-						onValueChange={(value) => updatePath({ endMarker: value as PathMarkerType })}>
+					<Select value={endMarker} onValueChange={(value) => updatePath({ endMarker: value as PathMarkerType })}>
 						<SelectTrigger id="path-end-marker" className="flex items-center gap-2">
 							<SelectValue>
 								<div className="flex items-center gap-2">
@@ -485,4 +500,3 @@ export const PathEditorToolbar: React.FC<PathEditorToolbarProps> = ({
 		</Card>
 	);
 };
-
