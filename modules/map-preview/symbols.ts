@@ -6,6 +6,7 @@ import type {
   GeocodedRow,
   StylingSettings,
 } from '@/app/(studio)/types'
+import type { MapTool } from '@/components/map-control-bar'
 
 type DataRecord = DataRow | GeocodedRow
 
@@ -39,6 +40,9 @@ interface RenderSymbolsParams {
   getNumericValue: NumericGetter
   getUniqueValues: UniqueValuesGetter
   getSymbolPathData: SymbolPathGetter
+  activeTool?: MapTool
+  onShowTooltip?: (x: number, y: number, record: DataRecord) => void
+  onHideTooltip?: () => void
 }
 
 interface RenderSymbolsResult {
@@ -56,6 +60,9 @@ export const renderSymbols = ({
   getNumericValue,
   getUniqueValues,
   getSymbolPathData,
+  activeTool = 'inspect',
+  onShowTooltip,
+  onHideTooltip,
 }: RenderSymbolsParams): RenderSymbolsResult => {
   const { symbol } = dimensionSettings
   const symbolGroup = svg.append('g').attr('id', 'Symbols')
@@ -183,6 +190,29 @@ export const renderSymbols = ({
 
     if (fillRule) {
       path.attr('fill-rule', fillRule)
+    }
+
+    // Add hover events for inspect tool
+    if (activeTool === 'inspect' && onShowTooltip && onHideTooltip) {
+      const lat = Number(record[symbol.latitude])
+      const lng = Number(record[symbol.longitude])
+      const projected = projection([lng, lat])
+
+      if (projected) {
+        path
+          .style('cursor', 'crosshair')
+          .on('mouseenter', function (event) {
+            const [x, y] = d3.pointer(event, svg.node())
+            onShowTooltip(x, y, record)
+          })
+          .on('mouseleave', () => {
+            onHideTooltip()
+          })
+      }
+    } else if (activeTool === 'draw') {
+      path.style('cursor', 'crosshair').on('mouseenter', null).on('mouseleave', null)
+    } else {
+      path.style('cursor', 'default')
     }
   })
 

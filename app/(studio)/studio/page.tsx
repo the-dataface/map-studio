@@ -10,9 +10,9 @@ import { DimensionMapping } from '@/components/dimension-mapping';
 import { MapPreview } from '@/components/map-preview';
 import { MapStyling } from '@/components/map-styling';
 import { MapProjectionSelection } from '@/components/map-projection-selection';
-import { FloatingActionButtons } from '@/components/floating-action-buttons';
+import { FloatingToolbar } from '@/components/floating-toolbar';
 import { Button } from '@/components/ui/button';
-import { Save, Download } from 'lucide-react';
+import { Save, Download, Copy, FileImage } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import React from 'react';
 import type {
@@ -73,6 +73,12 @@ function MapStudioContent() {
 		setStylingSettings,
 		resetDataStates,
 		resetAll,
+		pushHistory,
+		undo,
+		redo,
+		canUndo,
+		canRedo,
+		clearHistory,
 	} = useStudioStore();
 
 	const [dataInputExpanded, setDataInputExpanded] = useState(true);
@@ -89,6 +95,27 @@ function MapStudioContent() {
 	const [isSaving, setIsSaving] = useState(false);
 	const [isExporting, setIsExporting] = useState(false);
 	const svgRef = useRef<SVGSVGElement>(null);
+
+	// Debounced history push for styling changes (500ms delay)
+	const stylingHistoryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const pushStylingHistory = useCallback(() => {
+		if (stylingHistoryTimeoutRef.current) {
+			clearTimeout(stylingHistoryTimeoutRef.current);
+		}
+		stylingHistoryTimeoutRef.current = setTimeout(() => {
+			pushHistory();
+			stylingHistoryTimeoutRef.current = null;
+		}, 500);
+	}, [pushHistory]);
+
+	// Cleanup timeout on unmount
+	useEffect(() => {
+		return () => {
+			if (stylingHistoryTimeoutRef.current) {
+				clearTimeout(stylingHistoryTimeoutRef.current);
+			}
+		};
+	}, []);
 
 	// Reset to fresh state when no project ID is provided (new map)
 	useEffect(() => {
@@ -110,6 +137,9 @@ function MapStudioContent() {
 					loadProject(project);
 					setCurrentProjectId(project.id);
 					setProjectName(project.name);
+					// Clear history and push initial state after loading
+					clearHistory();
+					setTimeout(() => pushHistory(), 200);
 				} else {
 					toast({
 						title: 'Project not found',
@@ -129,7 +159,7 @@ function MapStudioContent() {
 				router.replace('/studio');
 			}
 		}
-	}, [projectId, toast, router]);
+	}, [projectId, toast, router, clearHistory, pushHistory]);
 
 	// Generate thumbnail for projects that don't have one after map renders
 	useEffect(() => {
@@ -538,10 +568,14 @@ function MapStudioContent() {
 			symbol: newSettings.symbol,
 			choropleth: newSettings.choropleth,
 		}));
+		// Push history immediately for dimension changes
+		pushHistory();
 	};
 
 	const updateStylingSettings = (newSettings: StylingSettings) => {
 		setStylingSettings(newSettings);
+		// Use debounced history push for styling changes
+		pushStylingHistory();
 	};
 
 	const updateColumnTypes = (newTypes: ColumnType) => {
@@ -559,6 +593,8 @@ function MapStudioContent() {
 			...prev,
 			selectedGeography: newGeography,
 		}));
+		// Push history for geography changes
+		pushHistory();
 	};
 
 	const getCurrentData = () => {
@@ -647,6 +683,9 @@ function MapStudioContent() {
 		if (projection !== selectedProjection) {
 			setSelectedProjection(projection);
 		}
+
+		// Push history after data load completes
+		setTimeout(() => pushHistory(), 100);
 	};
 
 	const handleClearData = (mapType: MapType) => {
@@ -681,6 +720,9 @@ function MapStudioContent() {
 			setDataInputExpanded(true);
 			setActiveMapType('symbol');
 		}
+
+		// Push history after data clear completes
+		setTimeout(() => pushHistory(), 100);
 	};
 
 	const updateGeocodedData = (geocodedData: GeocodedRow[]) => {
@@ -739,6 +781,9 @@ function MapStudioContent() {
 					longitude: chosenLngCol || prevSettings.symbol.longitude,
 				},
 			}));
+
+			// Push history after geocoding completes
+			setTimeout(() => pushHistory(), 100);
 		}
 	};
 
@@ -834,7 +879,7 @@ function MapStudioContent() {
 	}, [mapPreviewRef]);
 
 	// Handler to scroll to map preview and expand it
-	const handleScrollToMap = () => {
+	const handleJumpToMap = useCallback(() => {
 		setMapPreviewExpanded(true);
 		setTimeout(() => {
 			if (mapPreviewRef.current) {
@@ -844,7 +889,48 @@ function MapStudioContent() {
 				if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 			}
 		}, 50);
-	};
+	}, []);
+
+	// Handler to download SVG
+	const handleDownloadSVG = useCallback(() => {
+		if (!svgRef.current) {
+			toast({
+				title: 'No map to download',
+				description: 'Please ensure the map is rendered before downloading.',
+				variant: 'destructive',
+			});
+			return;
+		}
+
+		try {
+			const svgElement = svgRef.current;
+			const serializer = new XMLSerializer();
+			const svgString = serializer.serializeToString(svgElement);
+			const blob = new Blob([svgString], { type: 'image/svg+xml' });
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = `${projectName || 'map'}.svg`;
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+			URL.revokeObjectURL(url);
+
+			toast({
+				icon: <FileImage className="h-4 w-4" />,
+				description: 'Map downloaded as SVG.',
+				duration: 3000,
+			});
+		} catch (error) {
+			console.error('Error downloading SVG:', error);
+			toast({
+				title: 'Download failed',
+				description: 'Failed to download SVG file',
+				variant: 'destructive',
+				duration: 3000,
+			});
+		}
+	}, [toast, projectName]);
 
 	// Handler to collapse all panels except map preview
 	const handleCollapseAll = () => {
@@ -864,6 +950,130 @@ function MapStudioContent() {
 		dataPreviewExpanded ||
 		dimensionMappingExpanded ||
 		mapStylingExpanded;
+
+	// Copy SVG to clipboard
+	const handleCopySVG = useCallback(async () => {
+		if (!svgRef.current) {
+			toast({
+				title: 'No map to copy',
+				description: 'Please ensure the map is rendered before copying.',
+				variant: 'destructive',
+			});
+			return;
+		}
+
+		try {
+			const svgElement = svgRef.current;
+			const serializer = new XMLSerializer();
+			const svgString = serializer.serializeToString(svgElement);
+
+			await navigator.clipboard.writeText(svgString);
+
+			toast({
+				icon: <Copy className="h-4 w-4" />,
+				description: 'SVG copied to clipboard.',
+				duration: 3000,
+			});
+		} catch (error) {
+			console.error('Error copying SVG:', error);
+			toast({
+				title: 'Copy failed',
+				description: 'Failed to copy SVG to clipboard',
+				variant: 'destructive',
+				duration: 3000,
+			});
+		}
+	}, [toast]);
+
+	// Reset everything
+	const handleReset = useCallback(() => {
+		resetAll();
+		clearHistory();
+		setCurrentProjectId(null);
+		setProjectName('Untitled Project');
+		setDataInputExpanded(true);
+		setShowGeocoding(false);
+		setMapPreviewExpanded(false);
+
+		toast({
+			description: 'Map reset to defaults.',
+			duration: 3000,
+		});
+	}, [resetAll, clearHistory, toast]);
+
+	// Undo handler
+	const handleUndo = useCallback(() => {
+		undo();
+		toast({
+			description: 'Undone.',
+			duration: 2000,
+		});
+	}, [undo, toast]);
+
+	// Redo handler
+	const handleRedo = useCallback(() => {
+		redo();
+		toast({
+			description: 'Redone.',
+			duration: 2000,
+		});
+	}, [redo, toast]);
+
+	// Keyboard shortcuts
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			// Don't trigger shortcuts if user is typing in an input, textarea, or contenteditable element
+			const target = e.target as HTMLElement;
+			const isInputElement = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+			// Check for Cmd (Mac) or Ctrl (Windows/Linux)
+			const isModifierPressed = e.metaKey || e.ctrlKey;
+
+			if (!isModifierPressed) return;
+
+			// Cmd/Ctrl + Z: Undo (allow in inputs for text undo, but also trigger our undo)
+			if (e.key === 'z' && !e.shiftKey) {
+				if (!isInputElement && canUndo()) {
+					e.preventDefault();
+					handleUndo();
+				}
+				return;
+			}
+
+			// Cmd/Ctrl + Y or Cmd/Ctrl + Shift + Z: Redo
+			if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
+				if (!isInputElement && canRedo()) {
+					e.preventDefault();
+					handleRedo();
+				}
+				return;
+			}
+
+			// Cmd/Ctrl + S: Save project (prevent browser save dialog)
+			if (e.key === 's') {
+				e.preventDefault();
+				if (hasAnyData()) {
+					handleSaveProject();
+				}
+				return;
+			}
+
+			// Cmd/Ctrl + E: Export map as SVG
+			if (e.key === 'e') {
+				e.preventDefault();
+				if (hasAnyData()) {
+					handleDownloadSVG();
+				}
+				return;
+			}
+		};
+
+		window.addEventListener('keydown', handleKeyDown);
+
+		return () => {
+			window.removeEventListener('keydown', handleKeyDown);
+		};
+	}, [canUndo, canRedo, hasAnyData, handleUndo, handleRedo, handleSaveProject, handleDownloadSVG]);
 
 	return (
 		<>
@@ -945,7 +1155,12 @@ function MapStudioContent() {
 									symbolDataLength={symbolData.parsedData.length}
 									choroplethDataLength={choroplethData.parsedData.length}
 									customDataLoaded={customData.customMapData.length > 0}
-									onMapTypeChange={setActiveMapType}
+									onMapTypeChange={(newType) => {
+										setActiveMapType(newType);
+										if (hasAnyData()) {
+											setTimeout(() => pushHistory(), 100);
+										}
+									}}
 									selectedGeography={dimensionSettings.selectedGeography}
 									isExpanded={dataPreviewExpanded}
 									setIsExpanded={setDataPreviewExpanded}
@@ -1002,28 +1217,29 @@ function MapStudioContent() {
 								isExpanded={mapPreviewExpanded}
 								setIsExpanded={setMapPreviewExpanded}
 								svgRef={svgRef}
+								onUpdateStylingSettings={updateStylingSettings}
 							/>
 						</div>
 					</>
 				)}
 			</section>
-			{/* Floating action buttons */}
-			<FloatingActionButtons
-				onScrollToMap={() => {
-					setMapPreviewExpanded(true);
-					setTimeout(() => {
-						if (mapPreviewRef.current) {
-							mapPreviewRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-						} else {
-							const el = document.getElementById('map-preview-section');
-							if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-						}
-					}, 50);
-				}}
-				onCollapseAll={handleCollapseAll}
+			{/* Floating toolbar */}
+			<FloatingToolbar
 				visible={hasAnyData()}
-				showCollapse={anyPanelExpanded}
-				showJump={!mapInView || !mapPreviewExpanded}
+				onReset={handleReset}
+				onSave={handleSaveProject}
+				onExport={handleExportProject}
+				onExportSVG={handleDownloadSVG}
+				onCopy={handleCopySVG}
+				onUndo={handleUndo}
+				onRedo={handleRedo}
+				onCollapseAll={handleCollapseAll}
+				onJumpToMap={handleJumpToMap}
+				canUndo={canUndo()}
+				canRedo={canRedo()}
+				canCollapse={anyPanelExpanded}
+				isSaving={isSaving}
+				isExporting={isExporting}
 			/>
 		</>
 	);

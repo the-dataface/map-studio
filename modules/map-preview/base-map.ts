@@ -6,6 +6,7 @@ import type {
   ProjectionType,
   StylingSettings,
 } from '@/app/(studio)/types'
+import type { MapTool } from '@/components/map-control-bar'
 import type { TopoJSONData } from './types'
 import { findCountryFeature, getSubnationalLabel } from './geography'
 import type { CountryFinder } from './geography'
@@ -46,6 +47,13 @@ interface RenderBaseMapParams {
   stylingSettings: StylingSettings
   toast: ToastFn
   findCountryFeature: CountryFinder
+  activeTool?: MapTool
+  onShowTooltip?: (x: number, y: number, record: any) => void
+  onHideTooltip?: () => void
+  choroplethData?: any[]
+  dimensionSettings?: any
+  normalizeGeoIdentifier?: (value: string, geography: GeographyKey) => string
+  extractCandidateFromSVGId?: (id: string) => string | null
 }
 
 interface RenderBaseMapResult {
@@ -64,6 +72,13 @@ export const renderBaseMap = ({
   geoAtlasData,
   stylingSettings,
   toast,
+  activeTool = 'inspect',
+  onShowTooltip,
+  onHideTooltip,
+  choroplethData,
+  dimensionSettings,
+  normalizeGeoIdentifier,
+  extractCandidateFromSVGId,
 }: RenderBaseMapParams): RenderBaseMapResult => {
   const projection = createProjection(selectedProjection, width, mapHeight)
   const path = d3.geoPath().projection(projection)
@@ -87,6 +102,13 @@ export const renderBaseMap = ({
       stylingSettings,
       toast,
       findCountryFeature,
+      activeTool,
+      onShowTooltip,
+      onHideTooltip,
+      choroplethData,
+      dimensionSettings,
+      normalizeGeoIdentifier,
+      extractCandidateFromSVGId,
     })
   }
 
@@ -200,6 +222,13 @@ interface RenderTopoMapParams {
   stylingSettings: StylingSettings
   toast: ToastFn
   findCountryFeature: CountryFinder
+  activeTool?: MapTool
+  onShowTooltip?: (x: number, y: number, record: any) => void
+  onHideTooltip?: () => void
+  choroplethData?: any[]
+  dimensionSettings?: any
+  normalizeGeoIdentifier?: (value: string, geography: GeographyKey) => string
+  extractCandidateFromSVGId?: (id: string) => string | null
 }
 
 const renderTopoMap = ({
@@ -214,6 +243,13 @@ const renderTopoMap = ({
   geoAtlasData,
   stylingSettings,
   toast,
+  activeTool = 'inspect',
+  onShowTooltip,
+  onHideTooltip,
+  choroplethData,
+  dimensionSettings,
+  normalizeGeoIdentifier,
+  extractCandidateFromSVGId,
 }: RenderTopoMapParams) => {
   const mapGroup = svg.append('g').attr('id', 'Map')
   const nationsGroup = mapGroup.append('g').attr('id', 'Nations')
@@ -392,7 +428,70 @@ const renderTopoMap = ({
       .attr('d', path(nationMesh))
   }
 
-  statesOrCountiesGroup
+  // Create geoDataMap for tooltip matching
+  const geoDataMap = new Map<string, any>()
+  if (choroplethData && dimensionSettings?.choropleth?.stateColumn && normalizeGeoIdentifier) {
+    choroplethData.forEach((record: any) => {
+      const rawValue = String(record[dimensionSettings.choropleth.stateColumn] || '')
+      if (!rawValue.trim()) return
+      const normalizedKey = normalizeGeoIdentifier(rawValue, selectedGeography)
+      geoDataMap.set(normalizedKey, record)
+    })
+  }
+
+  // Helper to resolve feature identifier
+  const resolveFeatureIdentifier = (feature: any): string | null => {
+    if (!feature) return null
+
+    if (selectedGeography.startsWith('usa-states') || selectedGeography.startsWith('usa-counties')) {
+      return feature?.id ? (normalizeGeoIdentifier?.(String(feature.id), selectedGeography) || null) : null
+    }
+
+    if (selectedGeography.startsWith('canada-provinces')) {
+      const abbrKey = feature?.id ? (normalizeGeoIdentifier?.(String(feature.id), selectedGeography) || null) : null
+      const nameKey = feature?.properties?.name
+        ? (normalizeGeoIdentifier?.(String(feature.properties.name), selectedGeography) || null)
+        : null
+
+      if (abbrKey && geoDataMap.has(abbrKey)) return abbrKey
+      if (nameKey && geoDataMap.has(nameKey)) return nameKey
+      return abbrKey || nameKey
+    }
+
+    if (
+      selectedGeography === 'world' ||
+      selectedGeography === 'usa-nation' ||
+      selectedGeography === 'canada-nation'
+    ) {
+      const candidates = [
+        feature?.id,
+        feature?.properties?.name,
+        feature?.properties?.name_long,
+        feature?.properties?.admin,
+        feature?.properties?.iso_a3,
+      ]
+        .filter(Boolean)
+        .map((value) => normalizeGeoIdentifier?.(String(value), selectedGeography) || String(value))
+
+      const exact = candidates.find((candidate) => geoDataMap.has(candidate))
+      if (exact) return exact
+
+      const geoKeys = Array.from(geoDataMap.keys())
+      const fuzzy = geoKeys.find((key) =>
+        candidates.some(
+          (candidate) =>
+            key.toLowerCase().includes(candidate.toLowerCase()) ||
+            candidate.toLowerCase().includes(key.toLowerCase())
+        )
+      )
+
+      return fuzzy || null
+    }
+
+    return null
+  }
+
+  const paths = statesOrCountiesGroup
     .selectAll('path')
     .data(geoFeatures)
     .join('path')
@@ -419,6 +518,28 @@ const renderTopoMap = ({
     .attr('stroke-linejoin', 'round')
     .attr('stroke-linecap', 'round')
     .attr('d', path as any)
+
+  // Add hover events for inspect tool
+  if (activeTool === 'inspect' && onShowTooltip && onHideTooltip && choroplethData && dimensionSettings) {
+    paths
+      .style('cursor', 'crosshair')
+      .on('mouseenter', function (event, feature: any) {
+        const featureIdentifier = resolveFeatureIdentifier(feature)
+        const dataRecord = featureIdentifier ? geoDataMap.get(featureIdentifier) : null
+
+        if (dataRecord && onShowTooltip) {
+          const [x, y] = d3.pointer(event, svg.node())
+          onShowTooltip(x, y, dataRecord)
+        }
+      })
+      .on('mouseleave', () => {
+        if (onHideTooltip) onHideTooltip()
+      })
+  } else if (activeTool === 'draw') {
+    paths.style('cursor', 'crosshair').on('mouseenter', null).on('mouseleave', null)
+  } else {
+    paths.style('cursor', 'default')
+  }
 }
 
 const getNationId = (selectedGeography: GeographyKey) => {

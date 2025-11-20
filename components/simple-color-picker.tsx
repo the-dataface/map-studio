@@ -121,11 +121,13 @@ export function SimpleColorPicker({ isOpen, onClose, onColorChange, currentColor
 	return (
 		<div
 			ref={pickerRef}
-			className="fixed z-50 w-72 rounded-md border border-gray-200 bg-white p-4 text-gray-950 shadow-lg outline-none dark:border-gray-800 dark:bg-gray-950 dark:text-gray-50"
+			className="fixed z-[100] w-72 rounded-md border border-gray-200 bg-white p-4 text-gray-950 shadow-lg outline-none dark:border-gray-800 dark:bg-gray-950 dark:text-gray-50"
 			style={{
 				top: `${position.top}px`,
 				left: `${position.left}px`,
 				transform: 'translateZ(0)', // Force hardware acceleration for smooth positioning
+				maxHeight: 'calc(100vh - 20px)',
+				overflowY: 'auto',
 			}}>
 			{/* Small arrow pointing to the trigger */}
 			<div

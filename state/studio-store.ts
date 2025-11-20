@@ -21,6 +21,67 @@ type Updater<T> = T | ((previous: T) => T)
 const resolveValue = <T>(value: Updater<T>, previous: T): T =>
   typeof value === 'function' ? (value as (current: T) => T)(previous) : value
 
+// History management for undo/redo
+type StateSnapshot = {
+  symbolData: DataState
+  choroplethData: DataState
+  customData: DataState
+  isGeocoding: boolean
+  activeMapType: MapType
+  selectedGeography: GeographyKey
+  selectedProjection: ProjectionType
+  clipToCountry: boolean
+  columnTypes: ColumnType
+  columnFormats: ColumnFormat
+  dimensionSettings: DimensionSettings
+  stylingSettings: StylingSettings
+}
+
+const MAX_HISTORY_SIZE = 50
+
+const createStateSnapshot = (state: {
+  symbolData: DataState
+  choroplethData: DataState
+  customData: DataState
+  isGeocoding: boolean
+  activeMapType: MapType
+  selectedGeography: GeographyKey
+  selectedProjection: ProjectionType
+  clipToCountry: boolean
+  columnTypes: ColumnType
+  columnFormats: ColumnFormat
+  dimensionSettings: DimensionSettings
+  stylingSettings: StylingSettings
+}): StateSnapshot => ({
+  symbolData: JSON.parse(JSON.stringify(state.symbolData)),
+  choroplethData: JSON.parse(JSON.stringify(state.choroplethData)),
+  customData: JSON.parse(JSON.stringify(state.customData)),
+  isGeocoding: state.isGeocoding,
+  activeMapType: state.activeMapType,
+  selectedGeography: state.selectedGeography,
+  selectedProjection: state.selectedProjection,
+  clipToCountry: state.clipToCountry,
+  columnTypes: JSON.parse(JSON.stringify(state.columnTypes)),
+  columnFormats: JSON.parse(JSON.stringify(state.columnFormats)),
+  dimensionSettings: JSON.parse(JSON.stringify(state.dimensionSettings)),
+  stylingSettings: JSON.parse(JSON.stringify(state.stylingSettings)),
+})
+
+const applyStateSnapshot = (snapshot: StateSnapshot): Partial<StudioState> => ({
+  symbolData: snapshot.symbolData,
+  choroplethData: snapshot.choroplethData,
+  customData: snapshot.customData,
+  isGeocoding: snapshot.isGeocoding,
+  activeMapType: snapshot.activeMapType,
+  selectedGeography: snapshot.selectedGeography,
+  selectedProjection: snapshot.selectedProjection,
+  clipToCountry: snapshot.clipToCountry,
+  columnTypes: snapshot.columnTypes,
+  columnFormats: snapshot.columnFormats,
+  dimensionSettings: snapshot.dimensionSettings,
+  stylingSettings: snapshot.stylingSettings,
+})
+
 const createEmptyDataState = (): DataState => ({
   rawData: '',
   parsedData: [],
@@ -124,7 +185,7 @@ const createDefaultStylingSettings = (): StylingSettings => ({
     symbolStrokeColor: '#ffffff',
     symbolSize: 5,
     symbolStrokeWidth: 1,
-    labelFontFamily: 'Geist Sans',
+    labelFontFamily: 'Inter',
     labelBold: false,
     labelItalic: false,
     labelUnderline: false,
@@ -137,7 +198,7 @@ const createDefaultStylingSettings = (): StylingSettings => ({
     customSvgPath: '',
   },
   choropleth: {
-    labelFontFamily: 'Geist Sans',
+    labelFontFamily: 'Inter',
     labelBold: false,
     labelItalic: false,
     labelUnderline: false,
@@ -146,6 +207,16 @@ const createDefaultStylingSettings = (): StylingSettings => ({
     labelOutlineColor: '#ffffff',
     labelFontSize: 10,
     labelOutlineThickness: 0,
+  },
+  individualLabelOverrides: {},
+  drawnPaths: [],
+  defaultPathStyles: {
+    stroke: '#000000',
+    strokeWidth: 2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    fill: 'none',
+    opacity: 1,
   },
 })
 
@@ -218,6 +289,15 @@ interface StudioState {
   setStylingSettings: (value: Updater<StylingSettings>) => void
   resetDataStates: () => void
   resetAll: () => void
+  // Undo/Redo
+  history: StateSnapshot[]
+  historyIndex: number
+  pushHistory: () => void
+  undo: () => void
+  redo: () => void
+  canUndo: () => boolean
+  canRedo: () => boolean
+  clearHistory: () => void
 }
 
 export const useStudioStore = create<StudioState>((set) => ({
@@ -311,8 +391,84 @@ export const useStudioStore = create<StudioState>((set) => ({
           savedStyles: currentStyling.base.savedStyles, // Keep user's saved style presets
         },
       },
+      history: [],
+      historyIndex: -1,
     })
   },
+  // Undo/Redo implementation
+  history: [] as StateSnapshot[],
+  historyIndex: -1,
+  
+  pushHistory: () =>
+    set((state) => {
+      const snapshot = createStateSnapshot(state)
+      const newHistory = [...state.history]
+      const newIndex = state.historyIndex + 1
+      
+      // Remove any history after current index (when undoing then making new changes)
+      if (newIndex < newHistory.length) {
+        newHistory.splice(newIndex)
+      }
+      
+      // Add new snapshot
+      newHistory.push(snapshot)
+      
+      // Limit history size
+      if (newHistory.length > MAX_HISTORY_SIZE) {
+        newHistory.shift()
+        return {
+          history: newHistory,
+          historyIndex: newHistory.length - 1,
+        }
+      }
+      
+      return {
+        history: newHistory,
+        historyIndex: newIndex,
+      }
+    }),
+  
+  undo: () =>
+    set((state) => {
+      if (state.historyIndex <= 0) return state
+      
+      const newIndex = state.historyIndex - 1
+      const snapshot = state.history[newIndex]
+      
+      return {
+        ...applyStateSnapshot(snapshot),
+        historyIndex: newIndex,
+      }
+    }),
+  
+  redo: () =>
+    set((state) => {
+      if (state.historyIndex >= state.history.length - 1) return state
+      
+      const newIndex = state.historyIndex + 1
+      const snapshot = state.history[newIndex]
+      
+      return {
+        ...applyStateSnapshot(snapshot),
+        historyIndex: newIndex,
+      }
+    }),
+  
+  canUndo: () => {
+    const state = useStudioStore.getState()
+    return state.historyIndex > 0
+  },
+  
+  canRedo: () => {
+    const state = useStudioStore.getState()
+    return state.historyIndex < state.history.length - 1
+  },
+  
+  clearHistory: () =>
+    set({
+      history: [],
+      historyIndex: -1,
+    }),
 }))
 
 export const emptyDataState = createEmptyDataState

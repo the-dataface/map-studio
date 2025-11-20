@@ -159,8 +159,7 @@ interface MapStylingProps {
 }
 
 const googleFontFamilies = [
-	'Geist Sans', // Default
-	'Inter',
+	'Inter', // Default
 	'Roboto',
 	'Open Sans',
 	'Lato',
@@ -906,10 +905,10 @@ export function MapStyling({
 														Font family
 													</Label>
 													<Select
-														value={stylingSettings.symbol.labelFontFamily || 'Geist Sans'}
+														value={stylingSettings.symbol.labelFontFamily || 'Inter'}
 														onValueChange={(value) => updateSetting('symbol', 'labelFontFamily', value)}>
 														<SelectTrigger id="symbol-label-font-family">
-															<SelectValue placeholder="Geist Sans" />
+															<SelectValue placeholder="Inter" />
 														</SelectTrigger>
 														<SelectContent>
 															{googleFontFamilies.map((font) => (
@@ -1088,10 +1087,10 @@ export function MapStyling({
 														Font family
 													</Label>
 													<Select
-														value={stylingSettings.choropleth.labelFontFamily || 'Geist Sans'}
+														value={stylingSettings.choropleth.labelFontFamily || 'Inter'}
 														onValueChange={(value) => updateSetting('choropleth', 'labelFontFamily', value)}>
 														<SelectTrigger id="choropleth-label-font-family">
-															<SelectValue placeholder="Geist Sans" />
+															<SelectValue placeholder="Inter" />
 														</SelectTrigger>
 														<SelectContent>
 															{googleFontFamilies.map((font) => (
