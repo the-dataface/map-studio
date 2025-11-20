@@ -1,16 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, react-hooks/exhaustive-deps, react-hooks/rules-of-hooks */
 'use client';
 
-import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense, lazy } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { DataInput } from '@/components/data-input';
 import { GeocodingSection } from '@/components/geocoding-section';
-import { DataPreview } from '@/components/data-preview';
-import { DimensionMapping } from '@/components/dimension-mapping';
-import { MapPreview } from '@/components/map-preview';
-import { MapStyling } from '@/components/map-styling';
 import { MapProjectionSelection } from '@/components/map-projection-selection';
 import { FloatingToolbar } from '@/components/floating-toolbar';
+
+// Lazy load heavy components for better initial load performance
+const DataPreview = lazy(() => import('@/components/data-preview').then((mod) => ({ default: mod.DataPreview })));
+const DimensionMapping = lazy(() =>
+	import('@/components/dimension-mapping').then((mod) => ({ default: mod.DimensionMapping }))
+);
+const MapStyling = lazy(() => import('@/components/map-styling').then((mod) => ({ default: mod.MapStyling })));
+const MapPreview = lazy(() => import('@/components/map-preview').then((mod) => ({ default: mod.MapPreview })));
 import { Button } from '@/components/ui/button';
 import { Save, Download, Copy, FileImage } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -1140,85 +1144,113 @@ function MapStudioContent() {
 					<>
 						{!onlyCustomDataLoaded && (
 							<>
-								<DataPreview
-									data={getCurrentDisplayData()}
-									columns={getCurrentColumns()}
-									mapType={activeMapType}
-									onClearData={handleClearData}
-									symbolDataExists={hasDataForType('symbol')}
-									choroplethDataExists={hasDataForType('choropleth')}
-									customDataExists={hasDataForType('custom')}
-									columnTypes={columnTypes}
-									onUpdateColumnTypes={updateColumnTypes}
-									onUpdateColumnFormats={updateColumnFormats}
-									columnFormats={columnFormats}
-									symbolDataLength={symbolData.parsedData.length}
-									choroplethDataLength={choroplethData.parsedData.length}
-									customDataLoaded={customData.customMapData.length > 0}
-									onMapTypeChange={(newType) => {
-										setActiveMapType(newType);
-										if (hasAnyData()) {
-											setTimeout(() => pushHistory(), 100);
-										}
-									}}
-									selectedGeography={dimensionSettings.selectedGeography}
-									isExpanded={dataPreviewExpanded}
-									setIsExpanded={setDataPreviewExpanded}
-								/>
+								<Suspense
+									fallback={
+										<div className="rounded-xl border border-dashed border-border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
+											Loading data preview...
+										</div>
+									}>
+									<DataPreview
+										data={getCurrentDisplayData()}
+										columns={getCurrentColumns()}
+										mapType={activeMapType}
+										onClearData={handleClearData}
+										symbolDataExists={hasDataForType('symbol')}
+										choroplethDataExists={hasDataForType('choropleth')}
+										customDataExists={hasDataForType('custom')}
+										columnTypes={columnTypes}
+										onUpdateColumnTypes={updateColumnTypes}
+										onUpdateColumnFormats={updateColumnFormats}
+										columnFormats={columnFormats}
+										symbolDataLength={symbolData.parsedData.length}
+										choroplethDataLength={choroplethData.parsedData.length}
+										customDataLoaded={customData.customMapData.length > 0}
+										onMapTypeChange={(newType) => {
+											setActiveMapType(newType);
+											if (hasAnyData()) {
+												setTimeout(() => pushHistory(), 100);
+											}
+										}}
+										selectedGeography={dimensionSettings.selectedGeography}
+										isExpanded={dataPreviewExpanded}
+										setIsExpanded={setDataPreviewExpanded}
+									/>
+								</Suspense>
 
-								<DimensionMapping
-									mapType={activeMapType}
-									symbolDataExists={hasDataForType('symbol')}
-									choroplethDataExists={hasDataForType('choropleth')}
-									customDataExists={hasDataForType('custom')}
-									columnTypes={columnTypes}
-									dimensionSettings={dimensionSettings}
-									onUpdateSettings={updateDimensionSettings}
-									columnFormats={columnFormats}
-									symbolParsedData={symbolData.parsedData}
-									symbolGeocodedData={symbolData.geocodedData}
-									symbolColumns={symbolData.columns}
-									choroplethParsedData={choroplethData.parsedData}
-									choroplethGeocodedData={choroplethData.geocodedData}
-									choroplethColumns={choroplethData.columns}
-									selectedGeography={dimensionSettings.selectedGeography}
-									stylingSettings={stylingSettings}
-									isExpanded={dimensionMappingExpanded}
-									setIsExpanded={setDimensionMappingExpanded}
-								/>
+								<Suspense
+									fallback={
+										<div className="rounded-xl border border-dashed border-border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
+											Loading dimension mapping...
+										</div>
+									}>
+									<DimensionMapping
+										mapType={activeMapType}
+										symbolDataExists={hasDataForType('symbol')}
+										choroplethDataExists={hasDataForType('choropleth')}
+										customDataExists={hasDataForType('custom')}
+										columnTypes={columnTypes}
+										dimensionSettings={dimensionSettings}
+										onUpdateSettings={updateDimensionSettings}
+										columnFormats={columnFormats}
+										symbolParsedData={symbolData.parsedData}
+										symbolGeocodedData={symbolData.geocodedData}
+										symbolColumns={symbolData.columns}
+										choroplethParsedData={choroplethData.parsedData}
+										choroplethGeocodedData={choroplethData.geocodedData}
+										choroplethColumns={choroplethData.columns}
+										selectedGeography={dimensionSettings.selectedGeography}
+										stylingSettings={stylingSettings}
+										isExpanded={dimensionMappingExpanded}
+										setIsExpanded={setDimensionMappingExpanded}
+									/>
+								</Suspense>
 							</>
 						)}
-						<MapStyling
-							stylingSettings={stylingSettings}
-							onUpdateStylingSettings={updateStylingSettings}
-							dimensionSettings={dimensionSettings}
-							symbolDataExists={hasDataForType('symbol')}
-							choroplethDataExists={hasDataForType('choropleth')}
-							customDataExists={hasDataForType('custom')}
-							isExpanded={mapStylingExpanded}
-							setIsExpanded={setMapStylingExpanded}
-						/>
-
-						<div ref={mapPreviewRef} id="map-preview-section">
-							<MapPreview
-								symbolData={getSymbolDisplayData()}
-								choroplethData={getChoroplethDisplayData()}
-								mapType={activeMapType}
-								dimensionSettings={dimensionSettings}
+						<Suspense
+							fallback={
+								<div className="rounded-xl border border-dashed border-border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
+									Loading map styling...
+								</div>
+							}>
+							<MapStyling
 								stylingSettings={stylingSettings}
+								onUpdateStylingSettings={updateStylingSettings}
+								dimensionSettings={dimensionSettings}
 								symbolDataExists={hasDataForType('symbol')}
 								choroplethDataExists={hasDataForType('choropleth')}
-								columnTypes={columnTypes}
-								columnFormats={columnFormats}
-								customMapData={customData.customMapData}
-								selectedGeography={selectedGeography}
-								selectedProjection={selectedProjection}
-								clipToCountry={clipToCountry}
-								isExpanded={mapPreviewExpanded}
-								setIsExpanded={setMapPreviewExpanded}
-								svgRef={svgRef}
-								onUpdateStylingSettings={updateStylingSettings}
+								customDataExists={hasDataForType('custom')}
+								isExpanded={mapStylingExpanded}
+								setIsExpanded={setMapStylingExpanded}
 							/>
+						</Suspense>
+
+						<div ref={mapPreviewRef} id="map-preview-section">
+							<Suspense
+								fallback={
+									<div className="rounded-xl border border-dashed border-border bg-muted/30 p-12 text-center text-sm text-muted-foreground">
+										Loading map preview...
+									</div>
+								}>
+								<MapPreview
+									symbolData={getSymbolDisplayData()}
+									choroplethData={getChoroplethDisplayData()}
+									mapType={activeMapType}
+									dimensionSettings={dimensionSettings}
+									stylingSettings={stylingSettings}
+									symbolDataExists={hasDataForType('symbol')}
+									choroplethDataExists={hasDataForType('choropleth')}
+									columnTypes={columnTypes}
+									columnFormats={columnFormats}
+									customMapData={customData.customMapData}
+									selectedGeography={selectedGeography}
+									selectedProjection={selectedProjection}
+									clipToCountry={clipToCountry}
+									isExpanded={mapPreviewExpanded}
+									setIsExpanded={setMapPreviewExpanded}
+									svgRef={svgRef}
+									onUpdateStylingSettings={updateStylingSettings}
+								/>
+							</Suspense>
 						</div>
 					</>
 				)}
