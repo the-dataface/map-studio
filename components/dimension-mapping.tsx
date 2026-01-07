@@ -126,7 +126,6 @@ const getColoredTypeIcon = (type: string) => {
 	return <IconComponent className={cn('w-3 h-3', colorClasses)} />;
 };
 
-
 export function DimensionMapping({
 	mapType,
 	symbolDataExists,
@@ -365,8 +364,7 @@ export function DimensionMapping({
 			} else {
 				const uniqueValues = getUniqueValues(processedValue);
 				const defaultCategoricalPaletteName = COLOR_SCHEME_CATEGORIES.categorical[0];
-				const defaultColors =
-					D3_COLOR_SCHEMES[defaultCategoricalPaletteName as keyof typeof D3_COLOR_SCHEMES] || [];
+				const defaultColors = D3_COLOR_SCHEMES[defaultCategoricalPaletteName as keyof typeof D3_COLOR_SCHEMES] || [];
 				initialColorValues.current = {
 					...initialColorValues.current,
 					[section]: { min: null, mid: null, max: null },
@@ -779,8 +777,14 @@ export function DimensionMapping({
 				);
 			});
 
-			// Look for state columns
-			const stateColumn = currentColumns.find((col) => columnTypes[col] === 'state');
+			// Look for geographic columns (prioritize: state > province > county > country)
+			const stateColumn = currentColumns.find(
+				(col) =>
+					columnTypes[col] === 'state' ||
+					columnTypes[col] === 'province' ||
+					columnTypes[col] === 'county' ||
+					columnTypes[col] === 'country'
+			);
 
 			// Prioritize exact matches first, then partial matches
 			const bestLatColumn =
@@ -998,8 +1002,8 @@ export function DimensionMapping({
 					onClick={() => togglePanel(key)}
 					onKeyDown={(e) => {
 						if (e.key === 'Enter' || e.key === ' ') {
-							e.preventDefault()
-							togglePanel(key)
+							e.preventDefault();
+							togglePanel(key);
 						}
 					}}
 					role="button"

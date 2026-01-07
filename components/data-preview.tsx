@@ -36,7 +36,7 @@ interface DataPreviewProps {
 }
 
 interface ColumnType {
-	[key: string]: 'text' | 'number' | 'date' | 'coordinate' | 'state' | 'country';
+	[key: string]: 'text' | 'number' | 'date' | 'coordinate' | 'state' | 'province' | 'county' | 'country';
 }
 
 interface ColumnFormat {
@@ -231,7 +231,17 @@ const isNumericColumn = (column: string, data: (DataRow | GeocodedRow)[]): boole
 
 const isStateColumn = (column: string, data: (DataRow | GeocodedRow)[]): boolean => {
 	const colName = column.trim().toLowerCase();
-	return colName === 'state' || colName === 'province' || colName === 'county';
+	return colName === 'state';
+};
+
+const isProvinceColumn = (column: string): boolean => {
+	const colName = column.trim().toLowerCase();
+	return colName === 'province';
+};
+
+const isCountyColumn = (column: string): boolean => {
+	const colName = column.trim().toLowerCase();
+	return colName === 'county';
 };
 
 const isCountryColumn = (column: string): boolean => {
@@ -638,7 +648,10 @@ export function DataPreview({
 		}
 	};
 
-	const detectFormat = (column: string, type: 'number' | 'date' | 'state'): string => {
+	const detectFormat = (
+		column: string,
+		type: 'number' | 'date' | 'state' | 'province' | 'county' | 'country'
+	): string => {
 		if (!data.length) return getDefaultFormat(type);
 
 		const sampleValues = data
@@ -663,11 +676,11 @@ export function DataPreview({
 			return 'yyyy-mm-dd';
 		}
 
-		if (type === 'state') {
+		if (type === 'state' || type === 'province' || type === 'county') {
 			const firstValue = String(sampleValues[0] || '').trim();
 
 			// Handle Canadian provinces
-			if (selectedGeography === 'canada-provinces') {
+			if (type === 'province' || (type === 'state' && selectedGeography === 'canada-provinces')) {
 				// Check if it's an SGC code (2-digit number)
 				if (/^\d{2}$/.test(firstValue)) {
 					return 'abbreviated'; // SGC codes should be converted to abbreviations
@@ -689,17 +702,30 @@ export function DataPreview({
 			return 'abbreviated';
 		}
 
+		if (type === 'country') {
+			const firstValue = String(sampleValues[0] || '').trim();
+			// Check if it's ISO3 (3 uppercase letters)
+			if (/^[A-Z]{3}$/.test(firstValue)) return 'iso3';
+			// Check if it's a full country name
+			if (countryNameToIso3[firstValue]) return 'full';
+			return 'default';
+		}
+
 		return getDefaultFormat(type);
 	};
 
-	const getDefaultFormat = (type: 'number' | 'date' | 'state'): string => {
+	const getDefaultFormat = (type: 'number' | 'date' | 'state' | 'province' | 'county' | 'country'): string => {
 		switch (type) {
 			case 'number':
 				return 'raw';
 			case 'date':
 				return 'yyyy-mm-dd';
 			case 'state':
+			case 'province':
+			case 'county':
 				return 'abbreviated';
+			case 'country':
+				return 'default';
 			default:
 				return 'raw';
 		}
@@ -710,11 +736,18 @@ export function DataPreview({
 		const newColumnFormats: ColumnFormat = {};
 
 		columns.forEach((column) => {
+			// Check for exact column name matches first (case-insensitive)
+			// These take priority and will be applied even if user hasn't manually set a type
+			const colName = column.trim().toLowerCase();
 			if (isCoordinateColumn(column)) {
 				newInferredTypes[column] = 'coordinate';
-			} else if (isCountryColumn(column)) {
+			} else if (colName === 'country') {
 				newInferredTypes[column] = 'country';
-			} else if (isStateColumn(column, data)) {
+			} else if (colName === 'province') {
+				newInferredTypes[column] = 'province';
+			} else if (colName === 'county') {
+				newInferredTypes[column] = 'county';
+			} else if (colName === 'state') {
 				newInferredTypes[column] = 'state';
 			} else if (isDateColumn(column, data)) {
 				newInferredTypes[column] = 'date';
@@ -729,6 +762,8 @@ export function DataPreview({
 				inferredType === 'number' ||
 				inferredType === 'date' ||
 				inferredType === 'state' ||
+				inferredType === 'province' ||
+				inferredType === 'county' ||
 				inferredType === 'country'
 			) {
 				newColumnFormats[column] = detectFormat(column, inferredType as any);
@@ -738,7 +773,16 @@ export function DataPreview({
 		setInferredTypes(newInferredTypes);
 		onUpdateColumnFormats(newColumnFormats);
 
-		const mergedTypes = { ...newInferredTypes, ...columnTypes };
+		// Merge inferred types with user-set types
+		// User-set types take precedence, but if a column doesn't have a user-set type,
+		// use the inferred type (which will include exact name matches)
+		const mergedTypes: ColumnType = {};
+		columns.forEach((column) => {
+			// If user has manually set a type for this column, use it
+			// Otherwise, use the inferred type
+			mergedTypes[column] = columnTypes[column] || newInferredTypes[column];
+		});
+
 		let typesChanged = false;
 		if (Object.keys(mergedTypes).length !== Object.keys(columnTypes).length) {
 			typesChanged = true;
@@ -787,6 +831,8 @@ export function DataPreview({
 			case 'date':
 				return <Calendar className="w-3 h-3" />;
 			case 'state':
+			case 'province':
+			case 'county':
 			case 'country':
 				return <Flag className="w-3 h-3" />;
 			default:
@@ -803,6 +849,10 @@ export function DataPreview({
 			case 'date':
 				return 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:border-blue-300 dark:hover:border-blue-700';
 			case 'state':
+			case 'province':
+			case 'county':
+				return 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/30 hover:border-orange-300 dark:hover:border-orange-700';
+			case 'country':
 				return 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/30 hover:border-orange-300 dark:hover:border-orange-700';
 			default:
 				return 'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-900/30 hover:border-gray-300 dark:hover:border-gray-700';
@@ -941,7 +991,7 @@ export function DataPreview({
 			return formatDate(value, format);
 		}
 
-		if (type === 'state' && format) {
+		if ((type === 'state' || type === 'province' || type === 'county') && format) {
 			return formatState(value, format);
 		}
 
@@ -1075,7 +1125,7 @@ export function DataPreview({
 	};
 
 	const getFormatOptions = (
-		type: 'number' | 'date' | 'state' | 'country' | 'province'
+		type: 'number' | 'date' | 'state' | 'province' | 'county' | 'country'
 	): Array<{ value: string; label: string; example: string }> => {
 		switch (type) {
 			case 'number':
@@ -1104,6 +1154,7 @@ export function DataPreview({
 				];
 			case 'state':
 			case 'province':
+			case 'county':
 				return [
 					{ value: 'abbreviated', label: 'Abbreviated', example: 'CA / ON' },
 					{ value: 'full', label: 'Full', example: 'California / Ontario' },
@@ -1120,7 +1171,14 @@ export function DataPreview({
 	};
 
 	const shouldShowFormatting = (type: string) => {
-		return type === 'number' || type === 'date' || type === 'state' || type === 'province' || type === 'country';
+		return (
+			type === 'number' ||
+			type === 'date' ||
+			type === 'state' ||
+			type === 'province' ||
+			type === 'county' ||
+			type === 'country'
+		);
 	};
 
 	const hasFormattableColumns = () => {
@@ -1138,12 +1196,19 @@ export function DataPreview({
 	const handleColumnTypeChange = (column: string, type: string) => {
 		const newTypes = {
 			...columnTypes,
-			[column]: type as 'text' | 'number' | 'date' | 'coordinate' | 'state' | 'country',
+			[column]: type as 'text' | 'number' | 'date' | 'coordinate' | 'state' | 'province' | 'county' | 'country',
 		};
 		onUpdateColumnTypes(newTypes);
 
 		const newFormats = { ...columnFormats };
-		if (type === 'number' || type === 'date' || type === 'state' || type === 'country') {
+		if (
+			type === 'number' ||
+			type === 'date' ||
+			type === 'state' ||
+			type === 'province' ||
+			type === 'county' ||
+			type === 'country'
+		) {
 			newFormats[column] = getDefaultFormat(type as 'number' | 'date' | 'state');
 		} else {
 			delete newFormats[column];
@@ -1169,7 +1234,13 @@ export function DataPreview({
 	// Helper function to get display label for column types
 	const getColumnTypeDisplayLabel = (type: string) => {
 		if (type === 'state') {
-			return subnationalLabel;
+			return 'State';
+		}
+		if (type === 'province') {
+			return 'Province';
+		}
+		if (type === 'county') {
+			return 'County';
 		}
 		if (type === 'country') {
 			return 'Country';
@@ -1459,22 +1530,40 @@ export function DataPreview({
 																			<div className="flex items-center justify-between w-full">
 																				<div className="flex items-center gap-2">
 																					<Flag className="w-3 h-3" />
-																					<span>{subnationalLabel}</span>
+																					<span>State</span>
 																				</div>
 																			</div>
 																		</SelectItem>
-																		{subnationalLabel !== 'Country' && (
-																			<SelectItem
-																				value="country"
-																				className="text-gray-900 dark:text-gray-100 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
-																				<div className="flex items-center justify-between w-full">
-																					<div className="flex items-center gap-2">
-																						<Flag className="w-3 h-3" />
-																						<span>Country</span>
-																					</div>
+																		<SelectItem
+																			value="province"
+																			className="text-gray-900 dark:text-gray-100 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
+																			<div className="flex items-center justify-between w-full">
+																				<div className="flex items-center gap-2">
+																					<Flag className="w-3 h-3" />
+																					<span>Province</span>
 																				</div>
-																			</SelectItem>
-																		)}
+																			</div>
+																		</SelectItem>
+																		<SelectItem
+																			value="county"
+																			className="text-gray-900 dark:text-gray-100 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
+																			<div className="flex items-center justify-between w-full">
+																				<div className="flex items-center gap-2">
+																					<Flag className="w-3 h-3" />
+																					<span>County</span>
+																				</div>
+																			</div>
+																		</SelectItem>
+																		<SelectItem
+																			value="country"
+																			className="text-gray-900 dark:text-gray-100 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
+																			<div className="flex items-center justify-between w-full">
+																				<div className="flex items-center gap-2">
+																					<Flag className="w-3 h-3" />
+																					<span>Country</span>
+																				</div>
+																			</div>
+																		</SelectItem>
 																	</SelectContent>
 																</Select>
 															</div>
@@ -1564,7 +1653,9 @@ export function DataPreview({
 																	<Select
 																		value={
 																			columnFormats[column] ||
-																			getDefaultFormat(columnType as 'number' | 'date' | 'state')
+																			getDefaultFormat(
+																				columnType as 'number' | 'date' | 'state' | 'province' | 'county' | 'country'
+																			)
 																		}
 																		onValueChange={(value) => {
 																			onUpdateColumnFormats({
@@ -1578,11 +1669,27 @@ export function DataPreview({
 																			)} transition-all duration-200 relative z-30`}>
 																			<div className="flex items-center gap-2">
 																				<span>
-																					{getFormatOptions(columnType as 'number' | 'date' | 'state').find(
+																					{getFormatOptions(
+																						columnType as
+																							| 'number'
+																							| 'date'
+																							| 'state'
+																							| 'province'
+																							| 'county'
+																							| 'country'
+																					).find(
 																						(opt) =>
 																							opt.value ===
 																							(columnFormats[column] ||
-																								getDefaultFormat(columnType as 'number' | 'date' | 'state'))
+																								getDefaultFormat(
+																									columnType as
+																										| 'number'
+																										| 'date'
+																										| 'state'
+																										| 'province'
+																										| 'county'
+																										| 'country'
+																								))
 																					)?.label || 'Format'}
 																				</span>
 																			</div>
@@ -1591,7 +1698,9 @@ export function DataPreview({
 																			className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-lg z-[100]"
 																			position="popper"
 																			sideOffset={4}>
-																			{getFormatOptions(columnType as 'number' | 'date' | 'state').map((option) => (
+																			{getFormatOptions(
+																				columnType as 'number' | 'date' | 'state' | 'province' | 'county' | 'country'
+																			).map((option) => (
 																				<SelectItem
 																					key={option.value}
 																					value={option.value}
