@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 import { ColorInput } from '@/components/color-input'; // Re-added ColorInput import
 import { FormattedNumberInput } from '@/components/formatted-number-input';
-import type { DataRow, GeocodedRow, DimensionSettings } from '@/app/(studio)/types';
+import type { DataRow, GeocodedRow, DimensionSettings, ColumnType } from '@/app/(studio)/types';
 import type { CustomColorScheme } from '@/modules/data-ingest/color-schemes';
 import { applyColorSchemePreset, COLOR_SCHEME_CATEGORIES, D3_COLOR_SCHEMES } from '@/modules/data-ingest/color-schemes';
 import { getNumericBounds, getUniqueStringValues } from '@/modules/data-ingest/value-utils';
@@ -63,7 +63,7 @@ interface DimensionMappingProps {
 	symbolDataExists: boolean;
 	choroplethDataExists: boolean;
 	customDataExists: boolean; // Still need this to determine if custom map is loaded
-	columnTypes: { [key: string]: 'text' | 'number' | 'date' | 'coordinate' | 'state' | 'country' };
+	columnTypes: ColumnType;
 	dimensionSettings: DimensionSettings; // Use the defined interface
 	onUpdateSettings: (settings: DimensionSettings) => void; // Use the defined interface
 	columnFormats: { [key: string]: string }; // Add columnFormats prop
