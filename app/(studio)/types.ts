@@ -107,6 +107,8 @@ export interface IndividualLabelOverride {
 	id: string; // Unique identifier: "symbol-{index}" or "choropleth-{featureId}"
 	x?: number; // Override x position (SVG coordinates)
 	y?: number; // Override y position (SVG coordinates)
+	offsetX?: number; // Per-label x offset in pixels
+	offsetY?: number; // Per-label y offset in pixels
 	fontFamily?: string;
 	fontStyle?: 'normal' | 'italic';
 	fontWeight?: 'normal' | 'bold';

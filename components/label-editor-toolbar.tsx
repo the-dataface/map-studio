@@ -154,6 +154,8 @@ export const LabelEditorToolbar: React.FC<LabelEditorToolbarProps> = ({
 	};
 
 	const alignment = getAlignmentFromOverride();
+	const offsetX = currentOverride.offsetX ?? 0;
+	const offsetY = currentOverride.offsetY ?? 0;
 
 	const updateOverride = (updates: Partial<IndividualLabelOverride>) => {
 		const currentOverrides = stylingSettings.individualLabelOverrides || {};
@@ -437,6 +439,39 @@ export const LabelEditorToolbar: React.FC<LabelEditorToolbarProps> = ({
 						</div>
 					</div>
 				)}
+
+				<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+					<div className="space-y-2">
+						<Label htmlFor="label-offset-x" className="text-sm">
+							X offset ({offsetX}px)
+						</Label>
+						<Slider
+							id="label-offset-x"
+							value={[offsetX]}
+							onValueChange={(value) =>
+								updateOverride({ offsetX: value[0], x: undefined, y: undefined })
+							}
+							min={-50}
+							max={50}
+							step={1}
+						/>
+					</div>
+					<div className="space-y-2">
+						<Label htmlFor="label-offset-y" className="text-sm">
+							Y offset ({offsetY}px)
+						</Label>
+						<Slider
+							id="label-offset-y"
+							value={[offsetY]}
+							onValueChange={(value) =>
+								updateOverride({ offsetY: value[0], x: undefined, y: undefined })
+							}
+							min={-50}
+							max={50}
+							step={1}
+						/>
+					</div>
+				</div>
 			</CardContent>
 		</Card>
 	);
