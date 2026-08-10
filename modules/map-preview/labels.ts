@@ -277,10 +277,16 @@ export const renderSymbolLabels = ({
 			});
 
 			// Apply position override if exists, otherwise use calculated position
-			const offsetX = stylingSettings.symbol.labelOffsetX ?? 0;
-			const offsetY = stylingSettings.symbol.labelOffsetY ?? 0;
-			const finalX = hasPositionOverride ? override!.x! : projected[0] + position.dx + offsetX;
-			const finalY = hasPositionOverride ? override!.y! : projected[1] + position.dy + offsetY;
+			const globalOffsetX = stylingSettings.symbol.labelOffsetX ?? 0;
+			const globalOffsetY = stylingSettings.symbol.labelOffsetY ?? 0;
+			const individualOffsetX = override?.offsetX ?? 0;
+			const individualOffsetY = override?.offsetY ?? 0;
+			const finalX = hasPositionOverride
+				? override!.x!
+				: projected[0] + position.dx + globalOffsetX + individualOffsetX;
+			const finalY = hasPositionOverride
+				? override!.y!
+				: projected[1] + position.dy + globalOffsetY + individualOffsetY;
 
 			// Use override textAnchor/dominantBaseline if provided, otherwise use calculated position
 			const finalTextAnchor = textAnchor ?? position.anchor;
@@ -513,10 +519,16 @@ export const renderChoroplethLabels = ({
 			};
 
 			// Apply position override if exists, otherwise use centroid
-			const offsetX = stylingSettings.choropleth.labelOffsetX ?? 0;
-			const offsetY = stylingSettings.choropleth.labelOffsetY ?? 0;
-			const finalX = hasPositionOverride ? override!.x! : centroid[0] + offsetX;
-			const finalY = hasPositionOverride ? override!.y! : centroid[1] + offsetY;
+			const globalOffsetX = stylingSettings.choropleth.labelOffsetX ?? 0;
+			const globalOffsetY = stylingSettings.choropleth.labelOffsetY ?? 0;
+			const individualOffsetX = override?.offsetX ?? 0;
+			const individualOffsetY = override?.offsetY ?? 0;
+			const finalX = hasPositionOverride
+				? override!.x!
+				: centroid[0] + globalOffsetX + individualOffsetX;
+			const finalY = hasPositionOverride
+				? override!.y!
+				: centroid[1] + globalOffsetY + individualOffsetY;
 
 			textElement
 				.attr('x', finalX)
