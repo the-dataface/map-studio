@@ -191,6 +191,8 @@ export interface StylingSettings {
 		labelOutlineColor: string;
 		labelFontSize: number;
 		labelOutlineThickness: number;
+		labelOffsetX: number;
+		labelOffsetY: number;
 		labelAlignment:
 			| 'auto'
 			| 'top-left'
@@ -214,6 +216,8 @@ export interface StylingSettings {
 		labelOutlineColor: string;
 		labelFontSize: number;
 		labelOutlineThickness: number;
+		labelOffsetX: number;
+		labelOffsetY: number;
 	};
 	individualLabelOverrides?: Record<string, IndividualLabelOverride>;
 	drawnPaths?: DrawnPath[]; // Array of user-drawn paths

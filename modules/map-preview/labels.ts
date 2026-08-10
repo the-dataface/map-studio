@@ -277,8 +277,10 @@ export const renderSymbolLabels = ({
 			});
 
 			// Apply position override if exists, otherwise use calculated position
-			const finalX = hasPositionOverride ? override!.x! : projected[0] + position.dx;
-			const finalY = hasPositionOverride ? override!.y! : projected[1] + position.dy;
+			const offsetX = stylingSettings.symbol.labelOffsetX ?? 0;
+			const offsetY = stylingSettings.symbol.labelOffsetY ?? 0;
+			const finalX = hasPositionOverride ? override!.x! : projected[0] + position.dx + offsetX;
+			const finalY = hasPositionOverride ? override!.y! : projected[1] + position.dy + offsetY;
 
 			// Use override textAnchor/dominantBaseline if provided, otherwise use calculated position
 			const finalTextAnchor = textAnchor ?? position.anchor;
@@ -511,8 +513,10 @@ export const renderChoroplethLabels = ({
 			};
 
 			// Apply position override if exists, otherwise use centroid
-			const finalX = hasPositionOverride ? override!.x! : centroid[0];
-			const finalY = hasPositionOverride ? override!.y! : centroid[1];
+			const offsetX = stylingSettings.choropleth.labelOffsetX ?? 0;
+			const offsetY = stylingSettings.choropleth.labelOffsetY ?? 0;
+			const finalX = hasPositionOverride ? override!.x! : centroid[0] + offsetX;
+			const finalY = hasPositionOverride ? override!.y! : centroid[1] + offsetY;
 
 			textElement
 				.attr('x', finalX)

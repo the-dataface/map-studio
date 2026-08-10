@@ -110,6 +110,8 @@ interface StylingSettings {
 		labelOutlineColor: string;
 		labelFontSize: number;
 		labelOutlineThickness: number;
+		labelOffsetX: number;
+		labelOffsetY: number;
 		labelAlignment:
 			| 'auto'
 			| 'top-left'
@@ -133,6 +135,8 @@ interface StylingSettings {
 		labelOutlineColor: string;
 		labelFontSize: number;
 		labelOutlineThickness: number;
+		labelOffsetX: number;
+		labelOffsetY: number;
 	};
 }
 
@@ -1025,6 +1029,35 @@ export function MapStyling({
 													/>
 												</div>
 											</div>
+
+											<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+												<div className="space-y-2">
+													<Label htmlFor="symbol-label-offset-x" className="text-sm">
+														X offset ({stylingSettings.symbol.labelOffsetX ?? 0}px)
+													</Label>
+													<Slider
+														id="symbol-label-offset-x"
+														value={[stylingSettings.symbol.labelOffsetX ?? 0]}
+														onValueChange={(value) => updateSetting('symbol', 'labelOffsetX', value[0])}
+														min={-50}
+														max={50}
+														step={1}
+													/>
+												</div>
+												<div className="space-y-2">
+													<Label htmlFor="symbol-label-offset-y" className="text-sm">
+														Y offset ({stylingSettings.symbol.labelOffsetY ?? 0}px)
+													</Label>
+													<Slider
+														id="symbol-label-offset-y"
+														value={[stylingSettings.symbol.labelOffsetY ?? 0]}
+														onValueChange={(value) => updateSetting('symbol', 'labelOffsetY', value[0])}
+														min={-50}
+														max={50}
+														step={1}
+													/>
+												</div>
+											</div>
 										</div>
 
 										<div className="space-y-2">
@@ -1204,6 +1237,35 @@ export function MapStyling({
 														min={0}
 														max={10}
 														step={0.5}
+													/>
+												</div>
+											</div>
+
+											<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+												<div className="space-y-2">
+													<Label htmlFor="choropleth-label-offset-x" className="text-sm">
+														X offset ({stylingSettings.choropleth.labelOffsetX ?? 0}px)
+													</Label>
+													<Slider
+														id="choropleth-label-offset-x"
+														value={[stylingSettings.choropleth.labelOffsetX ?? 0]}
+														onValueChange={(value) => updateSetting('choropleth', 'labelOffsetX', value[0])}
+														min={-50}
+														max={50}
+														step={1}
+													/>
+												</div>
+												<div className="space-y-2">
+													<Label htmlFor="choropleth-label-offset-y" className="text-sm">
+														Y offset ({stylingSettings.choropleth.labelOffsetY ?? 0}px)
+													</Label>
+													<Slider
+														id="choropleth-label-offset-y"
+														value={[stylingSettings.choropleth.labelOffsetY ?? 0]}
+														onValueChange={(value) => updateSetting('choropleth', 'labelOffsetY', value[0])}
+														min={-50}
+														max={50}
+														step={1}
 													/>
 												</div>
 											</div>
