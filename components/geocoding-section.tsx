@@ -117,9 +117,13 @@ const stateAbbreviations: Record<string, string> = {
 	wyoming: 'WY',
 };
 
-// Helper for randomized delay
-function randomDelay(min: number, max: number) {
-	return Math.floor(Math.random() * (max - min + 1)) + min;
+const NOMINATIM_DELAY_MS = 1100; // Nominatim usage policy: max 1 request per second
+
+async function waitForRateLimitReset(response: Response): Promise<void> {
+	const retryAfterHeader = response.headers.get('Retry-After');
+	const retryAfterSeconds = retryAfterHeader ? Number.parseInt(retryAfterHeader, 10) : 60;
+	const waitMs = (Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : 60) * 1000 + 500;
+	await new Promise((resolve) => setTimeout(resolve, waitMs));
 }
 
 export function GeocodingSection({
@@ -369,43 +373,55 @@ export function GeocodingSection({
 		}
 
 		// 3. Use API proxy (which handles server-side caching and rate limiting)
-		try {
-			const response = await fetch('/api/geocode', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({ address, city, state }),
-			});
+		const maxAttempts = 4;
+		for (let attempt = 0; attempt < maxAttempts; attempt++) {
+			try {
+				const response = await fetch('/api/geocode', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify({ address, city, state }),
+				});
 
-			if (!response.ok) {
 				if (response.status === 429) {
+					if (attempt < maxAttempts - 1) {
+						await waitForRateLimitReset(response);
+						continue;
+					}
 					const error = await response.json();
 					throw new Error(error.message || 'Rate limit exceeded. Please try again later.');
 				}
-				const error = await response.json();
-				throw new Error(error.message || `Geocoding failed: ${response.statusText}`);
+
+				if (!response.ok) {
+					const error = await response.json();
+					throw new Error(error.message || `Geocoding failed: ${response.statusText}`);
+				}
+
+				const result = await response.json();
+
+				// Cache the result in both session and persistent storage (using addressKey)
+				sessionCache[addressKey] = { lat: result.lat, lng: result.lng };
+				if (result.source === 'api') {
+					// Only save to localStorage if it came from API (not already cached on server)
+					saveCachedLocation(addressKey, result.lat, result.lng, 'nominatim');
+				}
+
+				return {
+					lat: result.lat,
+					lng: result.lng,
+					fromCache: result.cached || false,
+					source: result.cached ? 'persistent' : 'api',
+				};
+			} catch (error) {
+				if (attempt === maxAttempts - 1) {
+					console.warn(`Geocoding failed for address: ${address}`, error);
+					throw error;
+				}
 			}
-
-			const result = await response.json();
-
-			// Cache the result in both session and persistent storage (using addressKey)
-			sessionCache[addressKey] = { lat: result.lat, lng: result.lng };
-			if (result.source === 'api') {
-				// Only save to localStorage if it came from API (not already cached on server)
-				saveCachedLocation(addressKey, result.lat, result.lng, 'nominatim');
-			}
-
-			return {
-				lat: result.lat,
-				lng: result.lng,
-				fromCache: result.cached || false,
-				source: result.cached ? 'persistent' : 'api',
-			};
-		} catch (error) {
-			console.warn(`Geocoding failed for address: ${address}`, error);
-			throw error;
 		}
+
+		throw new Error(`Geocoding failed for address: ${address}`);
 	};
 
 	// Execute the actual geocoding process
@@ -533,13 +549,7 @@ export function GeocodingSection({
 
 					if (!result.fromCache) {
 						apiCallCount++;
-						let delay = 0;
-						if (apiCallCount <= 10) {
-							delay = randomDelay(200, 400);
-						} else {
-							delay = randomDelay(800, 1500);
-						}
-						await new Promise((resolve) => setTimeout(resolve, delay));
+						await new Promise((resolve) => setTimeout(resolve, NOMINATIM_DELAY_MS));
 					}
 				} catch (error) {
 					console.warn(`Failed to geocode: ${address}`, error);

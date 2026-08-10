@@ -125,6 +125,24 @@ export async function deleteCached(key: string): Promise<void> {
   inMemoryCache.delete(key)
 }
 
+interface CounterState {
+  count: number
+  windowStart: number
+}
+
+function getInMemoryCounter(key: string, ttl: number): CounterState | null {
+  const cached = inMemoryCache.get(key) as CacheEntry<number> | undefined
+  if (!cached) return null
+
+  const age = Date.now() - cached.cachedAt
+  if (age > ttl) {
+    inMemoryCache.delete(key)
+    return null
+  }
+
+  return { count: cached.data, windowStart: cached.cachedAt }
+}
+
 /**
  * Increment a counter in KV or in-memory fallback (for rate limiting)
  */
@@ -145,29 +163,64 @@ export async function incrementCounter(key: string, ttl: number): Promise<number
     }
   }
 
-  // In-memory fallback
-  const current = (inMemoryCache.get(key) as CacheEntry<number> | undefined)?.data ?? 0
-  const newValue = current + 1
-  await setCached(key, newValue, ttl)
+  // In-memory fallback — preserve window start so TTL is not extended on every increment
+  const existing = getInMemoryCounter(key, ttl)
+  const newValue = (existing?.count ?? 0) + 1
+  inMemoryCache.set(key, {
+    data: newValue,
+    cachedAt: existing?.windowStart ?? Date.now(),
+  })
   return newValue
 }
 
 /**
  * Get counter value
  */
-export async function getCounter(key: string): Promise<number> {
+export async function getCounter(key: string, ttl?: number): Promise<number> {
+  const state = await getCounterState(key, ttl)
+  return state.count
+}
+
+/**
+ * Get counter value and the start of its active window (for rate-limit reset times)
+ */
+export async function getCounterState(
+  key: string,
+  ttl?: number
+): Promise<{ count: number; windowStart: number | null }> {
   const kv = await getKVClient()
   if (kv) {
     try {
       const value = await kv.get<number>(key)
-      return value ?? 0
+      if (value === null || value === undefined) {
+        return { count: 0, windowStart: null }
+      }
+
+      const ttlMs = ttl ?? 60_000
+      const ttlSeconds = Math.ceil(ttlMs / 1000)
+      const remainingSeconds = await kv.ttl(key)
+      const windowStart =
+        remainingSeconds > 0 ? Date.now() - (ttlSeconds - remainingSeconds) * 1000 : Date.now()
+
+      return { count: value, windowStart }
     } catch (error) {
       console.warn('[Cache] KV error, falling back to in-memory:', error)
     }
   }
 
-  const cached = inMemoryCache.get(key) as CacheEntry<number> | undefined
-  return cached?.data ?? 0
+  if (ttl === undefined) {
+    const cached = inMemoryCache.get(key) as CacheEntry<number> | undefined
+    return {
+      count: cached?.data ?? 0,
+      windowStart: cached?.cachedAt ?? null,
+    }
+  }
+
+  const existing = getInMemoryCounter(key, ttl)
+  return {
+    count: existing?.count ?? 0,
+    windowStart: existing?.windowStart ?? null,
+  }
 }
 
 /**

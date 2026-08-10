@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-import { getCached, setCached, incrementCounter, getCounter } from '@/lib/cache/kv'
+import { getCached, setCached, incrementCounter, getCounterState } from '@/lib/cache/kv'
 import { dedupeRequest } from '@/lib/cache/dedupe'
 import { recordAPIMetric, recordRateLimit } from '@/lib/monitoring/metrics'
 
@@ -24,7 +24,8 @@ interface NominatimResult {
 }
 
 const RATE_LIMIT_WINDOW = 60 * 1000 // 1 minute
-const RATE_LIMIT_MAX_REQUESTS = 10 // Max 10 requests per minute per IP
+// Match Nominatim's 1 req/sec guidance while allowing reasonable batch geocoding
+const RATE_LIMIT_MAX_REQUESTS = 60
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000 // 7 days
 
 function getRateLimitKey(request: NextRequest): string {
@@ -35,23 +36,19 @@ function getRateLimitKey(request: NextRequest): string {
 
 async function checkRateLimit(key: string): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
   const now = Date.now()
-  const count = await getCounter(key)
-
-  if (count === 0) {
-    // First request in window
-    await incrementCounter(key, RATE_LIMIT_WINDOW)
-    return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - 1, resetAt: now + RATE_LIMIT_WINDOW }
-  }
+  const { count, windowStart } = await getCounterState(key, RATE_LIMIT_WINDOW)
+  const resetAt = (windowStart ?? now) + RATE_LIMIT_WINDOW
 
   if (count >= RATE_LIMIT_MAX_REQUESTS) {
-    // Rate limit exceeded - calculate reset time
-    const resetAt = now + RATE_LIMIT_WINDOW
     return { allowed: false, remaining: 0, resetAt }
   }
 
-  // Increment counter
-  await incrementCounter(key, RATE_LIMIT_WINDOW)
-  return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - count - 1, resetAt: now + RATE_LIMIT_WINDOW }
+  const newCount = await incrementCounter(key, RATE_LIMIT_WINDOW)
+  return {
+    allowed: true,
+    remaining: RATE_LIMIT_MAX_REQUESTS - newCount,
+    resetAt: (windowStart ?? now) + RATE_LIMIT_WINDOW,
+  }
 }
 
 function getCacheKey(address: string, city?: string, state?: string): string {
@@ -104,8 +101,43 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
 
   try {
-    // Rate limiting
     const rateLimitKey = getRateLimitKey(request)
+
+    // Parse request body
+    const body = (await request.json()) as GeocodeRequest
+    const { address, city, state } = body
+
+    if (!address || typeof address !== 'string' || address.trim().length === 0) {
+      return NextResponse.json({ error: 'Invalid request: address is required' }, { status: 400 })
+    }
+
+    // Check cache first — cached responses should not consume rate limit budget
+    const cacheKey = getCacheKey(address, city, state)
+    const cached = await getCached<{ lat: number; lng: number }>(cacheKey, CACHE_TTL)
+
+    if (cached) {
+      const { count } = await getCounterState(rateLimitKey, RATE_LIMIT_WINDOW)
+      const duration = Date.now() - startTime
+      recordAPIMetric('/api/geocode', duration, true)
+      return NextResponse.json(
+        {
+          lat: cached.lat,
+          lng: cached.lng,
+          source: 'cache',
+          cached: true,
+        } as GeocodeResponse,
+        {
+          headers: {
+            'X-RateLimit-Limit': String(RATE_LIMIT_MAX_REQUESTS),
+            'X-RateLimit-Remaining': String(Math.max(RATE_LIMIT_MAX_REQUESTS - count, 0)),
+            'X-Cache': 'HIT',
+            'X-Response-Time': String(duration),
+          },
+        }
+      )
+    }
+
+    // Rate limit only applies to upstream Nominatim lookups
     const rateLimit = await checkRateLimit(rateLimitKey)
 
     if (!rateLimit.allowed) {
@@ -121,41 +153,8 @@ export async function POST(request: NextRequest) {
             'X-RateLimit-Limit': String(RATE_LIMIT_MAX_REQUESTS),
             'X-RateLimit-Remaining': String(rateLimit.remaining),
             'X-RateLimit-Reset': new Date(rateLimit.resetAt).toISOString(),
-            'Retry-After': String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)),
+            'Retry-After': String(Math.max(Math.ceil((rateLimit.resetAt - Date.now()) / 1000), 1)),
             'X-Response-Time': String(Date.now() - startTime),
-          },
-        }
-      )
-    }
-
-    // Parse request body
-    const body = (await request.json()) as GeocodeRequest
-    const { address, city, state } = body
-
-    if (!address || typeof address !== 'string' || address.trim().length === 0) {
-      return NextResponse.json({ error: 'Invalid request: address is required' }, { status: 400 })
-    }
-
-    // Check cache first
-    const cacheKey = getCacheKey(address, city, state)
-    const cached = await getCached<{ lat: number; lng: number }>(cacheKey, CACHE_TTL)
-
-    if (cached) {
-      const duration = Date.now() - startTime
-      recordAPIMetric('/api/geocode', duration, true)
-      return NextResponse.json(
-        {
-          lat: cached.lat,
-          lng: cached.lng,
-          source: 'cache',
-          cached: true,
-        } as GeocodeResponse,
-        {
-          headers: {
-            'X-RateLimit-Limit': String(RATE_LIMIT_MAX_REQUESTS),
-            'X-RateLimit-Remaining': String(rateLimit.remaining),
-            'X-Cache': 'HIT',
-            'X-Response-Time': String(duration),
           },
         }
       )
