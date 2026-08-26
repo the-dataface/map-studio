@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, react-hooks/exhaustive-deps, react-hooks/rules-of-hooks */
 'use client';
 
-import { useState, useEffect, useCallback, useRef, Suspense, lazy } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense, lazy, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { DataInput } from '@/components/data-input';
 import { GeocodingSection } from '@/components/geocoding-section';
@@ -15,7 +15,12 @@ const DimensionMapping = lazy(() =>
 );
 const MapStyling = lazy(() => import('@/components/map-styling').then((mod) => ({ default: mod.MapStyling })));
 const MapPreview = lazy(() => import('@/components/map-preview').then((mod) => ({ default: mod.MapPreview })));
-import { Button } from '@/components/ui/button';
+const LabelEditorToolbar = lazy(() =>
+	import('@/components/label-editor-toolbar').then((mod) => ({ default: mod.LabelEditorToolbar }))
+);
+const PathEditorToolbar = lazy(() =>
+	import('@/components/path-editor-toolbar').then((mod) => ({ default: mod.PathEditorToolbar }))
+);
 import { Save, Download, Copy, FileImage } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import React from 'react';
@@ -40,6 +45,13 @@ import {
 	resetDimensionForMapType,
 } from '@/modules/data-ingest/dimension-schema';
 import { saveProject, getProject, exportProject, generatePreviewThumbnail, type SavedProject } from '@/lib/projects';
+import { useRegisterStudioChrome, type StudioMode } from '@/lib/studio-chrome-context';
+import { DesignTabHint } from '@/components/design-tab-hint';
+import { DataCanvasEmpty } from '@/components/data-canvas-empty';
+import { CustomMapInput } from '@/components/custom-map-input';
+import { cn } from '@/lib/utils';
+import type { StylingSettingsUpdater } from '@/lib/label-overrides';
+import { resolveLabelMapType } from '@/lib/symbol-text-content';
 
 // Mark page as dynamic to prevent static generation
 export const dynamic = 'force-dynamic';
@@ -86,19 +98,26 @@ function MapStudioContent() {
 	} = useStudioStore();
 
 	const [dataInputExpanded, setDataInputExpanded] = useState(true);
+	const [customMapInputExpanded, setCustomMapInputExpanded] = useState(false);
 	const [showGeocoding, setShowGeocoding] = useState(false);
 	const [geocodingExpanded, setGeocodingExpanded] = useState(true);
 	const [projectionExpanded, setProjectionExpanded] = useState(true);
 	const [dataPreviewExpanded, setDataPreviewExpanded] = useState(true);
-	const [dimensionMappingExpanded, setDimensionMappingExpanded] = useState(true);
-	const [mapStylingExpanded, setMapStylingExpanded] = useState(true);
+	const [dimensionMappingExpanded, setDimensionMappingExpanded] = useState(false);
+	const [mapStylingExpanded, setMapStylingExpanded] = useState(false);
 	const [mapPreviewExpanded, setMapPreviewExpanded] = useState(true);
-	const [mapInView, setMapInView] = useState(false);
+	const [studioMode, setStudioMode] = useState<StudioMode>('data');
+	const [mapFocusMode, setMapFocusMode] = useState(false);
+	const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
+	const [selectedPathId, setSelectedPathId] = useState<string | null>(null);
 	const [currentProjectId, setCurrentProjectId] = useState<string | null>(projectId);
 	const [projectName, setProjectName] = useState<string>('Untitled Project');
 	const [isSaving, setIsSaving] = useState(false);
 	const [isExporting, setIsExporting] = useState(false);
 	const svgRef = useRef<SVGSVGElement>(null);
+	const draftSessionRef = useRef(
+		typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `draft-${Date.now()}`
+	);
 
 	// Debounced history push for styling changes (500ms delay)
 	const stylingHistoryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -346,6 +365,7 @@ function MapStudioContent() {
 			setStylingSettings(project.stylingSettings);
 			setShowGeocoding(project.symbolData.parsedData.length > 0);
 			setDataInputExpanded(false);
+			setStudioMode('design');
 		},
 		[
 			setSymbolData,
@@ -393,11 +413,13 @@ function MapStudioContent() {
 			// Add small delay to show loading state
 			await new Promise((resolve) => setTimeout(resolve, 100));
 
-			// Ensure map preview is expanded for thumbnail generation
-			if (!mapPreviewExpanded) {
+			if (studioMode !== 'design') {
+				setStudioMode('design');
 				setMapPreviewExpanded(true);
-				// Wait a bit for map to render
-				await new Promise((resolve) => setTimeout(resolve, 500));
+				await new Promise((resolve) => setTimeout(resolve, 400));
+			} else if (!mapPreviewExpanded) {
+				setMapPreviewExpanded(true);
+				await new Promise((resolve) => setTimeout(resolve, 200));
 			}
 
 			// Generate preview thumbnail
@@ -482,6 +504,8 @@ function MapStudioContent() {
 		dimensionSettings,
 		stylingSettings,
 		toast,
+		studioMode,
+		mapPreviewExpanded,
 	]);
 
 	// Export project
@@ -576,7 +600,7 @@ function MapStudioContent() {
 		pushHistory();
 	};
 
-	const updateStylingSettings = (newSettings: StylingSettings) => {
+	const updateStylingSettings = (newSettings: StylingSettingsUpdater) => {
 		setStylingSettings(newSettings);
 		// Use debounced history push for styling changes
 		pushStylingHistory();
@@ -630,6 +654,40 @@ function MapStudioContent() {
 
 	const onlyCustomDataLoaded = hasDataForType('custom') && !hasDataForType('symbol') && !hasDataForType('choropleth');
 
+	const goToDesignFromHint = useCallback(() => {
+		setStudioMode('design');
+	}, []);
+
+	const hasDataLoaded =
+		hasDataForType('symbol') || hasDataForType('choropleth') || hasDataForType('custom');
+
+	const studioChrome = useMemo(
+		() => ({
+			projectName,
+			setProjectName,
+			onSave: handleSaveProject,
+			onExport: handleExportProject,
+			isSaving,
+			isExporting,
+			showProjectControls: hasDataLoaded,
+			showModeTabs: true,
+			studioMode,
+			setStudioMode,
+			designModeEnabled: hasDataLoaded,
+		}),
+		[
+			hasDataLoaded,
+			projectName,
+			handleSaveProject,
+			handleExportProject,
+			isSaving,
+			isExporting,
+			studioMode,
+		]
+	);
+
+	useRegisterStudioChrome(studioChrome);
+
 	const handleDataLoad = (
 		mapType: 'symbol' | 'choropleth' | 'custom',
 		parsedData: DataRow[],
@@ -667,25 +725,35 @@ function MapStudioContent() {
 		}
 
 		if (parsedData.length > 0) {
-			const inferredTypes = inferColumnTypesFromData(parsedData);
+			const inferredTypes = inferColumnTypesFromData(parsedData, columns);
 			setColumnTypes((prev: ColumnType) => mergeInferredTypes(prev, inferredTypes));
 		}
 
 		setActiveMapType(nextMapType);
 		setDataInputExpanded(false);
-		setDimensionSettings((prev: DimensionSettings) => resetDimensionForMapType(prev, nextMapType));
 
-		const { geography, projection } = inferGeographyAndProjection({
-			columns,
-			sampleRows: parsedData,
-		});
-
-		if (geography !== selectedGeography) {
-			updateSelectedGeography(geography);
+		// Only reset dimension mappings when loading genuinely new data type,
+		// not when refreshing choropleth data on an existing custom map project
+		const isCustomMapRefresh =
+			nextMapType === 'custom' && customData.customMapData.length > 0 && mapType === 'choropleth';
+		if (!isCustomMapRefresh) {
+			setDimensionSettings((prev: DimensionSettings) => resetDimensionForMapType(prev, nextMapType));
 		}
 
-		if (projection !== selectedProjection) {
-			setSelectedProjection(projection);
+		// Only re-infer geography when loading data with rows (skip custom-only SVG loads)
+		if (parsedData.length > 0) {
+			const { geography, projection } = inferGeographyAndProjection({
+				columns,
+				sampleRows: parsedData,
+			});
+
+			if (geography !== selectedGeography) {
+				updateSelectedGeography(geography);
+			}
+
+			if (projection !== selectedProjection) {
+				setSelectedProjection(projection);
+			}
 		}
 
 		// Push history after data load completes
@@ -863,40 +931,33 @@ function MapStudioContent() {
 	// Ref for map preview
 	const mapPreviewRef = useRef<HTMLDivElement>(null);
 
-	// Track if map preview is fully in view using scroll/resize events
-	useEffect(() => {
-		function checkMapInView() {
-			const ref = mapPreviewRef.current;
-			if (!ref) return;
-			const rect = ref.getBoundingClientRect();
-			const visibleHeight = Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0);
-			const percentVisible = visibleHeight / rect.height;
-			setMapInView(rect.top >= 0 && percentVisible > 0.6);
+	const ensureDesignMode = useCallback(async () => {
+		if (studioMode !== 'design') {
+			setStudioMode('design');
+			setMapPreviewExpanded(true);
+			await new Promise((resolve) => setTimeout(resolve, 400));
+		} else if (!mapPreviewExpanded) {
+			setMapPreviewExpanded(true);
+			await new Promise((resolve) => setTimeout(resolve, 200));
 		}
-		checkMapInView();
-		window.addEventListener('scroll', checkMapInView, { passive: true });
-		window.addEventListener('resize', checkMapInView);
-		return () => {
-			window.removeEventListener('scroll', checkMapInView);
-			window.removeEventListener('resize', checkMapInView);
-		};
-	}, [mapPreviewRef]);
+	}, [studioMode, mapPreviewExpanded]);
 
-	// Handler to scroll to map preview and expand it
+	// Jump to design mode (map)
 	const handleJumpToMap = useCallback(() => {
+		setStudioMode('design');
 		setMapPreviewExpanded(true);
-		setTimeout(() => {
-			if (mapPreviewRef.current) {
-				mapPreviewRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-			} else {
-				const el = document.getElementById('map-preview-section');
-				if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-			}
-		}, 50);
 	}, []);
 
+	useEffect(() => {
+		if (!hasDataLoaded && studioMode === 'design') {
+			setStudioMode('data');
+		}
+	}, [hasDataLoaded, studioMode]);
+
 	// Handler to download SVG
-	const handleDownloadSVG = useCallback(() => {
+	const handleDownloadSVG = useCallback(async () => {
+		await ensureDesignMode();
+
 		if (!svgRef.current) {
 			toast({
 				title: 'No map to download',
@@ -934,7 +995,7 @@ function MapStudioContent() {
 				duration: 3000,
 			});
 		}
-	}, [toast, projectName]);
+	}, [toast, projectName, ensureDesignMode]);
 
 	// Handler to collapse all panels except map preview
 	const handleCollapseAll = () => {
@@ -944,6 +1005,7 @@ function MapStudioContent() {
 		setDataPreviewExpanded(false);
 		setDimensionMappingExpanded(false);
 		setMapStylingExpanded(false);
+		window.dispatchEvent(new CustomEvent('collapse-all-panels'));
 	};
 
 	// Compute if any panel except map preview is expanded
@@ -957,6 +1019,8 @@ function MapStudioContent() {
 
 	// Copy SVG to clipboard
 	const handleCopySVG = useCallback(async () => {
+		await ensureDesignMode();
+
 		if (!svgRef.current) {
 			toast({
 				title: 'No map to copy',
@@ -987,7 +1051,7 @@ function MapStudioContent() {
 				duration: 3000,
 			});
 		}
-	}, [toast]);
+	}, [toast, ensureDesignMode]);
 
 	// Reset everything
 	const handleReset = useCallback(() => {
@@ -998,6 +1062,9 @@ function MapStudioContent() {
 		setDataInputExpanded(true);
 		setShowGeocoding(false);
 		setMapPreviewExpanded(false);
+		setStudioMode('data');
+		draftSessionRef.current =
+			typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `draft-${Date.now()}`;
 
 		toast({
 			description: 'Map reset to defaults.',
@@ -1029,6 +1096,19 @@ function MapStudioContent() {
 			// Don't trigger shortcuts if user is typing in an input, textarea, or contenteditable element
 			const target = e.target as HTMLElement;
 			const isInputElement = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+			if (!isInputElement && !e.metaKey && !e.ctrlKey && !e.altKey) {
+				if (e.key === '1') {
+					e.preventDefault();
+					setStudioMode('data');
+					return;
+				}
+				if (e.key === '2' && hasDataLoaded) {
+					e.preventDefault();
+					setStudioMode('design');
+					return;
+				}
+			}
 
 			// Check for Cmd (Mac) or Ctrl (Windows/Linux)
 			const isModifierPressed = e.metaKey || e.ctrlKey;
@@ -1077,157 +1157,128 @@ function MapStudioContent() {
 		return () => {
 			window.removeEventListener('keydown', handleKeyDown);
 		};
-	}, [canUndo, canRedo, hasAnyData, handleUndo, handleRedo, handleSaveProject, handleDownloadSVG]);
+	}, [canUndo, canRedo, hasAnyData, hasDataLoaded, handleUndo, handleRedo, handleSaveProject, handleDownloadSVG]);
 
 	return (
 		<>
-			<section className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-				{hasAnyData() && (
-					<div className="flex items-center justify-between mb-4">
-						<div className="flex items-center gap-2">
-							<input
-								type="text"
-								value={projectName}
-								onChange={(e) => setProjectName(e.target.value)}
-								className="text-lg font-semibold bg-transparent border-none outline-none focus:ring-2 focus:ring-primary rounded px-2 py-1"
-								placeholder="Project name"
+			<section
+				id="studio-panel-data"
+				role="tabpanel"
+				aria-labelledby="studio-tab-data"
+				tabIndex={studioMode === 'data' ? 0 : -1}
+				className={cn('studio-data-view', studioMode !== 'data' && 'hidden')}>
+				<div className="studio-data-shell">
+					<aside className="studio-data-sidebar" aria-label="Data configuration">
+						<DataInput
+							onDataLoad={handleDataLoad}
+							isExpanded={dataInputExpanded}
+							setIsExpanded={setDataInputExpanded}
+							onClearData={handleClearData}
+						/>
+
+						{hasAnyData() && !hasDataForType('custom') && (
+							<MapProjectionSelection
+								geography={selectedGeography}
+								projection={selectedProjection}
+								onGeographyChange={updateSelectedGeography}
+								onProjectionChange={setSelectedProjection}
+								columns={getCurrentColumns()}
+								sampleRows={getCurrentSampleRows()}
+								clipToCountry={clipToCountry}
+								onClipToCountryChange={setClipToCountry}
+								isExpanded={projectionExpanded}
+								setIsExpanded={setProjectionExpanded}
 							/>
-						</div>
-						<div className="flex items-center gap-2">
-							<Button onClick={handleExportProject} variant="outline" size="sm" disabled={isExporting || isSaving}>
-								<Download className="h-4 w-4 mr-2" />
-								{isExporting ? 'Exporting...' : 'Export'}
-							</Button>
-							<Button onClick={handleSaveProject} variant="default" size="sm" disabled={isSaving || isExporting}>
-								<Save className="h-4 w-4 mr-2" />
-								{isSaving ? 'Saving...' : 'Save Project'}
-							</Button>
-						</div>
-					</div>
-				)}
-
-				<DataInput
-					onDataLoad={handleDataLoad}
-					isExpanded={dataInputExpanded}
-					setIsExpanded={setDataInputExpanded}
-					onClearData={handleClearData}
-				/>
-
-				{hasAnyData() && !hasDataForType('custom') && (
-					<MapProjectionSelection
-						geography={selectedGeography}
-						projection={selectedProjection}
-						onGeographyChange={updateSelectedGeography}
-						onProjectionChange={setSelectedProjection}
-						columns={getCurrentColumns()}
-						sampleRows={getCurrentSampleRows()}
-						clipToCountry={clipToCountry}
-						onClipToCountryChange={setClipToCountry}
-						isExpanded={projectionExpanded}
-						setIsExpanded={setProjectionExpanded}
-					/>
-				)}
-
-				{showGeocoding && (
-					<GeocodingSection
-						columns={symbolData.columns}
-						parsedData={symbolData.parsedData}
-						setGeocodedData={updateGeocodedData}
-						isGeocoding={isGeocoding}
-						setIsGeocoding={setIsGeocoding}
-						isExpanded={geocodingExpanded}
-						setIsExpanded={setGeocodingExpanded}
-					/>
-				)}
-
-				{hasAnyData() && (
-					<>
-						{!onlyCustomDataLoaded && (
-							<>
-								<Suspense
-									fallback={
-										<div className="rounded-xl border border-dashed border-border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
-											Loading data preview...
-										</div>
-									}>
-									<DataPreview
-										data={getCurrentDisplayData()}
-										columns={getCurrentColumns()}
-										mapType={activeMapType}
-										onClearData={handleClearData}
-										symbolDataExists={hasDataForType('symbol')}
-										choroplethDataExists={hasDataForType('choropleth')}
-										customDataExists={hasDataForType('custom')}
-										columnTypes={columnTypes}
-										onUpdateColumnTypes={updateColumnTypes}
-										onUpdateColumnFormats={updateColumnFormats}
-										columnFormats={columnFormats}
-										symbolDataLength={symbolData.parsedData.length}
-										choroplethDataLength={choroplethData.parsedData.length}
-										customDataLoaded={customData.customMapData.length > 0}
-										onMapTypeChange={(newType) => {
-											setActiveMapType(newType);
-											if (hasAnyData()) {
-												setTimeout(() => pushHistory(), 100);
-											}
-										}}
-										selectedGeography={dimensionSettings.selectedGeography}
-										isExpanded={dataPreviewExpanded}
-										setIsExpanded={setDataPreviewExpanded}
-									/>
-								</Suspense>
-
-								<Suspense
-									fallback={
-										<div className="rounded-xl border border-dashed border-border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
-											Loading dimension mapping...
-										</div>
-									}>
-									<DimensionMapping
-										mapType={activeMapType}
-										symbolDataExists={hasDataForType('symbol')}
-										choroplethDataExists={hasDataForType('choropleth')}
-										customDataExists={hasDataForType('custom')}
-										columnTypes={columnTypes}
-										dimensionSettings={dimensionSettings}
-										onUpdateSettings={updateDimensionSettings}
-										columnFormats={columnFormats}
-										symbolParsedData={symbolData.parsedData}
-										symbolGeocodedData={symbolData.geocodedData}
-										symbolColumns={symbolData.columns}
-										choroplethParsedData={choroplethData.parsedData}
-										choroplethGeocodedData={choroplethData.geocodedData}
-										choroplethColumns={choroplethData.columns}
-										selectedGeography={dimensionSettings.selectedGeography}
-										stylingSettings={stylingSettings}
-										isExpanded={dimensionMappingExpanded}
-										setIsExpanded={setDimensionMappingExpanded}
-									/>
-								</Suspense>
-							</>
 						)}
-						<Suspense
-							fallback={
-								<div className="rounded-xl border border-dashed border-border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
-									Loading map styling...
-								</div>
-							}>
-							<MapStyling
-								stylingSettings={stylingSettings}
-								onUpdateStylingSettings={updateStylingSettings}
-								dimensionSettings={dimensionSettings}
-								symbolDataExists={hasDataForType('symbol')}
-								choroplethDataExists={hasDataForType('choropleth')}
-								customDataExists={hasDataForType('custom')}
-								isExpanded={mapStylingExpanded}
-								setIsExpanded={setMapStylingExpanded}
-							/>
-						</Suspense>
 
-						<div ref={mapPreviewRef} id="map-preview-section">
+						{showGeocoding && (
+							<GeocodingSection
+								columns={symbolData.columns}
+								parsedData={symbolData.parsedData}
+								setGeocodedData={updateGeocodedData}
+								isGeocoding={isGeocoding}
+								setIsGeocoding={setIsGeocoding}
+								isExpanded={geocodingExpanded}
+								setIsExpanded={setGeocodingExpanded}
+							/>
+						)}
+
+						<CustomMapInput
+							onDataLoad={handleDataLoad}
+							isExpanded={customMapInputExpanded}
+							setIsExpanded={setCustomMapInputExpanded}
+							onClearData={handleClearData}
+						/>
+					</aside>
+
+					<div className="studio-data-canvas" aria-label="Data preview canvas">
+						{hasAnyData() && !onlyCustomDataLoaded ? (
+							<>
+								<div className="studio-data-canvas-preview">
+									<Suspense
+										fallback={
+											<div className="flex flex-1 items-center justify-center bg-muted/20 p-8 text-center text-xs text-muted-foreground">
+												Loading data preview...
+											</div>
+										}>
+										<DataPreview
+											variant="canvas"
+											data={getCurrentDisplayData()}
+											columns={getCurrentColumns()}
+											mapType={activeMapType}
+											onClearData={handleClearData}
+											symbolDataExists={hasDataForType('symbol')}
+											choroplethDataExists={hasDataForType('choropleth')}
+											customDataExists={hasDataForType('custom')}
+											columnTypes={columnTypes}
+											onUpdateColumnTypes={updateColumnTypes}
+											onUpdateColumnFormats={updateColumnFormats}
+											columnFormats={columnFormats}
+											symbolDataLength={symbolData.parsedData.length}
+											choroplethDataLength={choroplethData.parsedData.length}
+											customDataLoaded={customData.customMapData.length > 0}
+											onMapTypeChange={(newType) => {
+												setActiveMapType(newType);
+												if (hasAnyData()) {
+													setTimeout(() => pushHistory(), 100);
+												}
+											}}
+											selectedGeography={dimensionSettings.selectedGeography}
+											isExpanded={dataPreviewExpanded}
+											setIsExpanded={setDataPreviewExpanded}
+										/>
+									</Suspense>
+								</div>
+
+								{hasAnyData() && !onlyCustomDataLoaded && (
+									<DesignTabHint
+										className="studio-data-canvas-hint"
+										onGoToDesign={goToDesignFromHint}
+									/>
+								)}
+							</>
+						) : (
+							<DataCanvasEmpty
+								variant={onlyCustomDataLoaded ? 'custom-only' : 'no-data'}
+								onGoToDesign={onlyCustomDataLoaded ? goToDesignFromHint : undefined}
+							/>
+						)}
+					</div>
+				</div>
+			</section>
+
+			{hasAnyData() && (
+				<section
+					id="studio-panel-design"
+					role="tabpanel"
+					aria-labelledby="studio-tab-design"
+					tabIndex={studioMode === 'design' ? 0 : -1}
+					className={cn('studio-design-view', studioMode !== 'design' && 'hidden')}>
+					<div className={cn('studio-design-shell', mapFocusMode && 'studio-design-shell-focus')}>
+						<div ref={mapPreviewRef} id="map-preview-section" className="studio-design-map">
 							<Suspense
 								fallback={
-									<div className="rounded-xl border border-dashed border-border bg-muted/30 p-12 text-center text-sm text-muted-foreground">
+									<div className="bg-muted/20 p-12 text-center text-xs text-muted-foreground">
 										Loading map preview...
 									</div>
 								}>
@@ -1247,32 +1298,137 @@ function MapStudioContent() {
 									clipToCountry={clipToCountry}
 									isExpanded={mapPreviewExpanded}
 									setIsExpanded={setMapPreviewExpanded}
+									isFocusMode={mapFocusMode}
+									onToggleFocusMode={() => setMapFocusMode((prev) => !prev)}
 									svgRef={svgRef}
 									onUpdateStylingSettings={updateStylingSettings}
+									selectedLabelId={selectedLabelId}
+									onSelectedLabelIdChange={setSelectedLabelId}
+									selectedPathId={selectedPathId}
+									onSelectedPathIdChange={setSelectedPathId}
+									embedEditorsInSidebar
 								/>
 							</Suspense>
+							{studioMode === 'design' && hasAnyData() && (
+								<FloatingToolbar
+									visible
+									placement="map-canvas"
+									studioMode={studioMode}
+									onReset={handleReset}
+									onSave={handleSaveProject}
+									onExport={handleExportProject}
+									onExportSVG={handleDownloadSVG}
+									onCopy={handleCopySVG}
+									onUndo={handleUndo}
+									onRedo={handleRedo}
+									onCollapseAll={handleCollapseAll}
+									onJumpToMap={handleJumpToMap}
+									showJumpToMap={false}
+									canUndo={canUndo()}
+									canRedo={canRedo()}
+									canCollapse={anyPanelExpanded}
+									isSaving={isSaving}
+									isExporting={isExporting}
+								/>
+							)}
 						</div>
-					</>
-				)}
-			</section>
-			{/* Floating toolbar */}
-			<FloatingToolbar
-				visible={hasAnyData()}
-				onReset={handleReset}
-				onSave={handleSaveProject}
-				onExport={handleExportProject}
-				onExportSVG={handleDownloadSVG}
-				onCopy={handleCopySVG}
-				onUndo={handleUndo}
-				onRedo={handleRedo}
-				onCollapseAll={handleCollapseAll}
-				onJumpToMap={handleJumpToMap}
-				canUndo={canUndo()}
-				canRedo={canRedo()}
-				canCollapse={anyPanelExpanded}
-				isSaving={isSaving}
-				isExporting={isExporting}
-			/>
+
+						{!mapFocusMode && (
+							<aside className="studio-design-inspector" aria-label="Map design inspector">
+								{selectedLabelId ? (
+									<Suspense
+										fallback={
+											<div className="bg-muted/20 p-8 text-center text-xs text-muted-foreground">
+												Loading label editor...
+											</div>
+										}>
+										<LabelEditorToolbar
+											labelId={selectedLabelId}
+											onClose={() => setSelectedLabelId(null)}
+											stylingSettings={stylingSettings}
+											onUpdateStylingSettings={updateStylingSettings}
+											mapType={resolveLabelMapType(selectedLabelId)}
+											dimensionSettings={dimensionSettings}
+											symbolData={getSymbolDisplayData()}
+											choroplethData={getChoroplethDisplayData()}
+											columnTypes={columnTypes}
+											columnFormats={columnFormats}
+											selectedGeography={selectedGeography}
+											variant="inspector"
+										/>
+									</Suspense>
+								) : selectedPathId ? (
+									<Suspense
+										fallback={
+											<div className="bg-muted/20 p-8 text-center text-xs text-muted-foreground">
+												Loading path editor...
+											</div>
+										}>
+										<PathEditorToolbar
+											pathId={selectedPathId}
+											onClose={() => setSelectedPathId(null)}
+											stylingSettings={stylingSettings}
+											onUpdateStylingSettings={updateStylingSettings}
+											variant="inspector"
+										/>
+									</Suspense>
+								) : (
+									<>
+										<Suspense
+											fallback={
+												<div className="bg-muted/20 p-8 text-center text-xs text-muted-foreground">
+													Loading dimension mapping...
+												</div>
+											}>
+											<DimensionMapping
+												mapType={activeMapType}
+												symbolDataExists={hasDataForType('symbol')}
+												choroplethDataExists={hasDataForType('choropleth')}
+												customDataExists={hasDataForType('custom')}
+												columnTypes={columnTypes}
+												dimensionSettings={dimensionSettings}
+												onUpdateSettings={updateDimensionSettings}
+												columnFormats={columnFormats}
+												symbolParsedData={symbolData.parsedData}
+												symbolGeocodedData={symbolData.geocodedData}
+												symbolColumns={symbolData.columns}
+												choroplethParsedData={choroplethData.parsedData}
+												choroplethGeocodedData={choroplethData.geocodedData}
+												choroplethColumns={choroplethData.columns}
+												selectedGeography={dimensionSettings.selectedGeography}
+												stylingSettings={stylingSettings}
+												isExpanded={dimensionMappingExpanded}
+												setIsExpanded={setDimensionMappingExpanded}
+												variant="inspector"
+											/>
+										</Suspense>
+
+										<Suspense
+											fallback={
+												<div className="bg-muted/20 p-8 text-center text-xs text-muted-foreground">
+													Loading map styling...
+												</div>
+											}>
+											<MapStyling
+												stylingSettings={stylingSettings}
+												onUpdateStylingSettings={updateStylingSettings}
+												dimensionSettings={dimensionSettings}
+												symbolDataExists={hasDataForType('symbol')}
+												choroplethDataExists={hasDataForType('choropleth')}
+												customDataExists={hasDataForType('custom')}
+												isExpanded={mapStylingExpanded}
+												setIsExpanded={setMapStylingExpanded}
+												variant="inspector"
+											/>
+										</Suspense>
+									</>
+								)}
+							</aside>
+						)}
+					</div>
+				</section>
+			)}
+			{/* Floating toolbar — design tab uses map-canvas placement inside .studio-design-map */}
 		</>
 	);
 }

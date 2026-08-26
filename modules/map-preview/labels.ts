@@ -8,9 +8,17 @@ import type {
 	DimensionSettings,
 	GeocodedRow,
 	GeographyKey,
+	IndividualLabelOverride,
 	MapType,
 	StylingSettings,
+	SymbolLabelAlignment,
 } from '@/app/(studio)/types';
+import { resolveLabelRenderText } from '@/lib/label-content';
+import {
+	getSymbolTextLabelId,
+	getSymbolTextStyling,
+	resolveSymbolTextRenderText,
+} from '@/lib/symbol-text-content';
 import type { MapTool } from '@/components/map-control-bar';
 import type { TopoJSONData } from './types';
 
@@ -109,13 +117,17 @@ export const renderSymbolLabels = ({
 				return;
 			}
 
-			const labelText = renderLabelPreview(
-				dimensionSettings.symbol.labelTemplate,
-				record,
+			const labelText = resolveLabelRenderText({
+				labelId,
+				mapType: 'symbol',
+				dimensionSettings,
+				stylingSettings,
+				symbolData,
+				choroplethData: [],
 				columnTypes,
 				columnFormats,
-				selectedGeography
-			);
+				selectedGeography,
+			});
 
 			if (!labelText) {
 				return;
@@ -127,7 +139,6 @@ export const renderSymbolLabels = ({
 
 			// Check for overrides
 			const override = stylingSettings.individualLabelOverrides?.[labelId];
-			const hasPositionOverride = override && override.x !== undefined && override.y !== undefined;
 
 			// Apply style overrides if they exist, otherwise use defaults
 			const fontFamily = override?.fontFamily
@@ -137,8 +148,6 @@ export const renderSymbolLabels = ({
 			const fill = override?.fill ?? stylingSettings.symbol.labelColor;
 			const stroke = override?.stroke ?? stylingSettings.symbol.labelOutlineColor;
 			const strokeWidth = override?.strokeWidth ?? stylingSettings.symbol.labelOutlineThickness;
-			const textAnchor = override?.textAnchor;
-			const dominantBaseline = override?.dominantBaseline;
 
 			// Update baseStyles with override values
 			// IMPORTANT: If override exists and has fontWeight/fontStyle, use them even if 'normal'
@@ -209,45 +218,9 @@ export const renderSymbolLabels = ({
 
 			createFormattedText(textElement, labelText, overrideBaseStyles);
 
-			// CRITICAL: Re-apply fontWeight and fontStyle after createFormattedText to ensure override styles
-			// take precedence over any HTML tag styles. This must happen AFTER all tspan elements are created.
-			// Store the override values explicitly to ensure they're always used
-			const fontWeightValue = overrideBaseStyles.fontWeight || 'normal';
-			const fontStyleValue = overrideBaseStyles.fontStyle || 'normal';
-
-			// Debug logging
-			if (override && (override.fontWeight !== undefined || override.fontStyle !== undefined)) {
-				console.log(
-					`[${labelId}] Applying override styles: fontWeight=${fontWeightValue}, fontStyle=${fontStyleValue}`
-				);
-			}
-
-			// Apply to parent text element first - remove old values first, then set new ones
-			textElement
-				.attr('font-weight', null)
-				.attr('font-style', null)
-				.style('font-weight', null)
-				.style('font-style', null)
-				.attr('font-weight', fontWeightValue)
-				.attr('font-style', fontStyleValue)
-				.style('font-weight', fontWeightValue)
-				.style('font-style', fontStyleValue);
-
-			// Force apply to ALL tspan elements - remove old values first, then set new ones
-			textElement.selectAll('tspan').each(function () {
-				const tspan = d3.select(this);
-				const element = this as SVGTSpanElement;
-				// Remove existing attributes and styles
-				element.removeAttribute('font-weight');
-				element.removeAttribute('font-style');
-				tspan.style('font-weight', null).style('font-style', null);
-				// Set new values
-				tspan
-					.attr('font-weight', fontWeightValue)
-					.attr('font-style', fontStyleValue)
-					.style('font-weight', fontWeightValue)
-					.style('font-style', fontStyleValue);
-			});
+			const hasIndividualStyleOverride =
+				override?.fontWeight !== undefined || override?.fontStyle !== undefined;
+			applyPostFormatStyles(textElement, labelText, overrideBaseStyles, hasIndividualStyleOverride);
 
 			// Set up click handler after creating formatted text
 			if (activeTool === 'select') {
@@ -265,32 +238,30 @@ export const renderSymbolLabels = ({
 				textElement.selectAll('tspan').style('user-select', 'none').style('-webkit-user-select', 'none');
 			}
 
-			// Calculate base position
-			const position = resolveSymbolLabelPosition({
-				alignment: stylingSettings.symbol.labelAlignment,
+			const globalOffsetX = stylingSettings.symbol.labelOffsetX ?? 0;
+			const globalOffsetY = stylingSettings.symbol.labelOffsetY ?? 0;
+			const individualOffsetX = override?.offsetX ?? 0;
+			const individualOffsetY = override?.offsetY ?? 0;
+
+			const placement = computeSymbolLabelPlacement({
+				override,
+				globalAlignment: stylingSettings.symbol.labelAlignment,
 				projected,
 				symbolSize: size,
 				labelText,
 				fontSize,
 				width,
 				height,
+				globalOffsetX,
+				globalOffsetY,
+				individualOffsetX,
+				individualOffsetY,
 			});
 
-			// Apply position override if exists, otherwise use calculated position
-			const globalOffsetX = stylingSettings.symbol.labelOffsetX ?? 0;
-			const globalOffsetY = stylingSettings.symbol.labelOffsetY ?? 0;
-			const individualOffsetX = override?.offsetX ?? 0;
-			const individualOffsetY = override?.offsetY ?? 0;
-			const finalX = hasPositionOverride
-				? override!.x!
-				: projected[0] + position.dx + globalOffsetX + individualOffsetX;
-			const finalY = hasPositionOverride
-				? override!.y!
-				: projected[1] + position.dy + globalOffsetY + individualOffsetY;
-
-			// Use override textAnchor/dominantBaseline if provided, otherwise use calculated position
-			const finalTextAnchor = textAnchor ?? position.anchor;
-			const finalDominantBaseline = dominantBaseline ?? position.baseline;
+			const finalX = placement.x;
+			const finalY = placement.y;
+			const finalTextAnchor = placement.textAnchor;
+			const finalDominantBaseline = placement.dominantBaseline;
 
 			textElement
 				.attr('x', finalX)
@@ -298,64 +269,203 @@ export const renderSymbolLabels = ({
 				.attr('text-anchor', finalTextAnchor)
 				.attr('dominant-baseline', finalDominantBaseline);
 
-			// Update tspan x positions AND ensure fontWeight/fontStyle are still applied
-			textElement.selectAll('tspan').each(function (_, tspanIndex) {
-				const tspan = d3.select(this);
-				if (tspanIndex > 0 || tspan.attr('x') === '0') {
-					tspan.attr('x', finalX);
-				}
-				// Re-apply fontWeight and fontStyle to ensure they persist after position updates
-				tspan
-					.attr('font-weight', fontWeightValue)
-					.attr('font-style', fontStyleValue)
-					.style('font-weight', fontWeightValue)
-					.style('font-style', fontStyleValue);
-			});
+			updateTspanPositions(textElement, finalX);
 
-			// Add drag functionality for move tool - set up after createFormattedText
-			if (activeTool === 'move' && onLabelPositionUpdate) {
-				// Remove any existing drag behavior first
-				textElement.on('.drag', null);
-
-				const drag = d3
-					.drag<SVGTextElement, DataRecord>()
-					.on('start', function (event) {
-						if (event.sourceEvent) {
-							event.sourceEvent.preventDefault();
-							event.sourceEvent.stopPropagation();
-						}
-						d3.select(this).style('opacity', '0.7');
-					})
-					.on('drag', function (event) {
-						if (event.sourceEvent) {
-							event.sourceEvent.preventDefault();
-							event.sourceEvent.stopPropagation();
-						}
-						const [x, y] = d3.pointer(event, svg.node());
-						d3.select(this).attr('x', x).attr('y', y);
-						// Update tspan x positions
-						d3.select(this).selectAll('tspan').attr('x', x);
-					})
-					.on('end', function (event) {
-						if (event.sourceEvent) {
-							event.sourceEvent.preventDefault();
-							event.sourceEvent.stopPropagation();
-						}
-						d3.select(this).style('opacity', '1');
-						const [x, y] = d3.pointer(event, svg.node());
-						if (onLabelPositionUpdate) {
-							onLabelPositionUpdate(labelId, x, y);
-						}
-					});
-
-				textElement.call(drag as any);
+			if (activeTool === 'move') {
+				attachLabelDrag(textElement, svg, labelId, onLabelPositionUpdate);
 			} else {
-				// Remove drag behavior when not in move mode
 				textElement.on('.drag', null);
 			}
 		});
 
 	return labels;
+};
+
+interface SymbolTextParams {
+	svg: SvgSelection;
+	projection: Projection;
+	symbolData: DataRecord[];
+	dimensionSettings: DimensionSettings;
+	stylingSettings: StylingSettings;
+	columnTypes: ColumnType;
+	columnFormats: ColumnFormat;
+	selectedGeography: GeographyKey;
+	sizeScale: ScaleLinear | null;
+	activeTool?: MapTool;
+	onShowTooltip?: (x: number, y: number, record: DataRecord) => void;
+	onHideTooltip?: () => void;
+	onLabelPositionUpdate?: (labelId: string, x: number, y: number) => void;
+	onLabelClick?: (labelId: string) => void;
+}
+
+export const renderSymbolText = ({
+	svg,
+	projection,
+	symbolData,
+	dimensionSettings,
+	stylingSettings,
+	columnTypes,
+	columnFormats,
+	selectedGeography,
+	sizeScale,
+	activeTool = 'inspect',
+	onShowTooltip,
+	onHideTooltip,
+	onLabelPositionUpdate,
+	onLabelClick,
+}: SymbolTextParams) => {
+	if (!dimensionSettings.symbol.symbolTextBy) {
+		return;
+	}
+
+	const symbolTextSettings = getSymbolTextStyling(stylingSettings);
+	const symbolTextGroup = svg.append('g').attr('id', 'SymbolText');
+	const baseSymbolSize = stylingSettings.symbol.symbolSize;
+
+	symbolTextGroup
+		.selectAll('text')
+		.data(symbolData)
+		.join('text')
+		.each(function (record, index) {
+			const textElement = d3.select(this);
+			const labelId = getSymbolTextLabelId(index);
+			const lat = Number(record[dimensionSettings.symbol.latitude]);
+			const lng = Number(record[dimensionSettings.symbol.longitude]);
+			const projected = projection([lng, lat]);
+
+			if (!projected) {
+				return;
+			}
+
+			const labelText = resolveSymbolTextRenderText({
+				labelId,
+				stylingSettings,
+				symbolData,
+				dimensionSettings,
+				columnTypes,
+				columnFormats,
+				selectedGeography,
+			});
+
+			if (!labelText) {
+				textElement.remove();
+				return;
+			}
+
+			const symbolSize = sizeScale
+				? sizeScale(evalNumeric(record, dimensionSettings.symbol.sizeBy) || 0)
+				: baseSymbolSize;
+
+			const override = stylingSettings.individualLabelOverrides?.[labelId];
+			const fontFamily = override?.fontFamily
+				? mapFontFamilyForSVG(override.fontFamily)
+				: mapFontFamilyForSVG(symbolTextSettings.fontFamily);
+			let fontSize = override?.fontSize ?? symbolTextSettings.fontSize;
+			if (symbolTextSettings.scaleWithSymbol && override?.fontSize === undefined && baseSymbolSize > 0) {
+				fontSize = fontSize * (symbolSize / baseSymbolSize);
+			}
+			const fill = override?.fill ?? symbolTextSettings.color;
+			const stroke = override?.stroke ?? symbolTextSettings.outlineColor;
+			const strokeWidth = override?.strokeWidth ?? symbolTextSettings.outlineThickness;
+			const overrideBaseStyles = {
+				fontWeight:
+					override && override.fontWeight !== undefined
+						? override.fontWeight
+						: symbolTextSettings.fontBold
+							? 'bold'
+							: 'normal',
+				fontStyle:
+					override && override.fontStyle !== undefined
+						? override.fontStyle
+						: symbolTextSettings.fontItalic
+							? 'italic'
+							: 'normal',
+				textDecoration: override?.textDecoration ?? '',
+			};
+
+			textElement
+				.attr('font-family', fontFamily)
+				.attr('font-size', `${fontSize}px`)
+				.attr('font-weight', overrideBaseStyles.fontWeight)
+				.attr('font-style', overrideBaseStyles.fontStyle)
+				.attr('fill', fill)
+				.attr('stroke', stroke)
+				.attr('stroke-width', strokeWidth)
+				.style('paint-order', 'stroke fill')
+				.style(
+					'pointer-events',
+					activeTool === 'inspect' || activeTool === 'select' || activeTool === 'move' ? 'all' : 'none'
+				)
+				.attr('data-label-id', labelId);
+
+			textElement.on('mouseenter', null).on('mouseleave', null).on('click', null).on('.drag', null);
+
+			if (activeTool === 'select' || activeTool === 'move') {
+				textElement.style('user-select', 'none').style('-webkit-user-select', 'none');
+			} else {
+				textElement.style('user-select', null).style('-webkit-user-select', null);
+			}
+
+			if (activeTool === 'inspect' && onShowTooltip && onHideTooltip) {
+				textElement
+					.style('cursor', 'crosshair')
+					.on('mouseenter', function (event) {
+						const [x, y] = d3.pointer(event, svg.node());
+						onShowTooltip(x, y, record);
+					})
+					.on('mouseleave', () => {
+						onHideTooltip();
+					});
+			} else if (activeTool === 'select') {
+				textElement.style('cursor', 'pointer');
+			} else if (activeTool === 'move') {
+				textElement.style('cursor', 'move');
+			}
+
+			createFormattedText(textElement, labelText, overrideBaseStyles);
+
+			const hasIndividualStyleOverride =
+				override?.fontWeight !== undefined || override?.fontStyle !== undefined;
+			applyPostFormatStyles(textElement, labelText, overrideBaseStyles, hasIndividualStyleOverride);
+
+			if (activeTool === 'select') {
+				textElement.on('click', function (event) {
+					event.stopPropagation();
+					event.preventDefault();
+					onLabelClick?.(labelId);
+				});
+			}
+
+			if (activeTool === 'select' || activeTool === 'move') {
+				textElement.selectAll('tspan').style('user-select', 'none').style('-webkit-user-select', 'none');
+			}
+
+			const globalOffsetX = symbolTextSettings.offsetX ?? 0;
+			const globalOffsetY = symbolTextSettings.offsetY ?? 0;
+			const individualOffsetX = override?.offsetX ?? 0;
+			const individualOffsetY = override?.offsetY ?? 0;
+			const hasAbsolutePosition = override?.x !== undefined && override?.y !== undefined;
+			const finalX = hasAbsolutePosition
+				? override!.x!
+				: projected[0] + globalOffsetX + individualOffsetX;
+			const finalY = hasAbsolutePosition
+				? override!.y!
+				: projected[1] + globalOffsetY + individualOffsetY;
+
+			textElement
+				.attr('x', finalX)
+				.attr('y', finalY)
+				.attr('text-anchor', 'middle')
+				.attr('dominant-baseline', 'middle');
+
+			updateTspanPositions(textElement, finalX);
+
+			if (activeTool === 'move') {
+				attachLabelDrag(textElement, svg, labelId, onLabelPositionUpdate);
+			} else {
+				textElement.on('.drag', null);
+			}
+		});
 };
 
 interface ChoroplethLabelParams {
@@ -451,14 +561,19 @@ export const renderChoroplethLabels = ({
 			});
 
 			const dataRow = featureIdentifier ? geoDataMap.get(featureIdentifier) : undefined;
+			const labelId = `choropleth-${featureIdentifier || 'unknown'}`;
 			const labelText = dataRow
-				? renderLabelPreview(
-						dimensionSettings.choropleth.labelTemplate,
-						dataRow,
+				? resolveLabelRenderText({
+						labelId,
+						mapType: 'choropleth',
+						dimensionSettings,
+						stylingSettings,
+						symbolData: [],
+						choroplethData,
 						columnTypes,
 						columnFormats,
-						selectedGeography
-				  )
+						selectedGeography,
+					})
 				: '';
 
 			if (!labelText) {
@@ -471,9 +586,6 @@ export const renderChoroplethLabels = ({
 				textElement.remove();
 				return;
 			}
-
-			// Create label ID for choropleth labels
-			const labelId = `choropleth-${featureIdentifier || 'unknown'}`;
 
 			// Check for overrides
 			const override = stylingSettings.individualLabelOverrides?.[labelId];
@@ -580,45 +692,9 @@ export const renderChoroplethLabels = ({
 
 			createFormattedText(textElement, labelText, overrideBaseStyles);
 
-			// CRITICAL: Re-apply fontWeight and fontStyle after createFormattedText to ensure override styles
-			// take precedence over any HTML tag styles. This must happen AFTER all tspan elements are created.
-			// Store the override values explicitly to ensure they're always used
-			const fontWeightValue = overrideBaseStyles.fontWeight || 'normal';
-			const fontStyleValue = overrideBaseStyles.fontStyle || 'normal';
-
-			// Debug logging
-			if (override && (override.fontWeight !== undefined || override.fontStyle !== undefined)) {
-				console.log(
-					`[${labelId}] Applying override styles: fontWeight=${fontWeightValue}, fontStyle=${fontStyleValue}`
-				);
-			}
-
-			// Apply to parent text element first - remove old values first, then set new ones
-			textElement
-				.attr('font-weight', null)
-				.attr('font-style', null)
-				.style('font-weight', null)
-				.style('font-style', null)
-				.attr('font-weight', fontWeightValue)
-				.attr('font-style', fontStyleValue)
-				.style('font-weight', fontWeightValue)
-				.style('font-style', fontStyleValue);
-
-			// Force apply to ALL tspan elements - remove old values first, then set new ones
-			textElement.selectAll('tspan').each(function () {
-				const tspan = d3.select(this);
-				const element = this as SVGTSpanElement;
-				// Remove existing attributes and styles
-				element.removeAttribute('font-weight');
-				element.removeAttribute('font-style');
-				tspan.style('font-weight', null).style('font-style', null);
-				// Set new values
-				tspan
-					.attr('font-weight', fontWeightValue)
-					.attr('font-style', fontStyleValue)
-					.style('font-weight', fontWeightValue)
-					.style('font-style', fontStyleValue);
-			});
+			const hasIndividualStyleOverride =
+				override?.fontWeight !== undefined || override?.fontStyle !== undefined;
+			applyPostFormatStyles(textElement, labelText, overrideBaseStyles, hasIndividualStyleOverride);
 
 			// Set up click handler after creating formatted text
 			if (activeTool === 'select') {
@@ -636,59 +712,11 @@ export const renderChoroplethLabels = ({
 				textElement.selectAll('tspan').style('user-select', 'none').style('-webkit-user-select', 'none');
 			}
 
-			// Update tspan x positions AND ensure fontWeight/fontStyle are still applied
-			textElement.selectAll('tspan').each(function (_, index) {
-				const tspan = d3.select(this);
-				if (index > 0 || tspan.attr('x') === '0') {
-					tspan.attr('x', finalX);
-				}
-				// Re-apply fontWeight and fontStyle to ensure they persist after position updates
-				tspan
-					.attr('font-weight', fontWeightValue)
-					.attr('font-style', fontStyleValue)
-					.style('font-weight', fontWeightValue)
-					.style('font-style', fontStyleValue);
-			});
+			updateTspanPositions(textElement, finalX);
 
-			// Add drag functionality for move tool - set up after createFormattedText
-			if (activeTool === 'move' && onLabelPositionUpdate) {
-				// Remove any existing drag behavior first
-				textElement.on('.drag', null);
-
-				const drag = d3
-					.drag<SVGTextElement, any>()
-					.on('start', function (event) {
-						if (event.sourceEvent) {
-							event.sourceEvent.preventDefault();
-							event.sourceEvent.stopPropagation();
-						}
-						d3.select(this).style('opacity', '0.7');
-					})
-					.on('drag', function (event) {
-						if (event.sourceEvent) {
-							event.sourceEvent.preventDefault();
-							event.sourceEvent.stopPropagation();
-						}
-						const [x, y] = d3.pointer(event, svg.node());
-						d3.select(this).attr('x', x).attr('y', y);
-						// Update tspan x positions
-						d3.select(this).selectAll('tspan').attr('x', x);
-					})
-					.on('end', function (event) {
-						if (event.sourceEvent) {
-							event.sourceEvent.preventDefault();
-							event.sourceEvent.stopPropagation();
-						}
-						d3.select(this).style('opacity', '1');
-						const [x, y] = d3.pointer(event, svg.node());
-						if (onLabelPositionUpdate) {
-							onLabelPositionUpdate(labelId, x, y);
-						}
-					});
-
-				textElement.call(drag as any);
+			if (activeTool === 'move') {
+				attachLabelDrag(textElement, svg, labelId, onLabelPositionUpdate);
 			} else {
-				// Remove drag behavior when not in move mode
 				textElement.on('.drag', null);
 			}
 		});
@@ -896,13 +924,176 @@ const computeFeatureCentroid = ({ feature, path }: ComputeCentroidParams): [numb
 };
 
 interface ResolveSymbolLabelPositionParams {
-	alignment: StylingSettings['symbol']['labelAlignment'];
+	alignment: SymbolLabelAlignment;
 	projected: [number, number];
 	symbolSize: number;
 	labelText: string;
 	fontSize: number;
 	width: number;
 	height: number;
+}
+
+interface ComputeSymbolLabelPlacementParams {
+	override?: IndividualLabelOverride;
+	globalAlignment: SymbolLabelAlignment;
+	projected: [number, number];
+	symbolSize: number;
+	labelText: string;
+	fontSize: number;
+	width: number;
+	height: number;
+	globalOffsetX: number;
+	globalOffsetY: number;
+	individualOffsetX: number;
+	individualOffsetY: number;
+}
+
+export interface SymbolLabelPlacement {
+	x: number;
+	y: number;
+	textAnchor: 'start' | 'middle' | 'end';
+	dominantBaseline: 'baseline' | 'middle' | 'hanging';
+	alignment: SymbolLabelAlignment;
+}
+
+/** Resolve which positional alignment preset drives label placement for a symbol label. */
+export const resolveEffectiveSymbolLabelAlignment = (
+	override: ComputeSymbolLabelPlacementParams['override'],
+	globalAlignment: SymbolLabelAlignment
+): SymbolLabelAlignment => {
+	let alignmentForPosition = override?.labelAlignment ?? globalAlignment;
+
+	if (
+		override?.labelAlignment === undefined &&
+		override?.textAnchor !== undefined &&
+		override?.dominantBaseline !== undefined
+	) {
+		const inferred = anchorBaselineToLabelAlignment(override.textAnchor, override.dominantBaseline);
+		if (inferred) {
+			alignmentForPosition = inferred;
+		}
+	}
+
+	return alignmentForPosition;
+};
+
+/** Compute final SVG coordinates and anchor attributes for a symbol map label. */
+export const computeSymbolLabelPlacement = ({
+	override,
+	globalAlignment,
+	projected,
+	symbolSize,
+	labelText,
+	fontSize,
+	width,
+	height,
+	globalOffsetX,
+	globalOffsetY,
+	individualOffsetX,
+	individualOffsetY,
+}: ComputeSymbolLabelPlacementParams): SymbolLabelPlacement => {
+	const alignmentForPosition = resolveEffectiveSymbolLabelAlignment(override, globalAlignment);
+	const position = resolveSymbolLabelPosition({
+		alignment: alignmentForPosition,
+		projected,
+		symbolSize,
+		labelText,
+		fontSize,
+		width,
+		height,
+	});
+
+	const hasAbsolutePosition =
+		override != null && override.x !== undefined && override.y !== undefined;
+	const usesManualAlignment = alignmentForPosition !== 'auto';
+
+	const x = hasAbsolutePosition
+		? override!.x!
+		: projected[0] + position.dx + globalOffsetX + individualOffsetX;
+	const y = hasAbsolutePosition
+		? override!.y!
+		: projected[1] + position.dy + globalOffsetY + individualOffsetY;
+
+	// Manual alignment always uses anchors derived from placement side so the label
+	// sits beside the symbol, not overlapping it with a mismatched text-anchor.
+	const textAnchor = usesManualAlignment
+		? position.anchor
+		: (override?.textAnchor ?? position.anchor);
+	const dominantBaseline = usesManualAlignment
+		? position.baseline
+		: (override?.dominantBaseline ?? position.baseline);
+
+	return {
+		x,
+		y,
+		textAnchor,
+		dominantBaseline,
+		alignment: alignmentForPosition,
+	};
+};
+
+/** Map a positional alignment preset to SVG text anchor attributes. */
+export const labelAlignmentToAnchorBaseline = (
+	alignment: SymbolLabelAlignment
+): {
+	textAnchor: 'start' | 'middle' | 'end';
+	dominantBaseline: 'baseline' | 'middle' | 'hanging';
+} => {
+	switch (alignment) {
+		case 'top-left':
+			return { textAnchor: 'end', dominantBaseline: 'baseline' };
+		case 'top-center':
+			return { textAnchor: 'middle', dominantBaseline: 'baseline' };
+		case 'top-right':
+			return { textAnchor: 'start', dominantBaseline: 'baseline' };
+		case 'middle-left':
+			return { textAnchor: 'end', dominantBaseline: 'middle' };
+		case 'center':
+			return { textAnchor: 'middle', dominantBaseline: 'middle' };
+		case 'middle-right':
+			return { textAnchor: 'start', dominantBaseline: 'middle' };
+		case 'bottom-left':
+			return { textAnchor: 'end', dominantBaseline: 'hanging' };
+		case 'bottom-center':
+			return { textAnchor: 'middle', dominantBaseline: 'hanging' };
+		case 'bottom-right':
+			return { textAnchor: 'start', dominantBaseline: 'hanging' };
+		case 'auto':
+		default:
+			return { textAnchor: 'start', dominantBaseline: 'middle' };
+	}
+};
+
+const ANCHOR_BASELINE_TO_ALIGNMENT: Partial<
+	Record<
+		`${'baseline' | 'middle' | 'hanging'}-${'start' | 'middle' | 'end'}`,
+		Exclude<SymbolLabelAlignment, 'auto'>
+	>
+> = {
+	'baseline-end': 'top-left',
+	'baseline-middle': 'top-center',
+	'baseline-start': 'top-right',
+	'middle-end': 'middle-left',
+	'middle-middle': 'center',
+	'middle-start': 'middle-right',
+	'hanging-end': 'bottom-left',
+	'hanging-middle': 'bottom-center',
+	'hanging-start': 'bottom-right',
+};
+
+/** Infer positional alignment from anchor attributes (legacy per-label overrides). */
+export const anchorBaselineToLabelAlignment = (
+	textAnchor: 'start' | 'middle' | 'end',
+	dominantBaseline: 'baseline' | 'middle' | 'hanging'
+): SymbolLabelAlignment | undefined => {
+	return ANCHOR_BASELINE_TO_ALIGNMENT[`${dominantBaseline}-${textAnchor}`];
+};
+
+interface SymbolLabelPosition {
+	dx: number;
+	dy: number;
+	anchor: 'start' | 'middle' | 'end';
+	baseline: 'baseline' | 'middle' | 'hanging';
 }
 
 const resolveSymbolLabelPosition = ({
@@ -913,7 +1104,7 @@ const resolveSymbolLabelPosition = ({
 	fontSize,
 	width,
 	height,
-}: ResolveSymbolLabelPositionParams) => {
+}: ResolveSymbolLabelPositionParams): SymbolLabelPosition => {
 	if (alignment === 'auto') {
 		const estimatedWidth = labelText.length * (fontSize * 0.6);
 		const estimatedHeight = fontSize * 1.2;
@@ -954,15 +1145,15 @@ const getAutoPosition = (
 	labelHeight: number,
 	svgWidth: number,
 	svgHeight: number
-) => {
+): SymbolLabelPosition => {
 	const margin = Math.max(8, symbolSize * 0.3);
 	const edgeBuffer = 20;
 
-	const positions = [
-		{ dx: symbolSize / 2 + margin, dy: 0, anchor: 'start', baseline: 'middle' as const },
-		{ dx: -(symbolSize / 2 + margin), dy: 0, anchor: 'end', baseline: 'middle' as const },
-		{ dx: -labelWidth / 2, dy: symbolSize / 2 + margin + labelHeight, anchor: 'start', baseline: 'hanging' as const },
-		{ dx: -labelWidth / 2, dy: -(symbolSize / 2 + margin), anchor: 'start', baseline: 'baseline' as const },
+	const positions: SymbolLabelPosition[] = [
+		{ dx: symbolSize / 2 + margin, dy: 0, anchor: 'start', baseline: 'middle' },
+		{ dx: -(symbolSize / 2 + margin), dy: 0, anchor: 'end', baseline: 'middle' },
+		{ dx: -labelWidth / 2, dy: symbolSize / 2 + margin + labelHeight, anchor: 'start', baseline: 'hanging' },
+		{ dx: -labelWidth / 2, dy: -(symbolSize / 2 + margin), anchor: 'start', baseline: 'baseline' },
 	];
 
 	for (const pos of positions) {
@@ -982,6 +1173,81 @@ const getAutoPosition = (
 	}
 
 	return positions[0];
+};
+
+const hasInlineFormatting = (text: string): boolean =>
+	/<(b|strong|i|em|u|s|strike)\b/i.test(text);
+
+type LabelBaseStyles = { fontWeight?: string; fontStyle?: string; textDecoration?: string };
+
+const applyPostFormatStyles = (
+	textElement: d3.Selection<d3.BaseType | SVGTextElement, unknown, null, undefined>,
+	labelText: string,
+	baseStyles: LabelBaseStyles,
+	hasIndividualStyleOverride: boolean
+) => {
+	const fontWeightValue = baseStyles.fontWeight || 'normal';
+	const fontStyleValue = baseStyles.fontStyle || 'normal';
+
+	textElement.attr('font-weight', fontWeightValue).attr('font-style', fontStyleValue);
+
+	// Preserve per-tspan styles from <b>, <i>, etc. unless an individual override forces global style
+	if (hasIndividualStyleOverride || !hasInlineFormatting(labelText)) {
+		textElement.selectAll('tspan').each(function () {
+			const tspan = d3.select(this);
+			tspan.attr('font-weight', fontWeightValue).attr('font-style', fontStyleValue);
+		});
+	}
+};
+
+const updateTspanPositions = (
+	textElement: d3.Selection<d3.BaseType | SVGTextElement, unknown, null, undefined>,
+	finalX: number
+) => {
+	textElement.selectAll('tspan').each(function (_, tspanIndex) {
+		const tspan = d3.select(this);
+		if (tspanIndex > 0 || tspan.attr('x') === '0') {
+			tspan.attr('x', finalX);
+		}
+	});
+};
+
+const attachLabelDrag = (
+	textElement: d3.Selection<d3.BaseType | SVGTextElement, unknown, null, undefined>,
+	svg: SvgSelection,
+	labelId: string,
+	onLabelPositionUpdate?: (labelId: string, x: number, y: number) => void
+) => {
+	if (!onLabelPositionUpdate) return;
+
+	textElement.on('.drag', null);
+
+	const drag = d3
+		.drag<SVGTextElement, unknown>()
+		.container(() => svg.node()!)
+		.subject(function () {
+			const t = d3.select(this);
+			return { x: Number(t.attr('x')) || 0, y: Number(t.attr('y')) || 0 };
+		})
+		.on('start', function (event) {
+			event.sourceEvent?.preventDefault();
+			event.sourceEvent?.stopPropagation();
+			d3.select(this).style('opacity', '0.7');
+		})
+		.on('drag', function (event) {
+			event.sourceEvent?.preventDefault();
+			event.sourceEvent?.stopPropagation();
+			d3.select(this).attr('x', event.x).attr('y', event.y);
+			d3.select(this).selectAll('tspan').attr('x', event.x);
+		})
+		.on('end', function (event) {
+			event.sourceEvent?.preventDefault();
+			event.sourceEvent?.stopPropagation();
+			d3.select(this).style('opacity', '1');
+			onLabelPositionUpdate(labelId, event.x, event.y);
+		});
+
+	textElement.call(drag as never);
 };
 
 const createFormattedText = (

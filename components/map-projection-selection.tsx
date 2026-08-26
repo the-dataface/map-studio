@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { studioPanelClass, StudioExpandableHeader } from '@/components/studio-panel';
 import { Checkbox } from '@/components/ui/checkbox'; // Import Checkbox
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'; // Import Tooltip components
 
@@ -72,24 +73,15 @@ export function MapProjectionSelection({
 		: 'Clip the map to the boundaries of the selected country.';
 
 	return (
-		<Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
-			<CardHeader
-				className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-5 px-6 rounded-t-xl relative"
-				onClick={() => setIsExpanded(!isExpanded)}>
-				<div className="flex items-center justify-between">
-					<div className="flex items-center gap-2">
-						<CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">
-							Geography and projection
-						</CardTitle>
-					</div>
-					<div className="flex items-center gap-2">
-						{isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-					</div>
-				</div>
-			</CardHeader>
-			<CardContent className={cn('transition-all duration-200', isExpanded ? 'pb-6 pt-2' : 'pb-0 h-0 overflow-hidden')}>
-				<div className="flex items-center gap-2">
-					<div className="flex-grow">
+		<Card className={cn(studioPanelClass, 'overflow-hidden')}>
+			<StudioExpandableHeader
+				title="Geography and projection"
+				isExpanded={isExpanded}
+				onToggle={() => setIsExpanded(!isExpanded)}
+			/>
+			<CardContent className={cn('studio-panel-expand-body transition-all duration-200', isExpanded ? 'pb-6 pt-2 max-h-none opacity-100' : 'pb-0 h-0 max-h-0 overflow-hidden opacity-0')}>
+				<div className="flex flex-col gap-4">
+					<div>
 						<Label htmlFor="geography-search" className="mb-2 block">
 							Select geography
 						</Label>
@@ -116,8 +108,7 @@ export function MapProjectionSelection({
 							</ToggleGroup>
 						</ScrollArea>
 					</div>
-					{/* Projection Selection */}
-					<div className="flex-grow">
+					<div>
 						<Label htmlFor="projection-select" className="mb-2 block">
 							Select projection
 						</Label>

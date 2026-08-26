@@ -9,6 +9,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { Search, MousePointer, Move, PenTool } from 'lucide-react'
+import { studioHeaderIconButtonClass } from '@/components/studio-panel'
 import { cn } from '@/lib/utils'
 
 export type MapTool = 'inspect' | 'select' | 'move' | 'draw'
@@ -51,7 +52,7 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
 
   return (
     <TooltipProvider>
-      <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-40 flex flex-col gap-1 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border border-border rounded-full shadow-xl p-1">
+      <div className="absolute right-3 top-1/2 z-40 flex -translate-y-1/2 flex-col gap-0.5 border border-border bg-background/95 p-1 shadow-sm backdrop-blur-sm">
         {tools.map((tool) => (
           <Tooltip key={tool.id}>
             <TooltipTrigger asChild>
@@ -60,10 +61,9 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
                 size="icon"
                 onClick={() => onToolChange(tool.id)}
                 className={cn(
-                  'h-9 w-9 rounded-full transition-colors',
-                  activeTool === tool.id
-                    ? 'bg-secondary text-foreground'
-                    : 'hover:bg-muted'
+                  studioHeaderIconButtonClass,
+                  'h-8 w-8 border-0',
+                  activeTool === tool.id && 'bg-muted/60 text-foreground'
                 )}
                 aria-label={`${tool.label} tool (${tool.shortcut})`}
                 aria-pressed={activeTool === tool.id}
@@ -74,7 +74,7 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
             <TooltipContent side="left" sideOffset={8}>
               <div className="flex items-center gap-2">
                 <span>{tool.label}</span>
-                <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+                <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
                   {tool.shortcut}
                 </kbd>
               </div>
@@ -85,4 +85,3 @@ export const MapControlBar: React.FC<MapControlBarProps> = ({
     </TooltipProvider>
   )
 }
-

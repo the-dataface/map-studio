@@ -14,17 +14,27 @@ import type {
 	ProjectionType,
 	StylingSettings,
 } from '@/app/(studio)/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp, Download, Copy } from 'lucide-react';
+import { Download, Copy, Maximize2, Minimize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { resolveLabelMapType } from '@/lib/symbol-text-content';
+import { applyLabelOverrideUpdate } from '@/lib/label-overrides';
+import type { StylingSettingsUpdater } from '@/lib/label-overrides';
+import { studioHeaderIconButtonClass, StudioExpandableHeader } from '@/components/studio-panel';
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useToast } from '@/components/ui/use-toast';
 import { formatLegendValue, renderLabelPreview } from '@/modules/data-ingest/formatting';
 import { useGeoAtlasData } from '@/modules/map-preview/use-geo-atlas';
 import { renderBaseMap } from '@/modules/map-preview/base-map';
 import { renderSymbols } from '@/modules/map-preview/symbols';
 import { applyChoroplethColors } from '@/modules/map-preview/choropleth';
-import { renderSymbolLabels, renderChoroplethLabels } from '@/modules/map-preview/labels';
+import { renderSymbolLabels, renderChoroplethLabels, renderSymbolText } from '@/modules/map-preview/labels';
 import { estimateLegendHeight, renderLegends } from '@/modules/map-preview/legends';
 import { getNumericValue, getUniqueValues, getSymbolPathData } from '@/modules/map-preview/helpers';
 import {
@@ -39,7 +49,8 @@ import { MapTooltip } from '@/components/map-tooltip';
 import { LabelEditorToolbar } from '@/components/label-editor-toolbar';
 import { PathEditorToolbar } from '@/components/path-editor-toolbar';
 import { getMappedDimensionColumns, formatTooltipData } from '@/modules/map-preview/tooltip';
-import { renderDrawnPaths, constrainAngle, pathPointsToSVGPath } from '@/modules/map-preview/paths';
+import { renderDrawnPaths, constrainAngle } from '@/modules/map-preview/paths';
+import { renderPathPreview } from '@/modules/map-preview/path-preview';
 import type { DrawnPath, PathPoint } from '@/app/(studio)/types';
 
 type DataRecord = DataRow | GeocodedRow;
@@ -60,9 +71,16 @@ export interface MapPreviewProps {
 	clipToCountry: boolean;
 	isExpanded: boolean;
 	setIsExpanded: (expanded: boolean) => void;
+	isFocusMode?: boolean;
+	onToggleFocusMode?: () => void;
 	svgRef?: React.RefObject<SVGSVGElement>;
 	onCopySVG?: () => Promise<void>;
-	onUpdateStylingSettings?: (settings: StylingSettings) => void;
+	onUpdateStylingSettings?: (settings: StylingSettingsUpdater) => void;
+	selectedLabelId?: string | null;
+	onSelectedLabelIdChange?: (id: string | null) => void;
+	selectedPathId?: string | null;
+	onSelectedPathIdChange?: (id: string | null) => void;
+	embedEditorsInSidebar?: boolean;
 }
 
 const MAP_WIDTH = 975;
@@ -84,16 +102,39 @@ export function MapPreview({
 	clipToCountry,
 	isExpanded,
 	setIsExpanded,
+	isFocusMode = false,
+	onToggleFocusMode,
 	svgRef: externalSvgRef,
 	onUpdateStylingSettings,
+	selectedLabelId: selectedLabelIdProp,
+	onSelectedLabelIdChange,
+	selectedPathId: selectedPathIdProp,
+	onSelectedPathIdChange,
+	embedEditorsInSidebar = false,
 }: MapPreviewProps) {
 	const internalSvgRef = useRef<SVGSVGElement>(null);
 	const svgRef = externalSvgRef || internalSvgRef;
 	const mapContainerRef = useRef<HTMLDivElement>(null);
 	const { toast } = useToast();
 	const [activeTool, setActiveTool] = useState<MapTool>('inspect');
-	const [selectedLabelId, setSelectedLabelId] = useState<string | null>(null);
-	const [selectedPathId, setSelectedPathId] = useState<string | null>(null);
+	const [internalSelectedLabelId, setInternalSelectedLabelId] = useState<string | null>(null);
+	const [internalSelectedPathId, setInternalSelectedPathId] = useState<string | null>(null);
+	const selectedLabelId = selectedLabelIdProp ?? internalSelectedLabelId;
+	const selectedPathId = selectedPathIdProp ?? internalSelectedPathId;
+	const setSelectedLabelId = useCallback(
+		(id: string | null) => {
+			if (onSelectedLabelIdChange) onSelectedLabelIdChange(id);
+			else setInternalSelectedLabelId(id);
+		},
+		[onSelectedLabelIdChange]
+	);
+	const setSelectedPathId = useCallback(
+		(id: string | null) => {
+			if (onSelectedPathIdChange) onSelectedPathIdChange(id);
+			else setInternalSelectedPathId(id);
+		},
+		[onSelectedPathIdChange]
+	);
 	const [isDrawing, setIsDrawing] = useState(false);
 	const [currentPath, setCurrentPath] = useState<PathPoint[]>([]);
 	const [isDragging, setIsDragging] = useState(false);
@@ -112,12 +153,30 @@ export function MapPreview({
 	});
 	const drawingToastRef = useRef<{ dismiss: () => void } | null>(null);
 
-	// Hide tooltips when switching tools
+	const [isDesktop, setIsDesktop] = useState(
+		() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
+	);
+	useEffect(() => {
+		const mq = window.matchMedia('(min-width: 1024px)');
+		const update = () => setIsDesktop(mq.matches);
+		mq.addEventListener('change', update);
+		return () => mq.removeEventListener('change', update);
+	}, []);
+
+	const mapVisible = isDesktop || isExpanded;
+	const mapPanelCollapsible = !isDesktop;
+	const isHeroLayout = Boolean(onToggleFocusMode) && isDesktop;
+
+  // Hide tooltips when switching tools; clear label/path selection when leaving select mode
 	useEffect(() => {
 		if (activeTool !== 'inspect') {
 			setTooltipState((prev) => ({ ...prev, visible: false }));
 		}
-	}, [activeTool]);
+		if (activeTool !== 'select') {
+			setSelectedLabelId(null);
+			setSelectedPathId(null);
+		}
+	}, [activeTool, setSelectedLabelId, setSelectedPathId]);
 	const { geoAtlasData, isLoading } = useGeoAtlasData({
 		selectedGeography,
 		notify: (options) => {
@@ -130,23 +189,9 @@ export function MapPreview({
 		(labelId: string, x: number, y: number) => {
 			if (!onUpdateStylingSettings) return;
 
-			const currentOverrides = stylingSettings.individualLabelOverrides || {};
-			const updatedOverrides = {
-				...currentOverrides,
-				[labelId]: {
-					...currentOverrides[labelId],
-					id: labelId,
-					x,
-					y,
-				},
-			};
-
-			onUpdateStylingSettings({
-				...stylingSettings,
-				individualLabelOverrides: updatedOverrides,
-			});
+			onUpdateStylingSettings((prev) => applyLabelOverrideUpdate(prev, labelId, { x, y }));
 		},
-		[stylingSettings, onUpdateStylingSettings]
+		[onUpdateStylingSettings]
 	);
 
 	// Handler for path position updates
@@ -248,12 +293,11 @@ export function MapPreview({
 	const handleLabelClick = useCallback(
 		(labelId: string) => {
 			if (activeTool === 'select') {
+				setSelectedPathId(null);
 				setSelectedLabelId(labelId);
-
-				// Label editor will be shown via selectedLabelId state
 			}
 		},
-		[activeTool]
+		[activeTool, setSelectedLabelId, setSelectedPathId]
 	);
 
 	// Convert screen coordinates to SVG coordinates
@@ -328,7 +372,7 @@ export function MapPreview({
 
 	// Handle mouse events for drawing
 	useEffect(() => {
-		if (!svgRef.current || activeTool !== 'draw' || !onUpdateStylingSettings || !isExpanded) return;
+		if (!svgRef.current || activeTool !== 'draw' || !onUpdateStylingSettings || !mapVisible) return;
 
 		const svg = svgRef.current;
 		let localIsDrawing = isDrawing;
@@ -569,11 +613,15 @@ export function MapPreview({
 		getSVGCoordinates,
 		finishPath,
 		onUpdateStylingSettings,
-		isExpanded,
+		mapVisible,
 	]);
 
 	useEffect(() => {
-		if (!svgRef.current || !mapContainerRef.current || !geoAtlasData) {
+		const hasCustomMap = customMapData && customMapData.trim().length > 0;
+		if (!svgRef.current || !mapContainerRef.current) {
+			return;
+		}
+		if (!hasCustomMap && !geoAtlasData) {
 			return;
 		}
 
@@ -710,6 +758,45 @@ export function MapPreview({
 			});
 			symbolSizeScale = symbolResult.sizeScale;
 			symbolColorScale = symbolResult.colorScale as ((value: unknown) => string) | null;
+
+			renderSymbolText({
+				svg,
+				projection,
+				symbolData: symbolResult.validSymbolData,
+				dimensionSettings,
+				stylingSettings,
+				columnTypes,
+				columnFormats,
+				selectedGeography,
+				sizeScale: symbolSizeScale,
+				activeTool,
+				onShowTooltip: (x: number, y: number, record: DataRecord) => {
+					if (activeTool === 'inspect') {
+						const mappedColumns = getMappedDimensionColumns(dimensionSettings, 'symbol');
+						const tooltipData = formatTooltipData(record, mappedColumns, columnTypes, columnFormats);
+						setTooltipState({
+							visible: true,
+							x,
+							y,
+							content: (
+								<div className="space-y-1">
+									{tooltipData.map((item, index) => (
+										<div key={index} className="flex gap-2 text-xs">
+											<span className="font-medium text-muted-foreground">{item.column}:</span>
+											<span className="text-foreground">{item.value}</span>
+										</div>
+									))}
+								</div>
+							),
+						});
+					}
+				},
+				onHideTooltip: () => {
+					setTooltipState((prev) => ({ ...prev, visible: false }));
+				},
+				onLabelPositionUpdate: handleLabelPositionUpdate,
+				onLabelClick: handleLabelClick,
+			});
 
 			// Render symbol labels
 			renderSymbolLabels({
@@ -873,116 +960,13 @@ export function MapPreview({
 			selectedPathId,
 			onPathClick: (pathId: string) => {
 				if (activeTool === 'select') {
+					setSelectedLabelId(null);
 					setSelectedPathId(pathId);
 				}
 			},
 			onPathPositionUpdate: handlePathPositionUpdate,
 			onPathPointUpdate: handlePathPointUpdate,
 		});
-
-		// Render current path being drawn (preview)
-		if (isDrawing && currentPath.length > 0) {
-			const previewGroup = svg.select<SVGGElement>('#PathPreview').empty()
-				? svg.append('g').attr('id', 'PathPreview')
-				: svg.select<SVGGElement>('#PathPreview');
-
-			const defaultStyles = stylingSettings.defaultPathStyles || {
-				stroke: '#000000',
-				strokeWidth: 2,
-				strokeLinecap: 'round' as const,
-				strokeLinejoin: 'round' as const,
-				fill: 'none',
-				opacity: 1,
-			};
-
-			// Render anchor points (circles at each clicked point)
-			const anchorPoints = currentPath.filter((p) => p.type === 'line' || !p.type);
-			previewGroup
-				.selectAll<SVGCircleElement, PathPoint>('circle.anchor-point')
-				.data(anchorPoints, (d, i) => `anchor-${i}`)
-				.join(
-					(enter) =>
-						enter
-							.append('circle')
-							.attr('class', 'anchor-point')
-							.attr('cx', (d) => d.x)
-							.attr('cy', (d) => d.y)
-							.attr('r', 4)
-							.attr('fill', defaultStyles.stroke)
-							.attr('stroke', '#ffffff')
-							.attr('stroke-width', 1.5)
-							.style('pointer-events', 'none'),
-					(update) => update.attr('cx', (d) => d.x).attr('cy', (d) => d.y),
-					(exit) => exit.remove()
-				);
-
-			// Render the path so far
-			const pathData = pathPointsToSVGPath(currentPath);
-			previewGroup
-				.selectAll<SVGPathElement, PathPoint[]>('path.current-path')
-				.data([currentPath])
-				.join('path')
-				.attr('class', 'current-path')
-				.attr('d', pathData)
-				.attr('stroke', defaultStyles.stroke)
-				.attr('stroke-width', defaultStyles.strokeWidth)
-				.attr('stroke-linecap', defaultStyles.strokeLinecap || 'round')
-				.attr('stroke-linejoin', defaultStyles.strokeLinejoin || 'round')
-				.attr('fill', defaultStyles.fill || 'none')
-				.attr('opacity', (defaultStyles.opacity || 1) * 0.7)
-				.style('pointer-events', 'none');
-
-			// Render preview line from last point to mouse position
-			if (mousePosition && currentPath.length > 0) {
-				const lastPoint = currentPath[currentPath.length - 1];
-				let previewLineData: string;
-
-				// If dragging, show curve preview; otherwise show straight line
-				if (isDragging && dragStartPoint && currentPath.length > 0) {
-					// Calculate curve control points similar to handleMouseMove
-					const prevPoint = currentPath.length > 1 ? currentPath[currentPath.length - 2] : lastPoint;
-					const dx1 = dragStartPoint.x - prevPoint.x;
-					const dy1 = dragStartPoint.y - prevPoint.y;
-					const dist1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
-					const dx2 = mousePosition.x - dragStartPoint.x;
-					const dy2 = mousePosition.y - dragStartPoint.y;
-					const dist2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
-					const tension = 0.4;
-
-					if (dist1 > 0.001 && dist2 > 0.001) {
-						const cp1Distance = dist1 * tension;
-						const cp2Distance = dist2 * tension;
-						const cp1x = dragStartPoint.x - (dx1 / dist1) * cp1Distance;
-						const cp1y = dragStartPoint.y - (dy1 / dist1) * cp1Distance;
-						const cp2x = dragStartPoint.x + (dx2 / dist2) * cp2Distance;
-						const cp2y = dragStartPoint.y + (dy2 / dist2) * cp2Distance;
-						previewLineData = `M ${lastPoint.x} ${lastPoint.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${mousePosition.x} ${mousePosition.y}`;
-					} else {
-						previewLineData = `M ${lastPoint.x} ${lastPoint.y} L ${mousePosition.x} ${mousePosition.y}`;
-					}
-				} else {
-					previewLineData = `M ${lastPoint.x} ${lastPoint.y} L ${mousePosition.x} ${mousePosition.y}`;
-				}
-
-				previewGroup
-					.selectAll<SVGPathElement, { x: number; y: number }>('path.preview-line')
-					.data([mousePosition])
-					.join('path')
-					.attr('class', 'preview-line')
-					.attr('d', previewLineData)
-					.attr('stroke', defaultStyles.stroke)
-					.attr('stroke-width', defaultStyles.strokeWidth)
-					.attr('stroke-linecap', defaultStyles.strokeLinecap || 'round')
-					.attr('stroke-dasharray', '4 4')
-					.attr('fill', 'none')
-					.attr('opacity', (defaultStyles.opacity || 1) * 0.5)
-					.style('pointer-events', 'none');
-			} else {
-				previewGroup.selectAll('path.preview-line').remove();
-			}
-		} else {
-			svg.select('#PathPreview').remove();
-		}
 	}, [
 		geoAtlasData,
 		symbolData,
@@ -1003,13 +987,23 @@ export function MapPreview({
 		handleLabelPositionUpdate,
 		handleLabelClick,
 		handlePathPointUpdate,
-		isDrawing,
-		currentPath,
-		mousePosition,
-		isDragging,
-		dragStartPoint,
 		selectedPathId,
 	]);
+
+	// Path drawing preview — isolated so mouse moves don't rebuild the full map
+	useEffect(() => {
+		if (!svgRef.current) return;
+		const svg = d3.select(svgRef.current);
+		renderPathPreview({
+			svg,
+			isDrawing,
+			currentPath,
+			mousePosition,
+			isDragging,
+			dragStartPoint,
+			defaultPathStyles: stylingSettings.defaultPathStyles,
+		});
+	}, [isDrawing, currentPath, mousePosition, isDragging, dragStartPoint, stylingSettings.defaultPathStyles]);
 
 	useEffect(() => {
 		const handler = () => setIsExpanded(false);
@@ -1019,7 +1013,7 @@ export function MapPreview({
 
 	// Keyboard shortcuts for tool switching
 	useEffect(() => {
-		if (!isExpanded) return;
+		if (!mapVisible) return;
 
 		const handleKeyDown = (e: KeyboardEvent) => {
 			// Don't trigger shortcuts if user is typing in an input, textarea, or contenteditable element
@@ -1055,7 +1049,7 @@ export function MapPreview({
 		return () => {
 			window.removeEventListener('keydown', handleKeyDown);
 		};
-	}, [isExpanded]);
+	}, [mapVisible]);
 
 	const handleDownloadSVG = () => {
 		if (!svgRef.current) return;
@@ -1147,92 +1141,91 @@ export function MapPreview({
 
 	if (isLoading) {
 		return (
-			<Card className="w-full">
-				<CardHeader>
-					<CardTitle>Map Preview</CardTitle>
-				</CardHeader>
-				<CardContent>
+			<Card className="studio-panel-flat w-full h-full flex flex-col">
+				{!isHeroLayout ? (
+					<StudioExpandableHeader title="Map preview" isExpanded={true} onToggle={() => {}} collapsible={false} />
+				) : null}
+				<CardContent className="px-0 py-0 flex-1">
 					<div className="flex items-center justify-center h-64" role="status" aria-live="polite">
-						<div className="text-muted-foreground">Loading map data...</div>
+						<div className="text-sm text-muted-foreground">Loading map data…</div>
 					</div>
 				</CardContent>
 			</Card>
 		);
 	}
 
+	const mapHeaderActions = (
+		<TooltipProvider delayDuration={300}>
+			{onToggleFocusMode ? (
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Button
+							variant="outline"
+							size="sm"
+							className={studioHeaderIconButtonClass}
+							onClick={onToggleFocusMode}
+							aria-label={isFocusMode ? 'Exit focus mode' : 'Expand map preview'}>
+							{isFocusMode ? (
+								<Minimize2 className="h-4 w-4" aria-hidden />
+							) : (
+								<Maximize2 className="h-4 w-4" aria-hidden />
+							)}
+						</Button>
+					</TooltipTrigger>
+					<TooltipContent side="bottom">{isFocusMode ? 'Show inspector' : 'Focus map'}</TooltipContent>
+				</Tooltip>
+			) : null}
+			{!isHeroLayout ? (
+				<>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Button
+								variant="outline"
+								size="sm"
+								className={studioHeaderIconButtonClass}
+								onClick={handleCopySVG}
+								aria-label="Copy SVG to clipboard for use in Figma">
+								<Copy className="h-4 w-4" aria-hidden />
+							</Button>
+						</TooltipTrigger>
+						<TooltipContent side="bottom">Copy to Figma</TooltipContent>
+					</Tooltip>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Button
+								variant="outline"
+								size="sm"
+								className={studioHeaderIconButtonClass}
+								onClick={handleDownloadSVG}
+								aria-label="Download map as SVG file">
+								<Download className="h-4 w-4" aria-hidden />
+							</Button>
+						</TooltipTrigger>
+						<TooltipContent side="bottom">Download SVG</TooltipContent>
+					</Tooltip>
+				</>
+			) : null}
+		</TooltipProvider>
+	);
+
 	return (
-		<Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
-			<CardHeader
-				className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-4 px-6 rounded-t-xl relative"
-				onClick={() => setIsExpanded(!isExpanded)}
-				onKeyDown={(e) => {
-					if (e.key === 'Enter' || e.key === ' ') {
-						e.preventDefault();
-						setIsExpanded(!isExpanded);
-					}
-				}}
-				role="button"
-				tabIndex={0}
-				aria-expanded={isExpanded}
-				aria-controls={mapId}>
-				<div className="flex items-center justify-between">
-					<div className="flex items-center gap-2">
-						<CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">Map preview</CardTitle>
-					</div>
-					<div className="flex items-center gap-2">
-						<Button
-							variant="outline"
-							size="sm"
-							className={cn(
-								'flex items-center gap-2 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700',
-								'group'
-							)}
-							onClick={(e) => {
-								e.stopPropagation();
-								handleCopySVG();
-							}}
-							aria-label="Copy SVG to clipboard for use in Figma">
-							<Copy
-								className="h-3 w-3 transition-transform duration-300 group-hover:translate-x-1"
-								aria-hidden="true"
-							/>
-							<span className="sr-only">Copy to Figma</span>
-							<span aria-hidden="true">Copy to Figma</span>
-						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							className={cn(
-								'flex items-center gap-2 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700',
-								'group'
-							)}
-							onClick={(e) => {
-								e.stopPropagation();
-								handleDownloadSVG();
-							}}
-							aria-label="Download map as SVG file">
-							<Download
-								className="h-3 w-3 transition-transform duration-300 group-hover:translate-y-1"
-								aria-hidden="true"
-							/>
-							<span className="sr-only">Download SVG</span>
-							<span aria-hidden="true">Download SVG</span>
-						</Button>
-						{isExpanded ? (
-							<ChevronUp className="h-4 w-4" aria-hidden="true" />
-						) : (
-							<ChevronDown className="h-4 w-4" aria-hidden="true" />
-						)}
-					</div>
-				</div>
-			</CardHeader>
+		<Card className={cn('studio-panel-flat w-full h-full flex flex-col', mapVisible ? 'overflow-visible' : 'overflow-hidden')}>
+			{isHeroLayout ? null : (
+				<StudioExpandableHeader
+					title="Map preview"
+					isExpanded={mapVisible}
+					onToggle={() => setIsExpanded(!isExpanded)}
+					actions={mapHeaderActions}
+					collapsible={mapPanelCollapsible}
+				/>
+			)}
 			<CardContent
-				className={cn('transition-all duration-200', isExpanded ? 'pb-6 pt-2' : 'pb-0 h-0 overflow-hidden')}
+				className={cn('transition-all duration-200 p-0', mapVisible ? 'flex-1 min-h-0' : 'h-0 overflow-hidden')}
 				id={mapId}
-				aria-hidden={!isExpanded}>
+				aria-hidden={!mapVisible}>
 				<div
 					ref={mapContainerRef}
-					className="w-full border rounded-lg overflow-visible relative"
+					className="w-full h-full overflow-visible relative pr-14"
 					style={{
 						backgroundColor: stylingSettings.base.mapBackgroundColor,
 						userSelect: activeTool === 'move' || activeTool === 'draw' ? 'none' : 'auto',
@@ -1243,10 +1236,22 @@ export function MapPreview({
 						if (activeTool === 'move') {
 							e.preventDefault();
 						}
+					}}
+					onClick={(e) => {
+						if (activeTool !== 'select') return;
+						const target = e.target as Element;
+						if (target.closest('[data-label-id]') || target.closest('[data-path-id]')) return;
+						if (target.closest('svg')) {
+							setSelectedLabelId(null);
+							setSelectedPathId(null);
+						}
 					}}>
+					{isHeroLayout ? (
+						<div className="absolute top-3 right-3 z-50 flex items-center gap-1.5">{mapHeaderActions}</div>
+					) : null}
 					<svg
 						ref={svgRef}
-						className="w-full h-full"
+						className="relative z-0 w-full h-full"
 						role="img"
 						aria-label={mapSummary}
 						aria-describedby={`${mapId}-description`}
@@ -1259,7 +1264,7 @@ export function MapPreview({
 					<div id={`${mapId}-description`} className="sr-only">
 						{mapDescription}
 					</div>
-					{isExpanded && <MapControlBar activeTool={activeTool} onToolChange={setActiveTool} />}
+					{mapVisible && <MapControlBar activeTool={activeTool} onToolChange={setActiveTool} />}
 					<MapTooltip
 						x={tooltipState.x}
 						y={tooltipState.y}
@@ -1267,7 +1272,7 @@ export function MapPreview({
 						visible={tooltipState.visible}
 						svgElement={svgRef.current}
 					/>
-					{isExpanded && selectedLabelId && (
+					{mapVisible && !embedEditorsInSidebar && selectedLabelId && (
 						<LabelEditorToolbar
 							labelId={selectedLabelId}
 							onClose={() => {
@@ -1275,10 +1280,17 @@ export function MapPreview({
 							}}
 							stylingSettings={stylingSettings}
 							onUpdateStylingSettings={onUpdateStylingSettings || (() => {})}
-							mapType={selectedLabelId.startsWith('symbol-') ? 'symbol' : 'choropleth'}
+							mapType={resolveLabelMapType(selectedLabelId)}
+							dimensionSettings={dimensionSettings}
+							symbolData={symbolData}
+							choroplethData={choroplethData}
+							columnTypes={columnTypes}
+							columnFormats={columnFormats}
+							selectedGeography={selectedGeography}
+							variant="floating"
 						/>
 					)}
-					{isExpanded && selectedPathId && (
+					{mapVisible && !embedEditorsInSidebar && selectedPathId && (
 						<PathEditorToolbar
 							pathId={selectedPathId}
 							onClose={() => {
@@ -1286,6 +1298,7 @@ export function MapPreview({
 							}}
 							stylingSettings={stylingSettings}
 							onUpdateStylingSettings={onUpdateStylingSettings || (() => {})}
+							variant="floating"
 						/>
 					)}
 				</div>

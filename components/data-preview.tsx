@@ -13,6 +13,7 @@ import { MapPin, BarChart3, Hash, Type, Calendar, Flag, XCircle, Database, Loade
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { studioPanelClass, studioTabBarClass, studioTabButtonClass, studioHeaderActionButtonClass, studioHeaderIconButtonClass, StudioExpandableHeader, type StudioPanelVariant } from '@/components/studio-panel';
 
 interface DataPreviewProps {
 	data: (DataRow | GeocodedRow)[];
@@ -33,6 +34,7 @@ interface DataPreviewProps {
 	selectedGeography: string;
 	isExpanded: boolean;
 	setIsExpanded: (expanded: boolean) => void;
+	variant?: StudioPanelVariant | 'canvas';
 }
 
 interface ColumnType {
@@ -490,7 +492,9 @@ export function DataPreview({
 	selectedGeography,
 	isExpanded,
 	setIsExpanded,
+	variant = 'panel',
 }: DataPreviewProps) {
+	const isCanvas = variant === 'canvas';
 	const [inferredTypes, setInferredTypes] = useState<ColumnType>({});
 
 	// NEW: Enhanced tab logic - always show choropleth tab as active when custom map has choropleth data
@@ -511,10 +515,11 @@ export function DataPreview({
 	}, [mapType, choroplethDataExists]);
 
 	useEffect(() => {
+		if (isCanvas) return;
 		const handler = () => setIsExpanded(false);
 		window.addEventListener('collapse-all-panels', handler);
 		return () => window.removeEventListener('collapse-all-panels', handler);
-	}, []);
+	}, [isCanvas, setIsExpanded]);
 
 	const formatNumber = (value: any, format: string): string => {
 		if (value === null || value === undefined || value === '') return '';
@@ -1097,15 +1102,12 @@ export function DataPreview({
 			return (
 				<Tooltip>
 					<TooltipTrigger asChild>
-						<div className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-normal opacity-50 text-gray-500 dark:text-gray-400 transition-all duration-200">
+						<div className={studioTabButtonClass(actualIsActive, true)}>
 							{icon}
 							{label}
 						</div>
 					</TooltipTrigger>
-					<TooltipContent
-						side="bottom"
-						className="bg-black text-white border-black px-3 py-2 rounded-md shadow-lg text-xs font-medium z-50"
-						sideOffset={8}>
+					<TooltipContent side="bottom" className="text-xs" sideOffset={8}>
 						<p>{getTabTooltip(tab)}</p>
 					</TooltipContent>
 				</Tooltip>
@@ -1113,14 +1115,13 @@ export function DataPreview({
 		}
 
 		return (
-			<Button
-				variant={actualIsActive ? 'secondary' : 'ghost'}
-				size="sm"
-				className="px-3 py-1.5 text-xs font-normal hover:bg-gray-100 dark:hover:bg-gray-700 w-auto transition-colors duration-200 group"
+			<button
+				type="button"
+				className={studioTabButtonClass(actualIsActive)}
 				onClick={() => handleTabChange(tab)}>
 				{icon}
 				{label}
-			</Button>
+			</button>
 		);
 	};
 
@@ -1282,10 +1283,12 @@ export function DataPreview({
 	if (!data.length && !customDataLoaded) {
 		return (
 			<TooltipProvider>
-				<Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
-					<CardHeader className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-5 px-6 rounded-t-xl">
-						<CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">Data preview</CardTitle>
-					</CardHeader>
+				<Card className={cn(studioPanelClass, 'overflow-hidden')}>
+					<StudioExpandableHeader
+						title="Data preview"
+						isExpanded={false}
+						onToggle={() => {}}
+					/>
 					<CardContent className="px-6 pb-6">
 						<p className="text-gray-500 dark:text-gray-400 text-center min-h-[100px] flex items-center justify-center transition-colors duration-200">
 							No data to preview. Please load data first.
@@ -1298,158 +1301,61 @@ export function DataPreview({
 
 	const tableData = data;
 
+	const canvasToolbarActions = (
+		<>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<Button variant="ghost" size="icon" className={cn(studioHeaderIconButtonClass, 'border-0')} onClick={handleCopyData} aria-label="Copy data">
+						<Copy className="h-4 w-4" />
+					</Button>
+				</TooltipTrigger>
+				<TooltipContent side="bottom">Copy data</TooltipContent>
+			</Tooltip>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<Button variant="ghost" size="icon" className={cn(studioHeaderIconButtonClass, 'border-0')} onClick={handleDownloadData} aria-label="Download data">
+						<Download className="h-4 w-4" />
+					</Button>
+				</TooltipTrigger>
+				<TooltipContent side="bottom">Download data</TooltipContent>
+			</Tooltip>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<Button
+						variant="ghost"
+						size="icon"
+						className={cn(studioHeaderIconButtonClass, 'border-0 hover:!bg-destructive/10 hover:!text-destructive')}
+						onClick={handleClearData}
+						aria-label="Clear data">
+						<Trash2 className="h-4 w-4" />
+					</Button>
+				</TooltipTrigger>
+				<TooltipContent side="bottom">
+					Clear {mapType === 'custom' && choroplethDataExists ? 'choropleth' : mapType} data
+				</TooltipContent>
+			</Tooltip>
+		</>
+	);
+
 	return (
 		<TooltipProvider>
-			<Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
-				<CardHeader
-					className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-4 px-6 rounded-t-xl relative"
-					onClick={() => setIsExpanded(!isExpanded)}>
-					<div className="flex items-center justify-between">
-						<div className="flex items-center gap-2">
-							<CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">
-								Data preview
-							</CardTitle>
-							{symbolDataLength > 0 && (
-								<Badge
-									variant="secondary"
-									className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 transition-colors duration-200 animate-in fade-in-50 slide-in-from-left-2">
-									{symbolDataLength} rows (Symbol)
-								</Badge>
-							)}
-							{choroplethDataLength > 0 && (
-								<Badge
-									variant="secondary"
-									className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 transition-colors duration-200 animate-in fade-in-50 slide-in-from-left-2">
-									{choroplethDataLength} rows (Choropleth)
-								</Badge>
-							)}
-							{customDataLoaded && (
-								<Badge
-									variant="secondary"
-									className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 transition-colors duration-200 animate-in fade-in-50 slide-in-from-left-2">
-									Custom map loaded
-								</Badge>
-							)}
+			{isCanvas ? (
+				<div className="flex h-full min-h-0 flex-col">
+					<div className="flex items-center justify-between gap-2 border-b border-border px-2 py-2">
+						<div className={studioTabBarClass}>
+							{renderTabButton('symbol', <MapPin className="w-3 h-3" />, 'Symbol map', internalActiveTab === 'symbol')}
+							{renderTabButton('choropleth', <BarChart3 className="w-3 h-3" />, 'Choropleth', internalActiveTab === 'choropleth')}
 						</div>
-						<div className="flex items-center gap-2">
-							<Button
-								variant="outline"
-								size="sm"
-								className={cn(
-									'flex items-center gap-2 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700',
-									'group'
-								)}
-								onClick={(e) => {
-									e.stopPropagation();
-									handleCopyData();
-								}}>
-								<Copy className="h-3 w-3 transition-transform duration-300 group-hover:translate-x-1" />
-								Copy data
-							</Button>
-							<Button
-								variant="outline"
-								size="sm"
-								className={cn(
-									'flex items-center gap-2 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700',
-									'group'
-								)}
-								onClick={(e) => {
-									e.stopPropagation();
-									handleDownloadData();
-								}}>
-								<Download className="h-3 w-3 transition-transform duration-300 group-hover:translate-y-1" />
-								Download data
-							</Button>
-							<div className="transform transition-transform duration-200 ease-in-out">
-								{isExpanded ? (
-									<ChevronUp className="h-4 w-4 text-gray-600 dark:text-gray-400 transition-colors duration-200" />
-								) : (
-									<ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400 transition-colors duration-200" />
-								)}
-							</div>
-						</div>
+						<div className="flex items-center gap-0.5">{canvasToolbarActions}</div>
 					</div>
-				</CardHeader>
-
-				<div
-					className={`transition-all duration-300 ease-in-out ${
-						isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'
-					} overflow-hidden`}>
-					<CardContent className="space-y-4 px-6 pb-6 pt-2">
-						<div className="inline-flex h-auto items-center justify-start gap-2 bg-transparent p-0">
-							{renderTabButton(
-								'symbol',
-								<MapPin className="w-3 h-3 mr-1.5 transition-transform duration-300 group-hover:translate-y-0.5" />,
-								'Symbol map',
-								internalActiveTab === 'symbol'
-							)}
-
-							{renderTabButton(
-								'choropleth',
-								<BarChart3 className="w-3 h-3 mr-1.5 transition-transform duration-300 group-hover:translate-y-0.5" />,
-								'Choropleth',
-								internalActiveTab === 'choropleth'
-							)}
-						</div>
-
-						<div className="flex items-center justify-between">
-							<div className="flex items-center gap-2">
-								<BarChart3 className="w-4 h-4 text-gray-600 dark:text-gray-400 transition-colors duration-200" />
-								<span className="text-sm font-medium text-gray-900 dark:text-white">Data preview</span>
-								<Badge
-									variant="secondary"
-									className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 transition-colors duration-200">
-									({data.length} rows, {columns.length} columns)
-								</Badge>
-							</div>
-							<Tooltip>
-								<TooltipTrigger asChild>
-									<Button
-										variant="outline"
-										size="sm"
-										className={cn(
-											'flex items-center gap-2 transition-colors duration-200 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 hover:border-red-200 dark:hover:border-red-800',
-											'group'
-										)}
-										onClick={handleClearData}>
-										<Trash2 className="w-3 h-3 transition-transform duration-300 group-hover:rotate-3" />
-										Clear data
-									</Button>
-								</TooltipTrigger>
-								<TooltipContent side="left" className="max-w-xs">
-									<p className="font-medium">
-										Clear {mapType === 'custom' && choroplethDataExists ? 'choropleth' : mapType} data
-									</p>
-									<p className="text-gray-600 dark:text-gray-400 mt-1">
-										This will clear only the{' '}
-										{mapType === 'custom' && choroplethDataExists
-											? 'choropleth'
-											: mapType === 'symbol'
-											? 'symbol map'
-											: mapType === 'choropleth'
-											? 'choropleth'
-											: 'custom map'}{' '}
-										data
-									</p>
-								</TooltipContent>
-							</Tooltip>
-						</div>
-
-						{/* Render the table only if mapType is 'symbol' or 'choropleth', or if custom map with choropleth data */}
-						{(mapType === 'symbol' || mapType === 'choropleth' || (mapType === 'custom' && choroplethDataExists)) && (
-							<div
-								className="overflow-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg relative animate-in fade-in-50 slide-in-from-bottom-2 duration-300"
-								style={{
-									maxHeight: `${calculateTableHeight()}px`,
-								}}>
-								<table className="w-full min-w-full font-mono text-sm">
-									<thead className="sticky top-0 z-20 bg-white dark:bg-gray-800">
-										<tr className="bg-gray-100 dark:bg-gray-600 shadow-sm">
+					<div className="studio-data-preview-scroll">
+						<table className="studio-data-preview-table w-full min-w-full font-mono text-sm">
+									<thead className="sticky top-0 z-20 bg-background">
+										<tr className="bg-muted">
 											<th
-												className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 border-r border-gray-200 dark:border-gray-500 border-b border-gray-200 dark:border-gray-500 transition-colors duration-200 bg-gray-100 dark:bg-gray-600 sticky left-0 z-20 shadow-r"
+												className="studio-data-preview-index px-3 py-2 text-left text-xs font-medium text-muted-foreground border-r border-b border-border"
 												style={{
 													width: calculateRowNumberColumnWidth(),
-													boxShadow: '2px 0 4px rgba(0, 0, 0, 0.1)',
 												}}></th>
 											{columns.map((column, index) => {
 												const columnType = columnTypes[column] || inferredTypes[column] || 'text';
@@ -1457,10 +1363,10 @@ export function DataPreview({
 												return (
 													<th
 														key={column}
-														className="px-3 py-2 text-left border-r border-gray-200 dark:border-gray-500 border-b border-gray-200 dark:border-gray-500 last:border-r transition-colors duration-200 relative z-20 bg-gray-100 dark:bg-gray-600"
+														className="px-3 py-2 text-left border-r border-b border-border last:border-r relative z-20 bg-muted"
 														style={{ width: calculateColumnWidth(column, index), maxWidth: '200px' }}>
 														<div className="flex items-center justify-between">
-															<span className="text-xs font-medium text-gray-500 dark:text-gray-400 mr-4">
+															<span className="text-xs font-medium text-muted-foreground mr-4">
 																{getColumnLetter(index)}
 															</span>
 															<div className="relative z-30">
@@ -1572,17 +1478,16 @@ export function DataPreview({
 												);
 											})}
 										</tr>
-										<tr className="bg-gray-75 dark:bg-gray-650 shadow-sm">
+										<tr className="bg-background">
 											<th
-												className="px-3 py-2 text-left text-xs font-bold text-black dark:text-white border-r border-gray-200 dark:border-gray-500 border-b-2 border-gray-300 dark:border-gray-500 transition-colors duration-200 sticky left-0 z-20 shadow-r"
+												className="studio-data-preview-index px-3 py-2 text-left text-xs font-semibold text-foreground border-r border-b border-border bg-background"
 												style={{
 													width: calculateRowNumberColumnWidth(),
-													boxShadow: '2px 0 4px rgba(0, 0, 0, 0.1)',
 												}}></th>
 											{columns.map((column, index) => (
 												<th
 													key={column}
-													className="px-3 py-2 text-left text-xs font-bold text-black dark:text-white border-r border-gray-200 dark:border-gray-500 border-b-2 border-gray-300 dark:border-gray-500 last:border-r transition-colors duration-200 truncate z-20"
+													className="px-3 py-2 text-left text-xs font-semibold text-foreground border-r border-b border-border last:border-r truncate z-20 bg-background"
 													style={{
 														width: calculateColumnWidth(column, index),
 														maxWidth: '200px',
@@ -1593,20 +1498,13 @@ export function DataPreview({
 											))}
 										</tr>
 									</thead>
-									<tbody className="bg-white dark:bg-gray-800 transition-colors duration-200 relative z-10">
+									<tbody className="relative z-10 h-full bg-background">
 										{tableData.map((row, rowIndex) => (
-											<tr
-												key={rowIndex}
-												className={`transition-colors duration-150 ${
-													rowIndex % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-900'
-												}`}>
+											<tr key={rowIndex} className="bg-background hover:bg-muted/20">
 												<td
-													className={`px-3 py-2 text-xs text-gray-500 dark:text-gray-400 border-r border-gray-200 dark:border-gray-500 border-b border-gray-200 dark:border-gray-700 transition-colors duration-200 sticky left-0 z-20 font-medium shadow-r ${
-														rowIndex % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-900'
-													}`}
+													className="studio-data-preview-index px-3 py-2 text-xs text-muted-foreground border-r border-b border-border font-medium"
 													style={{
 														width: calculateRowNumberColumnWidth(),
-														boxShadow: '2px 0 4px rgba(0, 0, 0, 0.05)',
 													}}>
 													<div className="flex items-center gap-2">
 														<span>{rowIndex + 1}</span>
@@ -1616,7 +1514,7 @@ export function DataPreview({
 												{columns.map((column, colIndex) => (
 													<td
 														key={column}
-														className="px-3 py-2 text-xs border-r border-gray-200 dark:border-gray-500 border-b border-gray-200 dark:border-gray-700 last:border-r transition-colors duration-200 whitespace-nowrap text-gray-900 dark:text-gray-100 relative z-10"
+														className="px-3 py-2 text-xs border-r border-b border-border last:border-r whitespace-nowrap text-foreground relative z-10"
 														style={{
 															width: calculateColumnWidth(column, colIndex),
 															maxWidth: '200px',
@@ -1629,15 +1527,29 @@ export function DataPreview({
 												))}
 											</tr>
 										))}
+									{hasFormattableColumns() && (
+										<tr aria-hidden="true" className="studio-data-preview-spacer h-full">
+											<td
+												className="studio-data-preview-index border-r border-border"
+												style={{ width: calculateRowNumberColumnWidth() }}
+											/>
+											{columns.map((column, index) => (
+												<td
+													key={column}
+													className="border-r border-border last:border-r"
+													style={{ width: calculateColumnWidth(column, index), maxWidth: '200px' }}
+												/>
+											))}
+										</tr>
+									)}
 									</tbody>
 									{hasFormattableColumns() && (
-										<tfoot className="sticky bottom-0 z-30">
-											<tr className="bg-gray-100 dark:bg-gray-600 shadow-sm border-t-2 border-gray-300 dark:border-gray-500">
+										<tfoot className="sticky bottom-0 z-30 bg-muted">
+											<tr>
 												<td
-													className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 border-r border-gray-200 dark:border-gray-500 transition-colors duration-200 bg-gray-100 dark:bg-gray-600 sticky left-0 z-20 shadow-r"
+													className="studio-data-preview-index px-3 py-2 text-left text-xs font-medium text-muted-foreground border-r border-t border-border"
 													style={{
 														width: calculateRowNumberColumnWidth(),
-														boxShadow: '2px 0 4px rgba(0, 0, 0, 0.1)',
 													}}></td>
 												{columns.map((column, index) => {
 													const columnType = columnTypes[column] || inferredTypes[column] || 'text';
@@ -1646,7 +1558,7 @@ export function DataPreview({
 													return (
 														<td
 															key={column}
-															className="px-3 py-2 text-left border-r border-gray-200 dark:border-gray-500 last:border-r transition-colors duration-200 relative z-20 bg-gray-100 dark:bg-gray-600"
+															className="px-3 py-2 text-left border-r border-t border-border last:border-r relative z-20 bg-muted"
 															style={{ width: calculateColumnWidth(column, index), maxWidth: '200px' }}>
 															{needsFormatting && (
 																<div className="relative z-30">
@@ -1724,24 +1636,9 @@ export function DataPreview({
 										</tfoot>
 									)}
 								</table>
-							</div>
-						)}
-
-						{/* Render the custom map message only if mapType is 'custom' and no choropleth data */}
-						{mapType === 'custom' && !choroplethDataExists && (
-							<div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-800 transition-colors duration-200 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
-								<div className="flex items-center gap-2 mb-2">
-									<MapPin className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-									<span className="text-sm font-medium text-gray-900 dark:text-white">Custom SVG Map</span>
-								</div>
-								<p className="text-sm text-gray-600 dark:text-gray-300">
-									Custom map data has been loaded successfully. The SVG content is ready for visualization.
-								</p>
-							</div>
-						)}
-					</CardContent>
+					</div>
 				</div>
-			</Card>
+			) : null}
 		</TooltipProvider>
 	);
 }

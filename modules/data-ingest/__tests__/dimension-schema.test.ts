@@ -23,7 +23,8 @@ describe('resetDimensionForMapType', () => {
       colorMidColor: '#ccc',
       colorMaxColor: '#000',
       categoricalColors: [],
-      labelTemplate: ''
+      labelTemplate: '',
+      symbolTextBy: '',
     },
     choropleth: {
       stateColumn: 'state',
@@ -37,7 +38,7 @@ describe('resetDimensionForMapType', () => {
       colorMidColor: '#fb6a4a',
       colorMaxColor: '#cb181d',
       categoricalColors: [],
-      labelTemplate: ''
+      labelTemplate: '',
     },
     custom: {
       stateColumn: 'region',
@@ -51,7 +52,7 @@ describe('resetDimensionForMapType', () => {
       colorMidColor: '#000',
       colorMaxColor: '#000',
       categoricalColors: [],
-      labelTemplate: ''
+      labelTemplate: '',
     },
     selectedGeography: 'usa-states'
   }

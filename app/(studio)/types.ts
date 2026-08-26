@@ -79,6 +79,7 @@ export interface SymbolDimensionSettings {
 	colorMaxColor: string;
 	categoricalColors: CategoricalColor[];
 	labelTemplate: string;
+	symbolTextBy: string; // '' = off, '$n' = display-order row number, else column name
 }
 
 export interface ChoroplethDimensionSettings {
@@ -103,12 +104,38 @@ export interface DimensionSettings {
 	selectedGeography: GeographyKey;
 }
 
+export type SymbolLabelAlignment =
+	| 'auto'
+	| 'top-left'
+	| 'top-center'
+	| 'top-right'
+	| 'middle-left'
+	| 'center'
+	| 'middle-right'
+	| 'bottom-left'
+	| 'bottom-center'
+	| 'bottom-right';
+
+export interface SymbolTextStyling {
+	fontFamily: string;
+	fontBold: boolean;
+	fontItalic: boolean;
+	fontSize: number;
+	color: string;
+	outlineColor: string;
+	outlineThickness: number;
+	offsetX: number;
+	offsetY: number;
+	scaleWithSymbol: boolean;
+}
+
 export interface IndividualLabelOverride {
 	id: string; // Unique identifier: "symbol-{index}" or "choropleth-{featureId}"
 	x?: number; // Override x position (SVG coordinates)
 	y?: number; // Override y position (SVG coordinates)
 	offsetX?: number; // Per-label x offset in pixels
 	offsetY?: number; // Per-label y offset in pixels
+	labelAlignment?: SymbolLabelAlignment; // Per-label positional alignment (symbol labels)
 	fontFamily?: string;
 	fontStyle?: 'normal' | 'italic';
 	fontWeight?: 'normal' | 'bold';
@@ -119,6 +146,7 @@ export interface IndividualLabelOverride {
 	stroke?: string;
 	strokeWidth?: number;
 	textDecoration?: string; // For underline/strikethrough: 'underline', 'line-through', 'underline line-through', or ''
+	text?: string; // Per-label display text override (plain text; newlines allowed)
 }
 
 export interface PathPoint {
@@ -195,18 +223,9 @@ export interface StylingSettings {
 		labelOutlineThickness: number;
 		labelOffsetX: number;
 		labelOffsetY: number;
-		labelAlignment:
-			| 'auto'
-			| 'top-left'
-			| 'top-center'
-			| 'top-right'
-			| 'middle-left'
-			| 'center'
-			| 'middle-right'
-			| 'bottom-left'
-			| 'bottom-center'
-			| 'bottom-right';
+		labelAlignment: SymbolLabelAlignment;
 		customSvgPath?: string;
+		symbolText?: SymbolTextStyling;
 	};
 	choropleth: {
 		labelFontFamily: string;

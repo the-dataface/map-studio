@@ -7,14 +7,19 @@ import { Input } from '@/components/ui/input';
 import { ChromeColorPicker } from './chrome-color-picker';
 import { cn, normalizeColorInput } from '@/lib/utils';
 import { ColorContrastChecker } from './color-contrast-checker';
+import type { ContrastUseCase } from '@/lib/accessibility/contrast-context';
+import type { DimensionSettings, StylingSettings } from '@/app/(studio)/types';
 
 interface ColorInputProps {
 	value: string;
 	onChange: (value: string) => void;
 	className?: string;
-	backgroundColor?: string; // Background color for contrast checking
-	showContrastCheck?: boolean; // Whether to show contrast checker
-	isLargeText?: boolean; // Whether this is large text (for contrast requirements)
+	backgroundColor?: string;
+	showContrastCheck?: boolean;
+	isLargeText?: boolean;
+	contrastUseCase?: ContrastUseCase;
+	stylingSettings?: StylingSettings;
+	dimensionSettings?: DimensionSettings;
 }
 
 export function ColorInput({
@@ -24,6 +29,9 @@ export function ColorInput({
 	backgroundColor,
 	showContrastCheck = false,
 	isLargeText = false,
+	contrastUseCase,
+	stylingSettings,
+	dimensionSettings,
 }: ColorInputProps) {
 	const [inputValue, setInputValue] = useState(value);
 	const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -182,10 +190,13 @@ export function ColorInput({
 				/>
 			</div>
 
-			{showContrastCheck && backgroundColor && (
+			{showContrastCheck && (backgroundColor || contrastUseCase) && (
 				<ColorContrastChecker
 					foreground={inputValue}
 					background={backgroundColor}
+					contrastUseCase={contrastUseCase}
+					stylingSettings={stylingSettings}
+					dimensionSettings={dimensionSettings}
 					isLargeText={isLargeText}
 					onColorSelect={handleSuggestedColorSelect}
 				/>
