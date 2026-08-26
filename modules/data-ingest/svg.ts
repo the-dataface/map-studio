@@ -72,37 +72,57 @@ export const validateCustomSVG = (svgString: string): { isValid: boolean; messag
     }
 
     const nationsGroup = mapGroup.querySelector('g#Nations, g#Countries')
-    if (!nationsGroup) {
-      return {
-        isValid: false,
-        message: "Missing required <g id='Nations'> or <g id='Countries'> group inside #Map.",
-      }
-    }
+    // Nations/Countries group is optional — flat SVGs with only region paths are valid
 
     const statesGroup = mapGroup.querySelector('g#States, g#Provinces, g#Regions')
-    if (!statesGroup) {
-      return {
-        isValid: false,
-        message: "Missing required <g id='States'>, <g id='Provinces'>, or <g id='Regions'> group inside #Map.",
-      }
-    }
-
-    const countryUSPath = nationsGroup.querySelector('path#Country-US, path#Nation-US')
-    if (!countryUSPath) {
-      return {
-        isValid: false,
-        message: "Missing required <path id='Country-US'> or <path id='Nation-US'> inside Nations/Countries group.",
-      }
-    }
-
-    const statePaths = statesGroup.querySelectorAll(
-      "path[id^='State-'], path[id^='Nation-'], path[id^='Country-'], path[id^='Province-'], path[id^='Region-']",
+    const flatPaths = mapGroup.querySelectorAll(
+      "path[id^='State-'], path[id^='Nation-'], path[id^='Country-'], path[id^='Province-'], path[id^='Region-'], path[id]",
     )
-    if (statePaths.length === 0) {
+
+    if (!statesGroup && flatPaths.length === 0) {
       return {
         isValid: false,
         message:
-          "No <path id='State-XX'>, <path id='Nation-XX'>, <path id='Country-XX'>, <path id='Province-XX'>, or <path id='Region-XX'> elements found inside States/Provinces/Regions group.",
+          "No mappable paths found. Add a <g id='States'> group with <path id='State-XX'> elements, or paths with id attributes directly inside #Map.",
+      }
+    }
+
+    const regionPaths = statesGroup
+      ? statesGroup.querySelectorAll(
+          "path[id^='State-'], path[id^='Nation-'], path[id^='Country-'], path[id^='Province-'], path[id^='Region-'], path[id]",
+        )
+      : flatPaths
+
+    if (regionPaths.length === 0) {
+      return {
+        isValid: false,
+        message:
+          "No region paths found. Use ids like State-CA, Province-ON, or Region-XX, or any path with an id attribute.",
+      }
+    }
+
+    // Country path is optional (only required when Nations group is present)
+    if (nationsGroup) {
+      const countryUSPath = nationsGroup.querySelector('path#Country-US, path#Nation-US')
+      if (!countryUSPath) {
+        return {
+          isValid: false,
+          message:
+            "When a Nations/Countries group is present, include <path id='Country-US'> or <path id='Nation-US'>.",
+        }
+      }
+    }
+
+    if (statesGroup) {
+      const statePaths = statesGroup.querySelectorAll(
+        "path[id^='State-'], path[id^='Nation-'], path[id^='Country-'], path[id^='Province-'], path[id^='Region-'], path[id]",
+      )
+      if (statePaths.length === 0) {
+        return {
+          isValid: false,
+          message:
+            "No <path id='State-XX'> (or similar) elements found inside States/Provinces/Regions group.",
+        }
       }
     }
 

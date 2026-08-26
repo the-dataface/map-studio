@@ -4,58 +4,62 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 47% 11%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 97%;
-    --secondary-foreground: 222.2 47% 11%;
-    --muted: 210 40% 96.5%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.5%;
-    --accent-foreground: 222.2 47% 11%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 92%;
-    --input: 214.3 31.8% 92%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.625rem;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    /* Warm natural palette — calm editorial chrome */
+    --background: 40 33% 97%;
+    --foreground: 25 15% 15%;
+    --card: 40 33% 97%;
+    --card-foreground: 25 15% 15%;
+    --popover: 40 33% 99%;
+    --popover-foreground: 25 15% 15%;
+    --primary: 22 55% 45%;
+    --primary-foreground: 40 33% 98%;
+    --secondary: 35 20% 93%;
+    --secondary-foreground: 25 15% 20%;
+    --muted: 35 18% 92%;
+    --muted-foreground: 25 8% 46%;
+    --accent: 35 22% 90%;
+    --accent-foreground: 25 15% 15%;
+    --destructive: 0 65% 48%;
+    --destructive-foreground: 40 33% 98%;
+    --border: 35 14% 86%;
+    --input: 35 14% 86%;
+    --ring: 22 55% 45%;
+    --radius: 0rem;
+    --studio-header-height: 3rem;
+    --studio-panel-header-height: 3rem;
+    --studio-tab-row-height: 3.25rem;
+    --chart-1: 22 55% 45%;
+    --chart-2: 145 35% 38%;
+    --chart-3: 35 30% 55%;
+    --chart-4: 12 60% 52%;
+    --chart-5: 200 25% 45%;
   }
 
   .dark {
-    --background: 222.2 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 47% 11%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 47% 11%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47% 11%;
-    --secondary: 217.2 32.6% 18%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 18%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 18%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 18%;
-    --input: 217.2 32.6% 18%;
-    --ring: 224.3 76.3% 94.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --background: 25 12% 10%;
+    --foreground: 40 20% 92%;
+    --card: 25 12% 10%;
+    --card-foreground: 40 20% 92%;
+    --popover: 25 12% 12%;
+    --popover-foreground: 40 20% 92%;
+    --primary: 28 50% 55%;
+    --primary-foreground: 25 12% 10%;
+    --secondary: 25 10% 16%;
+    --secondary-foreground: 40 20% 92%;
+    --muted: 25 10% 16%;
+    --muted-foreground: 35 8% 58%;
+    --accent: 25 10% 18%;
+    --accent-foreground: 40 20% 92%;
+    --destructive: 0 55% 42%;
+    --destructive-foreground: 40 20% 92%;
+    --border: 25 8% 20%;
+    --input: 25 8% 20%;
+    --ring: 28 50% 55%;
+    --chart-1: 28 50% 55%;
+    --chart-2: 145 30% 45%;
+    --chart-3: 35 25% 50%;
+    --chart-4: 12 55% 48%;
+    --chart-5: 200 20% 50%;
   }
 }
 
@@ -64,110 +68,367 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-foreground antialiased font-sans;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
-  
-  /* Smooth scrolling */
+
   html {
     scroll-behavior: smooth;
   }
-  
-  /* Better focus styles */
+
   :focus-visible {
-    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+    @apply outline-none ring-1 ring-ring ring-offset-1 ring-offset-background;
+  }
+}
+
+@layer components {
+  /*
+   * Studio grid — page stays background-colored; panels get a single top border only
+   */
+  .studio-grid {
+    @apply min-h-[calc(100vh-var(--studio-header-height))] border-b border-border bg-background;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .studio-panel-flat,
+  .studio-panel-class {
+    @apply bg-background rounded-none;
+    border-left: 0 !important;
+    border-right: 0 !important;
+    border-bottom: 0 !important;
+    box-shadow: none !important;
+    /* top border kept — acts as stack divider between panels */
+  }
+
+  .studio-grid > *:first-child {
+    border-top: 0 !important;
+  }
+
+  /* Data mode — left sidebar + preview canvas (Figma-style) */
+  .studio-data-view {
+    @apply h-full w-full overflow-hidden bg-background;
+  }
+
+  .studio-data-shell {
+    display: grid;
+    grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .studio-data-sidebar {
+    @apply min-h-0 min-w-0 bg-background border-r border-border overflow-y-auto scrollbar-thin;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .studio-data-sidebar > *,
+  .studio-design-inspector > * {
+    flex-shrink: 0;
+  }
+
+  .studio-design-inspector > .studio-map-editor-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    flex-shrink: 1;
+  }
+
+  .studio-data-sidebar > *:first-child {
+    border-top: 0 !important;
+  }
+
+  .studio-data-sidebar > *:last-child,
+  .studio-design-inspector > *:last-child {
+    border-bottom: 1px solid hsl(var(--border)) !important;
+  }
+
+  /* Sticky panel headers — fully opaque so content never bleeds through */
+  .studio-data-sidebar .studio-panel-flat,
+  .studio-design-inspector .studio-panel-flat,
+  .studio-design-inspector .studio-inspector-block {
+    overflow: visible;
+  }
+
+  .studio-data-sidebar .studio-panel-sticky-header,
+  .studio-design-inspector .studio-panel-sticky-header {
+    position: sticky;
+    top: 0;
+    z-index: 11;
+    background-color: hsl(var(--background)) !important;
+  }
+
+  .studio-data-sidebar .studio-panel-sticky-header[aria-expanded='true'],
+  .studio-design-inspector .studio-panel-sticky-header[aria-expanded='true'] {
+    background-color: color-mix(in srgb, hsl(var(--muted)) 18%, hsl(var(--background))) !important;
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  .studio-data-sidebar .studio-panel-sticky-header:hover,
+  .studio-design-inspector .studio-panel-sticky-header:hover {
+    background-color: color-mix(in srgb, hsl(var(--muted)) 30%, hsl(var(--background))) !important;
+  }
+
+  /* No top border on expanded body — divider lives on the header instead */
+  .studio-data-sidebar .studio-panel-flat [aria-expanded='true'] + .studio-panel-expand-body,
+  .studio-design-inspector .studio-panel-flat [aria-expanded='true'] + .studio-panel-expand-body,
+  .studio-design-inspector .studio-inspector-block [aria-expanded='true'] + .studio-inspector-body {
+    border-top: 0 !important;
+  }
+
+  /* Tab row sticks below panel header (dimension mapping, etc.) */
+  .studio-data-sidebar .studio-inspector-tab-row,
+  .studio-design-inspector .studio-inspector-tab-row {
+    position: sticky;
+    top: var(--studio-panel-header-height);
+    z-index: 10;
+    background-color: hsl(var(--background)) !important;
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  /* Sub-section headers stick below panel header (+ tab row when present) */
+  .studio-data-sidebar .studio-inspector-section-header,
+  .studio-design-inspector .studio-inspector-section-header {
+    position: sticky;
+    top: var(--studio-panel-header-height);
+    z-index: 9;
+    background-color: hsl(var(--background)) !important;
+    border-bottom-color: hsl(var(--border) / 0.25);
+  }
+
+  .studio-data-sidebar .studio-inspector-body:has(.studio-inspector-tab-row) .studio-inspector-section-header,
+  .studio-design-inspector .studio-inspector-body:has(.studio-inspector-tab-row) .studio-inspector-section-header {
+    top: calc(var(--studio-panel-header-height) + var(--studio-tab-row-height));
+  }
+
+  .studio-data-canvas {
+    @apply min-h-0 min-w-0 flex flex-col bg-background overflow-hidden;
+  }
+
+  .studio-data-canvas-preview {
+    @apply flex min-h-0 flex-1 flex-col overflow-hidden;
+  }
+
+  .studio-data-preview-scroll {
+    @apply min-h-0 flex-1 overflow-auto scrollbar-thin;
+  }
+
+  .studio-data-preview-table {
+    min-height: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .studio-data-preview-table tbody {
+    height: 100%;
+  }
+
+  .studio-data-preview-table tbody .studio-data-preview-spacer td {
+    height: 100%;
+    padding: 0;
+    vertical-align: top;
+    background-color: hsl(var(--background));
+  }
+
+  .studio-data-preview-table .studio-data-preview-index {
+    position: sticky;
+    left: 0;
+    z-index: 30;
+    background-color: hsl(var(--background));
+  }
+
+  .studio-data-preview-table thead .studio-data-preview-index {
+    z-index: 40;
+  }
+
+  .studio-data-preview-table thead tr:first-child .studio-data-preview-index {
+    background-color: hsl(var(--muted));
+  }
+
+  .studio-data-preview-table tfoot .studio-data-preview-index {
+    z-index: 40;
+    background-color: hsl(var(--muted));
+  }
+
+  .studio-data-canvas .studio-panel-flat {
+    border: 0 !important;
+    @apply rounded-none;
+  }
+
+  .studio-data-canvas-hint {
+    @apply shrink-0;
+  }
+
+  /* Design mode — map hero + right inspector (Figma-style) */
+  .studio-design-view {
+    @apply h-full w-full overflow-hidden bg-background;
+  }
+
+  .studio-design-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .studio-design-shell-focus {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .studio-design-shell > * {
+    min-height: 0;
+  }
+
+  .studio-design-map {
+    @apply relative min-h-0 min-w-0 flex flex-col overflow-visible bg-background;
+  }
+
+  .studio-design-map > * {
+    @apply flex-1 min-h-0;
+  }
+
+  .studio-design-map .studio-panel-flat {
+    border: 0 !important;
+    @apply rounded-none;
+  }
+
+  .studio-design-inspector {
+    @apply min-h-0 min-w-0 bg-background border-l border-border overflow-y-auto overflow-x-hidden scrollbar-thin;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Inspector panels — constrain width without breaking sticky or row layouts */
+  .studio-design-inspector .studio-inspector-body {
+    @apply min-w-0;
+  }
+
+  .studio-design-inspector .studio-inspector-section-content {
+    @apply min-w-0 overflow-x-hidden;
+  }
+
+  /* Expanded panel bodies grow naturally — sidebar scrolls instead of clipping */
+  .studio-data-sidebar [aria-expanded='true'] + .studio-panel-expand-body,
+  .studio-design-inspector [aria-expanded='true'] + .studio-panel-expand-body {
+    max-height: none !important;
+  }
+
+  .studio-data-sidebar .studio-inspector-section-content label,
+  .studio-design-inspector .studio-inspector-section-content label,
+  .studio-data-sidebar .studio-panel-expand-body label,
+  .studio-design-inspector .studio-inspector-body label {
+    @apply text-xs font-normal text-foreground;
+  }
+
+  /* Stack side-by-side field grids in the narrow inspector — not categorical row grids */
+  .studio-design-inspector .studio-inspector-section-content .grid.grid-cols-2,
+  .studio-design-inspector .studio-inspector-section-content .grid.grid-cols-3,
+  .studio-design-inspector .studio-inspector-section-content .grid[class*='sm:grid-cols-2'],
+  .studio-design-inspector .studio-inspector-section-content .grid[class*='md:grid-cols-'] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  /* Preserve 3×3 alignment control layout in the narrow inspector */
+  .studio-design-inspector .studio-alignment-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    width: 100%;
+  }
+
+  .studio-design-inspector .studio-inspector-section-content input,
+  .studio-design-inspector .studio-inspector-section-content button[role='combobox'],
+  .studio-design-inspector .studio-inspector-section-content [data-radix-select-trigger] {
+    max-width: 100%;
+  }
+
+  .studio-design-inspector .studio-panel-flat,
+  .studio-design-inspector > .studio-inspector-block {
+    border-top: 0 !important;
+  }
+
+  .studio-design-inspector > .studio-inspector-block + .studio-inspector-block {
+    border-top: 1px solid hsl(var(--border)) !important;
+  }
+
+  .studio-inspector-block .studio-panel-flat,
+  .studio-inspector-block {
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .studio-inspector-group + .studio-inspector-group .studio-inspector-group-title {
+    @apply border-t-0;
+  }
+
+  /* Subtle divider between expanded panel header and body (non-sidebar panels only) */
+  .studio-panel-flat [aria-expanded='true'] + * {
+    border-top: 1px solid hsl(var(--border) / 0.45);
+  }
+
+  .studio-data-sidebar .studio-panel-flat [aria-expanded='true'] + *,
+  .studio-design-inspector .studio-panel-flat [aria-expanded='true'] + *,
+  .studio-design-inspector .studio-inspector-block [aria-expanded='true'] + * {
+    border-top: 0 !important;
+  }
+
+  @media (max-width: 1023px) {
+    .studio-data-shell {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 38vh) minmax(280px, 1fr);
+      height: auto;
+      min-height: calc(100vh - var(--studio-header-height, 3rem));
+    }
+
+    .studio-data-sidebar {
+      @apply border-r-0 border-b border-border;
+      max-height: 38vh;
+    }
+
+    .studio-data-canvas {
+      min-height: 280px;
+    }
+
+    .studio-design-shell {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(280px, 45vh) minmax(0, 1fr);
+      height: auto;
+      min-height: calc(100vh - var(--studio-header-height, 3rem));
+    }
+
+    .studio-design-inspector {
+      @apply border-l-0 border-t border-border;
+      max-height: none;
+    }
+
+    .studio-design-shell-focus .studio-design-inspector {
+      display: none;
+    }
   }
 }
 
 @layer utilities {
-  /* Custom scrollbar styles */
+  .font-mono {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+  }
+
   .scrollbar-thin {
     scrollbar-width: thin;
   }
 
-  .scrollbar-thumb-gray-300::-webkit-scrollbar-thumb {
-    background-color: rgb(209 213 219);
-    border-radius: 0.375rem;
-  }
-
-  .scrollbar-thumb-gray-600::-webkit-scrollbar-thumb {
-    background-color: rgb(75 85 99);
-    border-radius: 0.375rem;
-  }
-
-  .scrollbar-track-gray-100::-webkit-scrollbar-track {
-    background-color: rgb(243 244 246);
-  }
-
-  .scrollbar-track-gray-800::-webkit-scrollbar-track {
-    background-color: rgb(31 41 55);
-  }
-
   .scrollbar-thin::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
 
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: rgb(156 163 175);
-    border-radius: 0.375rem;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background-color: rgb(107 114 128);
+    background-color: hsl(var(--border));
   }
 
   .scrollbar-thin::-webkit-scrollbar-track {
-    background-color: rgb(243 244 246);
-  }
-
-  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: rgb(75 85 99);
-  }
-
-  .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background-color: rgb(107 114 128);
-  }
-
-  .dark .scrollbar-thin::-webkit-scrollbar-track {
-    background-color: rgb(31 41 55);
-  }
-  
-  /* Subtle background texture */
-  .bg-pattern {
-    background-image: 
-      radial-gradient(circle at 1px 1px, hsl(var(--muted-foreground) / 0.03) 1px, transparent 0);
-    background-size: 20px 20px;
-  }
-  
-  /* Smooth transitions for interactive elements */
-  .transition-smooth {
-    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    transition-duration: 150ms;
-  }
-  
-  /* Subtle hover lift effect */
-  .hover-lift {
-    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  
-  .hover-lift:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px -2px hsl(var(--foreground) / 0.1);
-  }
-  
-  /* Refined card shadow */
-  .card-shadow {
-    box-shadow: 
-      0 1px 2px 0 hsl(var(--foreground) / 0.05),
-      0 1px 3px 0 hsl(var(--foreground) / 0.1);
-  }
-  
-  .card-shadow-hover {
-    box-shadow: 
-      0 4px 6px -1px hsl(var(--foreground) / 0.05),
-      0 2px 4px -1px hsl(var(--foreground) / 0.06),
-      0 0 0 1px hsl(var(--border));
+    background-color: transparent;
   }
 }

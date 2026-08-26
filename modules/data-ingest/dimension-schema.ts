@@ -1,16 +1,39 @@
 import type { ColumnType, DimensionSettings, MapType } from '@/app/(studio)/types'
 
-const isCoordinate = (value: string | number | boolean | undefined) =>
-  typeof value === 'string' && value.trim().length > 0
-
-export const inferColumnTypesFromData = (rows: Record<string, unknown>[]): ColumnType => {
+/**
+ * Infer column types from column names first, then fall back to cell values.
+ * Column names are more reliable than inspecting cell content.
+ */
+export const inferColumnTypesFromData = (
+  rows: Record<string, unknown>[],
+  columns?: string[],
+): ColumnType => {
   const inferred: ColumnType = {}
+  const columnNames =
+    columns ?? (rows.length > 0 ? Object.keys(rows[0]) : [])
 
+  // Pass 1: column name heuristics
+  for (const key of columnNames) {
+    const colName = key.trim().toLowerCase()
+    if (colName === 'country' || colName === 'nation') {
+      inferred[key] = 'country'
+    } else if (colName === 'province' || colName === 'territory') {
+      inferred[key] = 'province'
+    } else if (colName === 'county' || colName === 'fips') {
+      inferred[key] = 'county'
+    } else if (colName === 'state') {
+      inferred[key] = 'state'
+    } else if (colName === 'latitude' || colName === 'lat') {
+      inferred[key] = 'coordinate'
+    } else if (colName === 'longitude' || colName === 'lon' || colName === 'lng') {
+      inferred[key] = 'coordinate'
+    }
+  }
+
+  // Pass 2: cell value heuristics for unset columns
   rows.forEach((row) => {
     Object.entries(row).forEach(([key, value]) => {
-      if (inferred[key]) {
-        return
-      }
+      if (inferred[key]) return
 
       if (typeof value === 'number') {
         inferred[key] = 'number'
@@ -23,12 +46,7 @@ export const inferColumnTypesFromData = (rows: Record<string, unknown>[]): Colum
       }
 
       if (typeof value === 'string') {
-        const lower = value.toLowerCase()
-        if (lower.includes('province') || lower.includes('state')) {
-          inferred[key] = 'state'
-        } else if (lower.includes('country') || lower.includes('nation')) {
-          inferred[key] = 'country'
-        } else if (!Number.isNaN(Number(value))) {
+        if (!Number.isNaN(Number(value)) && value.trim() !== '') {
           inferred[key] = 'number'
         } else {
           inferred[key] = 'text'

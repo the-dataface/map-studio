@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import { RefreshCcw } from "lucide-react"
+import { studioHeaderIconButtonClass } from "@/components/studio-panel"
 
 interface FormattedNumberInputProps {
   value: number | null // Canonical value from parent, let's call it propValue internally
@@ -122,11 +123,15 @@ export function FormattedNumberInput({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const currentInputText = e.target.value
-    setDisplayValue(currentInputText) // Crucial: Immediately update display to show typed character
+    setDisplayValue(currentInputText)
 
     const parsed = parseInputValue(currentInputText)
-    setInternalParsedValue(parsed) // Update internal understanding
-    onChange(parsed) // Notify parent
+    setInternalParsedValue(parsed)
+    // Parent is notified on blur/Enter only — avoids map re-render on every keystroke
+  }
+
+  const commitValue = () => {
+    onChange(internalParsedValue)
   }
 
   const handleFocus = () => {
@@ -138,18 +143,13 @@ export function FormattedNumberInput({
 
   const handleBlur = () => {
     setIsFocused(false)
-    // On blur, the useEffect listening to [propValue, format, isFocused]
-    // will trigger because isFocused changed. It will then format propValue.
-    // This means propValue (updated by parent via onChange) is the source of truth for formatting.
-    // If there's a desire to parse and format the *current text field content* before relying on propValue,
-    // that logic would go here, but it can be complex if propValue updates are asynchronous.
-    // For now, relying on the effect is simpler and defers to parent's state.
-    // To be absolutely sure, we can force a format based on the latest internalParsedValue:
+    commitValue()
     setDisplayValue(formatNumber(internalParsedValue, format))
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
+      commitValue()
       inputRef.current?.blur()
     }
   }
@@ -165,7 +165,7 @@ export function FormattedNumberInput({
           onFocus={handleFocus}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className={cn(onReset ? "pr-8" : "")}
+          className={cn(onReset ? "pr-9" : "")}
         />
         {onReset && (
           <Tooltip>
@@ -180,19 +180,16 @@ export function FormattedNumberInput({
                   }
                 }}
                 disabled={resetDisabled}
-                className="absolute right-0 top-0 h-full w-8 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed hover:text-gray-700 dark:hover:text-gray-300"
+                className={cn(
+                  studioHeaderIconButtonClass,
+                  "absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 border-0 p-0 disabled:cursor-not-allowed disabled:opacity-30"
+                )}
               >
-                <RefreshCcw className="h-3 w-3" />
+                <RefreshCcw className="h-3.5 w-3.5" />
                 <span className="sr-only">Reset to data value</span>
               </Button>
             </TooltipTrigger>
-            <TooltipContent
-              side="top"
-              className="bg-black text-white border-black px-3 py-2 rounded-md shadow-lg text-xs font-medium z-50"
-              sideOffset={8}
-            >
-              <p>Reset to data value</p>
-            </TooltipContent>
+            <TooltipContent side="top">Reset to data value</TooltipContent>
           </Tooltip>
         )}
       </div>

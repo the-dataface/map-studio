@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'; // Import ToggleGroup and ToggleGroupItem
 import {
 	ChevronDown,
@@ -37,8 +38,10 @@ import type { DataRow, GeocodedRow, DimensionSettings, ColumnType } from '@/app/
 import type { CustomColorScheme } from '@/modules/data-ingest/color-schemes';
 import { applyColorSchemePreset, COLOR_SCHEME_CATEGORIES, D3_COLOR_SCHEMES } from '@/modules/data-ingest/color-schemes';
 import { getNumericBounds, getUniqueStringValues } from '@/modules/data-ingest/value-utils';
-import { renderLabelPreview } from '@/modules/data-ingest/formatting';
+import { renderLabelPreview, formatLegendValue } from '@/modules/data-ingest/formatting';
+import { SYMBOL_TEXT_ROW_INDEX } from '@/lib/symbol-text-content';
 import { cn } from '@/lib/utils';
+import { studioPanelClass, studioSubPanelClass, studioSubPanelHeaderClass, studioSubPanelTitleClass, studioSubPanelContentClass, studioTabBarClass, studioTabButtonClass, studioTabToggleClass, studioTabTriggerClass, studioInspectorTabRowClass, studioInspectorSubpaneClass, StudioExpandableHeader, StudioInspectorBlock, StudioInspectorSection, type StudioPanelVariant } from '@/components/studio-panel';
 
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { TagIcon } from 'lucide-react'; // Import TagIcon
@@ -77,25 +80,10 @@ interface DimensionMappingProps {
 	stylingSettings?: { base: { mapBackgroundColor: string; defaultStateFillColor: string } }; // For contrast checking
 	isExpanded: boolean;
 	setIsExpanded: (expanded: boolean) => void;
+	variant?: StudioPanelVariant;
 }
 
-// Helper function to return a gray icon (used for panel titles)
-const getGrayTypeIcon = (type: string) => {
-	switch (type) {
-		case 'coordinate':
-			return <MapPin className="w-3 h-3 text-gray-500 dark:text-gray-400" />;
-		case 'number':
-			return <Hash className="w-3 h-3 text-gray-500 dark:text-gray-400" />;
-		case 'date':
-			return <Calendar className="w-3 h-3 text-gray-500 dark:text-gray-400" />;
-		case 'state':
-			return <Flag className="w-3 h-3 text-gray-500 dark:text-gray-400" />;
-		default:
-			return <Type className="w-3 h-3 text-gray-500 dark:text-gray-400" />;
-	}
-};
-
-// Helper function to return a colored icon (used for dropdown items)
+// Helper function to return a colored icon (used for dropdown items and section headers)
 const getColoredTypeIcon = (type: string) => {
 	let IconComponent: React.ElementType;
 	let colorClasses: string;
@@ -145,17 +133,17 @@ export function DimensionMapping({
 	stylingSettings, // For contrast checking
 	isExpanded,
 	setIsExpanded,
+	variant = 'panel',
 }: DimensionMappingProps) {
 	// Add this log at the beginning of the function
-	console.log('Current symbol size range:', dimensionSettings.symbol.sizeMin, '-', dimensionSettings.symbol.sizeMax);
-
 	const [expandedPanels, setExpandedPanels] = useState<{ [key: string]: boolean }>({
 		coordinates: true,
 		size: false,
 		color: false,
 		state: true,
 		fill: false,
-		labels: false, // NEW: Add labels panel state
+		labels: false,
+		symbolText: false,
 	});
 
 	// Internal state for active tab, synchronized with mapType prop on initial load/change
@@ -295,9 +283,8 @@ export function DimensionMapping({
 
 	// Renamed updateSetting to handleDimensionSettingChange
 	const handleDimensionSettingChange = (section: 'symbol' | 'choropleth', key: string, value: any) => {
-		// Handle null values by converting to 0 for numeric settings
-		const processedValue =
-			value === null && (key.includes('Value') || key.includes('Min') || key.includes('Max')) ? 0 : value;
+		// Preserve null for numeric fields (empty = unset); only coerce on explicit 0
+		const processedValue = value;
 
 		const newSettings = {
 			...dimensionSettings,
@@ -864,13 +851,15 @@ export function DimensionMapping({
 			const epsilon = 1e-9;
 
 			const isMinDefaultOrAuto =
-				(Math.abs(currentSettings.colorMinValue) < epsilon && currentSettings.colorMinValue === 0) ||
+				currentSettings.colorMinValue === null ||
 				(lastAutoPopulatedValues.current[currentTabType].min !== null &&
+					lastAutoPopulatedValues.current[currentTabType].min !== undefined &&
 					Math.abs(currentSettings.colorMinValue - lastAutoPopulatedValues.current[currentTabType].min!) < epsilon);
 
 			const isMaxDefaultOrAuto =
-				(Math.abs(currentSettings.colorMaxValue) < epsilon && currentSettings.colorMaxValue === 0) ||
+				currentSettings.colorMaxValue === null ||
 				(lastAutoPopulatedValues.current[currentTabType].max !== null &&
+					lastAutoPopulatedValues.current[currentTabType].max !== undefined &&
 					Math.abs(currentSettings.colorMaxValue - lastAutoPopulatedValues.current[currentTabType].max!) < epsilon);
 
 			if (
@@ -890,8 +879,9 @@ export function DimensionMapping({
 
 			// Midpoint value logic: Auto-populate if midpoint is visible AND value is default/auto.
 			const isMidValueDefaultOrAuto =
-				(Math.abs(currentSettings.colorMidValue) < epsilon && currentSettings.colorMidValue === 0) ||
+				currentSettings.colorMidValue === null ||
 				(lastAutoPopulatedValues.current[currentTabType].mid !== null &&
+					lastAutoPopulatedValues.current[currentTabType].mid !== undefined &&
 					Math.abs(currentSettings.colorMidValue - lastAutoPopulatedValues.current[currentTabType].mid!) < epsilon);
 
 			if (currentShowMidpoint && (isMidValueDefaultOrAuto || hasColorByOrScaleChanged)) {
@@ -970,35 +960,51 @@ export function DimensionMapping({
 		customSchemes,
 	]);
 
-	// Add this useEffect after the existing effects to debug color updates
-	useEffect(() => {
-		const currentSettings = dimensionSettings[internalActiveTab];
-		if (currentSettings.colorBy && currentSettings.colorScale === 'linear') {
-			console.log(`${internalActiveTab} linear colors:`, {
-				min: { value: currentSettings.colorMinValue, color: currentSettings.colorMinColor },
-				mid: { value: currentSettings.colorMidValue, color: currentSettings.colorMidColor },
-				max: { value: currentSettings.colorMaxValue, color: currentSettings.colorMaxColor },
-				palette: currentSettings.colorPalette,
-			});
-		}
-	}, [dimensionSettings, internalActiveTab]);
-
 	// Update the renderSubPanel function to add dynamic height and scrollability for color panel
+	const renderTypeIcons = (allowedTypes: string[]) => (
+		<div className="flex items-center gap-1">
+			{allowedTypes.map((type) => (
+				<span key={type}>{getColoredTypeIcon(type)}</span>
+			))}
+		</div>
+	);
+
 	const renderSubPanel = (
 		key: string,
 		title: string,
 		icon: React.ReactNode,
 		badge: string,
-		children: React.ReactNode
+		children: React.ReactNode,
+		allowedTypes?: string[]
 	) => {
+		const typeIcons = allowedTypes?.length ? renderTypeIcons(allowedTypes) : undefined;
+
+		if (variant === 'inspector') {
+			return (
+				<StudioInspectorSection
+					key={key}
+					title={title}
+					badge={
+						badge ? (
+							<Badge variant="outline" className="text-xs font-normal ml-1">
+								{badge}
+							</Badge>
+						) : undefined
+					}
+					typeIcons={typeIcons}>
+					{children}
+				</StudioInspectorSection>
+			);
+		}
+
 		const isExpanded = expandedPanels[key];
 		const isColorPanel = key === 'color' || key === 'fill';
 		const isLabelsPanel = key === 'labels'; // NEW: Check for labels panel
 
 		return (
-			<div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
+			<div className={studioSubPanelClass}>
 				<div
-					className="bg-gray-100 dark:bg-gray-700 px-4 py-3 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-650 transition-colors duration-200"
+					className={studioSubPanelHeaderClass}
 					onClick={() => togglePanel(key)}
 					onKeyDown={(e) => {
 						if (e.key === 'Enter' || e.key === ' ') {
@@ -1010,22 +1016,25 @@ export function DimensionMapping({
 					tabIndex={0}
 					aria-expanded={isExpanded}
 					aria-controls={`panel-${key}`}>
-					<div className="flex items-center justify-between">
-						<div className="flex items-center gap-2">
-							<div className="text-black dark:text-white transform scale-75">{icon}</div>
-							<span className="font-medium text-gray-900 dark:text-white">{title}</span>
+					<div className="flex items-center justify-between gap-2">
+						<div className="flex items-center gap-2 min-w-0">
+							<div className="text-foreground transform scale-75">{icon}</div>
+							<span className={studioSubPanelTitleClass}>{title}</span>
 							{badge && (
-								<Badge variant="outline" className="text-xs font-normal bg-white dark:bg-gray-800 ml-1">
+								<Badge variant="outline" className="text-xs font-normal ml-1">
 									{badge}
 								</Badge>
 							)}
 						</div>
-						<div className="transition-transform duration-200">
-							{isExpanded ? (
-								<ChevronUp className="h-4 w-4 text-gray-500" />
-							) : (
-								<ChevronDown className="h-4 w-4 text-gray-500" />
-							)}
+						<div className="flex shrink-0 items-center gap-2">
+							{typeIcons}
+							<div className="transition-transform duration-200">
+								{isExpanded ? (
+									<ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+								) : (
+									<ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+								)}
+							</div>
 						</div>
 					</div>
 				</div>
@@ -1034,9 +1043,10 @@ export function DimensionMapping({
 						isExpanded ? (isColorPanel || isLabelsPanel ? 'max-h-[600px]' : 'max-h-[500px]') : 'max-h-0' // Adjust max-height for labels panel
 					} ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
 					<div
-						className={`p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-600 ${
-							(isColorPanel || isLabelsPanel) && isExpanded ? 'overflow-y-auto max-h-[560px]' : '' // Adjust max-height for labels panel
-						}`}>
+						className={cn(
+							studioSubPanelContentClass,
+							(isColorPanel || isLabelsPanel) && isExpanded ? 'overflow-y-auto max-h-[560px]' : ''
+						)}>
 						{children}
 					</div>
 				</div>
@@ -1044,9 +1054,8 @@ export function DimensionMapping({
 		);
 	};
 
-	// Update the renderDropdown function to show correct icons and ensure proper filtering
+	// Column selector — label lives in the subsection header; type icons appear there too.
 	const renderDropdown = (
-		label: string,
 		value: string,
 		onValueChange: (value: string) => void,
 		allowedTypes: string[],
@@ -1055,25 +1064,47 @@ export function DimensionMapping({
 		const availableColumns = getColumnsByType(allowedTypes);
 
 		return (
-			<div className="space-y-2 w-full">
-				<div className="flex items-center gap-2">
-					<Label className="text-sm font-medium">{label}</Label>
-					<div className="flex gap-1">
-						{allowedTypes.map((type, index) => (
-							<span key={index}>{getGrayTypeIcon(type)}</span>
-						))}
-					</div>
-				</div>
-				<Select value={value || 'default'} onValueChange={(val) => onValueChange(val === 'default' ? '' : val)}>
-					<SelectTrigger className="w-full">
-						<SelectValue placeholder={placeholder} />
+			<Select value={value || 'default'} onValueChange={(val) => onValueChange(val === 'default' ? '' : val)}>
+				<SelectTrigger className="w-full">
+					<SelectValue placeholder={placeholder} />
+				</SelectTrigger>
+				<SelectContent>
+					<SelectItem value="default">None</SelectItem>
+					{availableColumns.map((column) => (
+						<SelectItem key={column} value={column}>
+							<div className="flex items-center gap-2">
+								{getColumnIcon(column)}
+								{toSentenceCase(column)}
+							</div>
+						</SelectItem>
+					))}
+				</SelectContent>
+			</Select>
+		);
+	};
+
+	const renderCoordinateField = (
+		label: string,
+		value: string,
+		onValueChange: (value: string) => void
+	) => {
+		const availableColumns = getColumnsByType(['coordinate']);
+
+		return (
+			<div className="flex min-w-0 items-center gap-2">
+				<Label className="w-16 shrink-0 text-xs font-normal text-muted-foreground">{label}</Label>
+				<Select
+					value={value || 'default'}
+					onValueChange={(val) => onValueChange(val === 'default' ? '' : val)}>
+					<SelectTrigger className="min-w-0 flex-1">
+						<SelectValue placeholder="Select column" />
 					</SelectTrigger>
 					<SelectContent>
 						<SelectItem value="default">None</SelectItem>
 						{availableColumns.map((column) => (
 							<SelectItem key={column} value={column}>
 								<div className="flex items-center gap-2">
-									{getColumnIcon(column)} {/* These icons are now colored */}
+									{getColumnIcon(column)}
 									{toSentenceCase(column)}
 								</div>
 							</SelectItem>
@@ -1082,6 +1113,55 @@ export function DimensionMapping({
 				</Select>
 			</div>
 		);
+	};
+
+	const renderSymbolTextDropdown = () => {
+		const columns = getColumnsForTab('symbol');
+		const currentValue = dimensionSettings.symbol.symbolTextBy || 'default';
+
+		return (
+			<Select
+				value={currentValue}
+				onValueChange={(val) =>
+					handleDimensionSettingChange('symbol', 'symbolTextBy', val === 'default' ? '' : val)
+				}>
+				<SelectTrigger className="w-full">
+					<SelectValue placeholder="None" />
+				</SelectTrigger>
+				<SelectContent>
+					<SelectItem value="default">None</SelectItem>
+					<SelectItem value={SYMBOL_TEXT_ROW_INDEX}>
+						<div className="flex items-center gap-2">
+							{getColoredTypeIcon('number')}
+							Row number (n)
+						</div>
+					</SelectItem>
+					{columns.map((column) => (
+						<SelectItem key={column} value={column}>
+							<div className="flex items-center gap-2">
+								{getColumnIcon(column)}
+								{toSentenceCase(column)}
+							</div>
+						</SelectItem>
+					))}
+				</SelectContent>
+			</Select>
+		);
+	};
+
+	const getSymbolTextPreview = () => {
+		const symbolTextBy = dimensionSettings.symbol.symbolTextBy;
+		if (!symbolTextBy || !firstRow) {
+			return '';
+		}
+		if (symbolTextBy === SYMBOL_TEXT_ROW_INDEX) {
+			return '1';
+		}
+		const value = firstRow[symbolTextBy];
+		if (value === undefined || value === null || String(value).trim() === '') {
+			return '';
+		}
+		return formatLegendValue(value, symbolTextBy, columnTypes, columnFormats, selectedGeography);
 	};
 
 	// Check if a tab has data
@@ -1120,15 +1200,12 @@ export function DimensionMapping({
 			return (
 				<Tooltip>
 					<TooltipTrigger asChild>
-						<div className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-normal opacity-50 text-gray-500 dark:text-gray-400 transition-all duration-200">
+						<div className={studioTabButtonClass(isActive, true)}>
 							{icon}
 							{label}
 						</div>
 					</TooltipTrigger>
-					<TooltipContent
-						side="bottom"
-						className="bg-black text-white border-black px-3 py-2 rounded-md shadow-lg text-xs font-medium z-50"
-						sideOffset={8}>
+					<TooltipContent side="bottom" className="text-xs" sideOffset={8}>
 						<p>{getTabTooltip(tab)}</p>
 					</TooltipContent>
 				</Tooltip>
@@ -1136,15 +1213,13 @@ export function DimensionMapping({
 		}
 
 		return (
-			<Button
-				variant={isActive ? 'secondary' : 'ghost'}
-				size="sm"
-				className="px-3 py-1.5 text-xs font-normal hover:bg-gray-100 dark:hover:bg-gray-700 w-auto transition-colors duration-200 group"
-				onClick={() => setInternalActiveTab(tab)} // Update internal state
-			>
+			<button
+				type="button"
+				className={studioTabButtonClass(isActive)}
+				onClick={() => setInternalActiveTab(tab)}>
 				{icon}
 				{label}
-			</Button>
+			</button>
 		);
 	};
 
@@ -1178,12 +1253,12 @@ export function DimensionMapping({
 	if (!hasAnyDataLoaded) {
 		return (
 			<TooltipProvider>
-				<Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
-					<CardHeader className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-6 px-6 rounded-t-xl">
-						<CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">
-							Dimension mapping
-						</CardTitle>
-					</CardHeader>
+				<Card className={cn(studioPanelClass, 'overflow-hidden')}>
+					<StudioExpandableHeader
+						title="Dimension mapping"
+						isExpanded={false}
+						onToggle={() => {}}
+					/>
 					<CardContent className="px-6 pb-6">
 						<p className="text-gray-500 dark:text-gray-400 text-center py-8 transition-colors duration-200">
 							No data available. Please load data first.
@@ -1254,52 +1329,54 @@ export function DimensionMapping({
 		return () => window.removeEventListener('collapse-all-panels', handler);
 	}, []);
 
-	return (
-		<TooltipProvider>
-			<Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
-				<CardHeader
-					className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-6 px-6 rounded-t-xl relative"
-					onClick={() => setIsExpanded(!isExpanded)}>
-					<div className="flex items-center justify-between">
-						<div className="flex items-center gap-2">
-							<CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">
-								Dimension mapping
-							</CardTitle>
-						</div>
-						<div className="transform transition-transform duration-200 ease-in-out">
-							{isExpanded ? (
-								<ChevronUp className="h-4 w-4 text-gray-600 dark:text-gray-400 transition-colors duration-200" />
-							) : (
-								<ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400 transition-colors duration-200" />
-							)}
-						</div>
-					</div>
-				</CardHeader>
+	const isInspector = variant === 'inspector';
 
-				<div
-					className={`transition-all duration-300 ease-in-out ${
-						isExpanded ? 'max-h-[9999px] opacity-100' : 'max-h-0 opacity-0'
-					} overflow-hidden`}>
-					<CardContent className="space-y-4 px-6 pb-6 pt-2">
-						<div className="inline-flex h-auto items-center justify-start gap-2 bg-transparent p-0">
-							{renderTabButton(
-								'symbol',
-								<MapPin className="w-3 h-3 mr-1.5 transition-transform duration-300 group-hover:translate-y-0.5" />,
-								'Symbol map',
-								internalActiveTab === 'symbol' // Use internal state
-							)}
+	const dimensionFields = (
+		<>
+			{isInspector ? (
+				<div className={studioInspectorTabRowClass}>
+					<Tabs
+						value={internalActiveTab}
+						onValueChange={(value) => setInternalActiveTab(value as 'symbol' | 'choropleth')}>
+						<TabsList className={studioTabBarClass}>
+							<TabsTrigger value="symbol" className={studioTabTriggerClass} disabled={isTabDisabled('symbol')}>
+								<MapPin className="w-3 h-3 mr-1.5" />
+								Symbol map
+							</TabsTrigger>
+							<TabsTrigger
+								value="choropleth"
+								className={studioTabTriggerClass}
+								disabled={isTabDisabled('choropleth')}>
+								<BarChart3 className="w-3 h-3 mr-1.5" />
+								Choropleth
+							</TabsTrigger>
+						</TabsList>
+					</Tabs>
+				</div>
+			) : (
+				<div className={studioTabBarClass}>
+					{renderTabButton(
+						'symbol',
+						<MapPin className="w-3 h-3" />,
+						'Symbol map',
+						internalActiveTab === 'symbol'
+					)}
 
-							{renderTabButton(
-								'choropleth',
-								<BarChart3 className="w-3 h-3 mr-1.5 transition-transform duration-300 group-hover:translate-y-0.5" />,
-								'Choropleth',
-								internalActiveTab === 'choropleth' // Use internal state
-							)}
-							{/* REMOVED: Custom map tab button */}
-						</div>
+					{renderTabButton(
+						'choropleth',
+						<BarChart3 className="w-3 h-3" />,
+						'Choropleth',
+						internalActiveTab === 'choropleth'
+					)}
+				</div>
+			)}
 
-						{internalActiveTab === 'symbol' && ( // Use internal state
-							<div className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+						{internalActiveTab === 'symbol' && (
+							<div
+								className={cn(
+									isInspector ? 'space-y-0' : 'space-y-4',
+									'animate-in fade-in-50 slide-in-from-bottom-2 duration-300'
+								)}>
 								{/* Coordinates Panel */}
 								{renderSubPanel(
 									'coordinates',
@@ -1310,20 +1387,19 @@ export function DimensionMapping({
 												dimensionSettings.symbol.longitude
 										  )}`
 										: 'Not mapped',
-									<div className="grid grid-cols-2 gap-4">
-										{renderDropdown(
+									<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+										{renderCoordinateField(
 											'Latitude',
 											dimensionSettings.symbol.latitude,
-											(value) => handleDimensionSettingChange('symbol', 'latitude', value), // Use new handler
-											['coordinate']
+											(value) => handleDimensionSettingChange('symbol', 'latitude', value)
 										)}
-										{renderDropdown(
+										{renderCoordinateField(
 											'Longitude',
 											dimensionSettings.symbol.longitude,
-											(value) => handleDimensionSettingChange('symbol', 'longitude', value), // Use new handler
-											['coordinate']
+											(value) => handleDimensionSettingChange('symbol', 'longitude', value)
 										)}
-									</div>
+									</div>,
+									['coordinate']
 								)}
 
 								{/* Size Panel */}
@@ -1334,14 +1410,13 @@ export function DimensionMapping({
 									dimensionSettings.symbol.sizeBy ? toSentenceCase(dimensionSettings.symbol.sizeBy) : 'Not mapped',
 									<div className="space-y-4">
 										{renderDropdown(
-											'Size by',
 											dimensionSettings.symbol.sizeBy,
-											(value) => handleDimensionSettingChange('symbol', 'sizeBy', value), // Use new handler
+											(value) => handleDimensionSettingChange('symbol', 'sizeBy', value),
 											['number']
 										)}
 
 										{dimensionSettings.symbol.sizeBy && (
-											<div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+											<div className={studioInspectorSubpaneClass}>
 												<div className="grid grid-cols-2 gap-4">
 													<div>
 														<Label className="text-sm">Min value in data</Label>
@@ -1410,7 +1485,8 @@ export function DimensionMapping({
 												</div>
 											</div>
 										)}
-									</div>
+									</div>,
+									['number']
 								)}
 
 								{/* Color Panel */}
@@ -1420,13 +1496,10 @@ export function DimensionMapping({
 									<Palette className="w-4 h-4" />,
 									dimensionSettings.symbol.colorBy ? toSentenceCase(dimensionSettings.symbol.colorBy) : 'Not mapped',
 									<div className="space-y-4">
-										<div className="flex items-end justify-between gap-2">
-											{' '}
-											{/* Flex container for alignment */}
+										<div className="space-y-3">
 											{renderDropdown(
-												'Color by',
 												dimensionSettings.symbol.colorBy,
-												(value) => handleDimensionSettingChange('symbol', 'colorBy', value), // Use new handler
+												(value) => handleDimensionSettingChange('symbol', 'colorBy', value),
 												['number', 'text', 'date', 'state']
 											)}
 											{dimensionSettings.symbol.colorBy && (
@@ -1437,18 +1510,18 @@ export function DimensionMapping({
 														(value: 'linear' | 'categorical') =>
 															value && handleDimensionSettingChange('symbol', 'colorScale', value) // Use new handler
 													}
-													className="flex flex-shrink-0 h-auto rounded-md border bg-muted p-1 text-muted-foreground"
+													className={cn(studioTabBarClass, 'w-full')}
 													aria-label="Color scale type">
 													<ToggleGroupItem
 														value="linear"
 														aria-label="Linear scale"
-														className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm">
+														className={studioTabToggleClass}>
 														Linear scale
 													</ToggleGroupItem>
 													<ToggleGroupItem
 														value="categorical"
 														aria-label="Categorical scale"
-														className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm">
+														className={studioTabToggleClass}>
 														Categorical scale
 													</ToggleGroupItem>
 												</ToggleGroup>
@@ -1715,7 +1788,7 @@ export function DimensionMapping({
 										)}
 
 										{dimensionSettings.symbol.colorBy && (
-											<div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+											<div className={studioInspectorSubpaneClass}>
 												{/* Existing linear/categorical content */}
 												{dimensionSettings.symbol.colorScale === 'linear' ? (
 													<div className="space-y-4">
@@ -1758,7 +1831,9 @@ export function DimensionMapping({
 																		value={dimensionSettings.symbol.colorMinColor}
 																		onChange={(value) => handleColorValueChange('symbol', 'colorMinColor', value)}
 																		showContrastCheck={true}
-																		backgroundColor={stylingSettings?.base?.mapBackgroundColor || '#ffffff'}
+																		contrastUseCase="scale-endpoint"
+																		stylingSettings={stylingSettings}
+																		dimensionSettings={dimensionSettings}
 																	/>
 																</div>
 															</div>
@@ -1848,7 +1923,9 @@ export function DimensionMapping({
 																		value={dimensionSettings.symbol.colorMaxColor}
 																		onChange={(value) => handleColorValueChange('symbol', 'colorMaxColor', value)}
 																		showContrastCheck={true}
-																		backgroundColor={stylingSettings?.base?.mapBackgroundColor || '#ffffff'}
+																		contrastUseCase="scale-endpoint"
+																		stylingSettings={stylingSettings}
+																		dimensionSettings={dimensionSettings}
 																	/>
 																</div>
 															</div>
@@ -1880,13 +1957,15 @@ export function DimensionMapping({
 																		onDragLeave={handleDragLeave}
 																		onDrop={(e) => handleDrop(e, index, 'symbol')}
 																		onDragEnd={handleDragEnd}
-																		className={`flex items-center gap-2 p-3 bg-white dark:bg-gray-800 rounded-md border transition-all duration-200 cursor-move hover:shadow-md ${
+																		className={cn(
+																			'grid grid-cols-[auto_minmax(6.5rem,7.5rem)_minmax(0,1fr)_auto] items-center gap-2 border border-border bg-background p-2 transition-colors cursor-move',
 																			dragOverIndex === index && draggedIndex !== index
-																				? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20'
-																				: 'border-gray-200 dark:border-gray-600'
-																		} ${draggedIndex === index ? 'opacity-50 scale-95' : ''}`}>
-																		<GripVertical className="w-4 h-4 text-gray-400" />
-																		<div>
+																				? 'border-primary/50 bg-muted/20'
+																				: '',
+																			draggedIndex === index ? 'opacity-50' : ''
+																		)}>
+																		<GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
+																		<div className="min-w-0">
 																			<ColorInput
 																				value={item.color}
 																				onChange={(color) => {
@@ -1894,9 +1973,7 @@ export function DimensionMapping({
 																				}}
 																			/>
 																		</div>
-																		<span className="flex-1 text-sm">
-																			{categoryLabel} {/* Display the actual category name */}
-																		</span>
+																		<span className="min-w-0 truncate text-sm">{categoryLabel}</span>
 																		<Button
 																			variant="ghost"
 																			size="sm"
@@ -1925,7 +2002,35 @@ export function DimensionMapping({
 												)}
 											</div>
 										)}
-									</div>
+									</div>,
+									['number', 'text', 'date', 'state']
+								)}
+
+								{renderSubPanel(
+									'symbolText',
+									'Symbol text',
+									<Hash className="w-4 h-4" />,
+									dimensionSettings.symbol.symbolTextBy
+										? dimensionSettings.symbol.symbolTextBy === SYMBOL_TEXT_ROW_INDEX
+											? 'Row number (n)'
+											: toSentenceCase(dimensionSettings.symbol.symbolTextBy)
+										: 'Not mapped',
+									<div className="space-y-4">
+										{renderSymbolTextDropdown()}
+										<p className="text-xs text-gray-500 dark:text-gray-400">
+											Displays centered text inside each symbol. Use row number (n) for display-order
+											indexing, or pick any column.
+										</p>
+										{dimensionSettings.symbol.symbolTextBy && firstRow && getSymbolTextPreview() && (
+											<div className="space-y-2">
+												<Label className="text-xs text-muted-foreground">Preview</Label>
+												<div className="border border-dashed border-border bg-muted/10 p-3 text-sm font-mono">
+													{getSymbolTextPreview()}
+												</div>
+											</div>
+										)}
+									</div>,
+									['number', 'text', 'date', 'state', 'coordinate']
 								)}
 
 								{/* NEW: Labels Panel */}
@@ -1936,7 +2041,7 @@ export function DimensionMapping({
 									dimensionSettings.symbol.labelTemplate ? 'Configured' : 'Not configured',
 									<div className="space-y-4">
 										<div className="space-y-2">
-											<Label className="text-sm font-medium">Available columns</Label>
+											<p className="text-xs text-muted-foreground">Click columns to add to the template.</p>
 											<div className="flex flex-wrap gap-2">
 												{getColumnsForTab(internalActiveTab).map((column) => {
 													const isUsed = (dimensionSettings.symbol.labelTemplate || '').includes(`{${column}}`);
@@ -1965,23 +2070,22 @@ export function DimensionMapping({
 										</div>
 
 										<div className="space-y-2">
-											<Label className="text-sm font-medium">Label template</Label>
 											<Textarea
 												value={dimensionSettings.symbol.labelTemplate || ''}
-												onChange={(e) => handleDimensionSettingChange('symbol', 'labelTemplate', e.target.value)} // Use new handler
-												placeholder="Enter label template using {column_name} placeholders..."
+												onChange={(e) => handleDimensionSettingChange('symbol', 'labelTemplate', e.target.value)}
+												placeholder="Label template — use {column_name} placeholders…"
 												className="min-h-[80px] resize-none"
 											/>
 											<p className="text-xs text-gray-500 dark:text-gray-400">
-												Use {'{column_name}'} to insert data values. Click column tags above to add them.
+												Use {'{column_name}'} to insert data values.
 											</p>
 										</div>
 
 										{dimensionSettings.symbol.labelTemplate && firstRow && (
 											<div className="space-y-2">
-												<Label className="text-sm font-medium">Preview</Label>
+												<p className="text-xs text-muted-foreground">Preview</p>
 												<div
-													className="p-3 bg-gray-50 dark:bg-gray-700 rounded rounded-lg border text-sm font-mono border-blue-300 border-dashed"
+													className="border border-dashed border-border bg-muted/10 p-3 text-sm font-mono"
 													dangerouslySetInnerHTML={{
 														__html: renderLabelPreview(
 															dimensionSettings.symbol.labelTemplate,
@@ -1994,13 +2098,18 @@ export function DimensionMapping({
 												/>
 											</div>
 										)}
-									</div>
+									</div>,
+									['text']
 								)}
 							</div>
 						)}
 
-						{internalActiveTab === 'choropleth' && ( // Use internal state
-							<div className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
+						{internalActiveTab === 'choropleth' && (
+							<div
+								className={cn(
+									isInspector ? 'space-y-0' : 'space-y-4',
+									'animate-in fade-in-50 slide-in-from-bottom-2 duration-300'
+								)}>
 								{/* State Panel */}
 								{renderSubPanel(
 									'state',
@@ -2011,12 +2120,12 @@ export function DimensionMapping({
 										: 'Not mapped',
 									<div>
 										{renderDropdown(
-											`${subnationalLabel} column`, // Use dynamic label
 											dimensionSettings[internalActiveTab].stateColumn,
-											(value) => handleDimensionSettingChange(internalActiveTab, 'stateColumn', value), // Use new handler
-											['state', 'country']
+											(value) => handleDimensionSettingChange(internalActiveTab, 'stateColumn', value),
+											['state', 'province', 'county', 'country', 'text']
 										)}
-									</div>
+									</div>,
+									['state', 'province', 'county', 'country', 'text']
 								)}
 
 								{/* Fill Panel */}
@@ -2028,13 +2137,10 @@ export function DimensionMapping({
 										? toSentenceCase(dimensionSettings[internalActiveTab].colorBy)
 										: 'Not mapped',
 									<div className="space-y-4">
-										<div className="flex items-end justify-between gap-2">
-											{' '}
-											{/* Flex container for alignment */}
+										<div className="space-y-3">
 											{renderDropdown(
-												'Fill by',
 												dimensionSettings[internalActiveTab].colorBy,
-												(value) => handleDimensionSettingChange(internalActiveTab, 'colorBy', value), // Use new handler
+												(value) => handleDimensionSettingChange(internalActiveTab, 'colorBy', value),
 												['number', 'text', 'date', 'state']
 											)}
 											{dimensionSettings[internalActiveTab].colorBy && (
@@ -2045,18 +2151,18 @@ export function DimensionMapping({
 														(value: 'linear' | 'categorical') =>
 															value && handleDimensionSettingChange(internalActiveTab, 'colorScale', value) // Use new handler
 													}
-													className="flex flex-shrink-0 h-auto rounded-md border bg-muted p-1 text-muted-foreground"
+													className={cn(studioTabBarClass, 'w-full')}
 													aria-label="Color scale type">
 													<ToggleGroupItem
 														value="linear"
 														aria-label="Linear scale"
-														className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm">
+														className={studioTabToggleClass}>
 														Linear scale
 													</ToggleGroupItem>
 													<ToggleGroupItem
 														value="categorical"
 														aria-label="Categorical scale"
-														className="h-7 px-3 text-xs data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm">
+														className={studioTabToggleClass}>
 														Categorical scale
 													</ToggleGroupItem>
 												</ToggleGroup>
@@ -2328,7 +2434,7 @@ export function DimensionMapping({
 										)}
 
 										{dimensionSettings[internalActiveTab].colorBy && (
-											<div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+											<div className={studioInspectorSubpaneClass}>
 												{/* Existing linear/categorical content */}
 												{dimensionSettings[internalActiveTab].colorScale === 'linear' ? (
 													<div className="space-y-4">
@@ -2376,7 +2482,9 @@ export function DimensionMapping({
 																			handleColorValueChange(internalActiveTab, 'colorMinColor', value)
 																		}
 																		showContrastCheck={true}
-																		backgroundColor={stylingSettings?.base?.mapBackgroundColor || '#ffffff'}
+																		contrastUseCase="scale-endpoint"
+																		stylingSettings={stylingSettings}
+																		dimensionSettings={dimensionSettings}
 																	/>
 																</div>
 															</div>
@@ -2474,7 +2582,9 @@ export function DimensionMapping({
 																			handleColorValueChange(internalActiveTab, 'colorMaxColor', value)
 																		}
 																		showContrastCheck={true}
-																		backgroundColor={stylingSettings?.base?.mapBackgroundColor || '#ffffff'}
+																		contrastUseCase="scale-endpoint"
+																		stylingSettings={stylingSettings}
+																		dimensionSettings={dimensionSettings}
 																	/>
 																</div>
 															</div>
@@ -2508,13 +2618,15 @@ export function DimensionMapping({
 																		onDragLeave={handleDragLeave}
 																		onDrop={(e) => handleDrop(e, index, internalActiveTab)}
 																		onDragEnd={handleDragEnd}
-																		className={`flex items-center gap-2 p-3 bg-white dark:bg-gray-800 rounded-md border transition-all duration-200 cursor-move hover:shadow-md ${
+																		className={cn(
+																			'grid grid-cols-[auto_minmax(6.5rem,7.5rem)_minmax(0,1fr)_auto] items-center gap-2 border border-border bg-background p-2 transition-colors cursor-move',
 																			dragOverIndex === index && draggedIndex !== index
-																				? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20'
-																				: 'border-gray-200 dark:border-gray-600'
-																		} ${draggedIndex === index ? 'opacity-50 scale-95' : ''}`}>
-																		<GripVertical className="w-4 h-4 text-gray-400" />
-																		<div>
+																				? 'border-primary/50 bg-muted/20'
+																				: '',
+																			draggedIndex === index ? 'opacity-50' : ''
+																		)}>
+																		<GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
+																		<div className="min-w-0">
 																			<ColorInput
 																				value={item.color}
 																				onChange={(color) => {
@@ -2522,9 +2634,7 @@ export function DimensionMapping({
 																				}}
 																			/>
 																		</div>
-																		<span className="flex-1 text-sm">
-																			{categoryLabel} {/* Display the actual category name */}
-																		</span>
+																		<span className="min-w-0 truncate text-sm">{categoryLabel}</span>
 																		<Button
 																			variant="ghost"
 																			size="sm"
@@ -2556,7 +2666,8 @@ export function DimensionMapping({
 												)}
 											</div>
 										)}
-									</div>
+									</div>,
+									['number', 'text', 'date', 'state']
 								)}
 
 								{/* NEW: Labels Panel */}
@@ -2567,7 +2678,7 @@ export function DimensionMapping({
 									dimensionSettings[internalActiveTab].labelTemplate ? 'Configured' : 'Not configured',
 									<div className="space-y-4">
 										<div className="space-y-2">
-											<Label className="text-sm font-medium">Available columns</Label>
+											<p className="text-xs text-muted-foreground">Click columns to add to the template.</p>
 											<div className="flex flex-wrap gap-2">
 												{getColumnsForTab(internalActiveTab).map((column) => {
 													const isUsed = (dimensionSettings[internalActiveTab].labelTemplate || '').includes(
@@ -2598,23 +2709,22 @@ export function DimensionMapping({
 										</div>
 
 										<div className="space-y-2">
-											<Label className="text-sm font-medium">Label template</Label>
 											<Textarea
 												value={dimensionSettings[internalActiveTab].labelTemplate || ''}
 												onChange={(e) =>
 													handleDimensionSettingChange(internalActiveTab, 'labelTemplate', e.target.value)
-												} // Use new handler
-												placeholder="Enter label template using {column_name} placeholders..."
+												}
+												placeholder="Label template — use {column_name} placeholders…"
 												className="min-h-[80px] resize-none"
 											/>
 											<p className="text-xs text-gray-500 dark:text-gray-400">
-												Use {'{column_name}'} to insert data values. Click column tags below to add them.
+												Use {'{column_name}'} to insert data values.
 											</p>
 										</div>
 
 										{dimensionSettings[internalActiveTab].labelTemplate && firstRow && (
 											<div className="space-y-2">
-												<Label className="text-sm font-medium">Preview</Label>
+												<p className="text-xs text-muted-foreground">Preview</p>
 												<div
 													className="p-3 bg-blue-50 dark:bg-blue-950 border-blue-400 dark:border-blue-500 border-dashed font-mono rounded-lg border text-sm"
 													dangerouslySetInnerHTML={{
@@ -2629,23 +2739,47 @@ export function DimensionMapping({
 												/>
 											</div>
 										)}
-									</div>
+									</div>,
+									['text']
 								)}
 							</div>
 						)}
-					</CardContent>
-				</div>
+		</>
+	);
 
-				{/* Save Scheme Modal */}
-				<SaveSchemeModal
-					isOpen={showSaveSchemeModal}
-					onClose={() => setShowSaveSchemeModal(false)}
-					onSave={handleSaveSchemeConfirm}
-					currentSchemeColors={schemeColorsToSave}
-					currentSchemeType={schemeTypeToSave || 'categorical'} // Provide a default if null
-					currentSchemeHasMidpoint={schemeHasMidpointToSave}
-				/>
-			</Card>
+	return (
+		<TooltipProvider>
+			{isInspector ? (
+				<StudioInspectorBlock
+					title="Dimension mapping"
+					isExpanded={isExpanded}
+					onToggle={() => setIsExpanded(!isExpanded)}>
+					{dimensionFields}
+				</StudioInspectorBlock>
+			) : (
+				<Card className={cn(studioPanelClass, 'overflow-hidden')}>
+					<StudioExpandableHeader
+						title="Dimension mapping"
+						isExpanded={isExpanded}
+						onToggle={() => setIsExpanded(!isExpanded)}
+					/>
+					<div
+						className={`studio-panel-expand-body transition-all duration-300 ease-in-out overflow-hidden ${
+							isExpanded ? 'max-h-none opacity-100' : 'max-h-0 opacity-0'
+						}`}>
+						<CardContent className="space-y-4 px-6 pb-6 pt-2">{dimensionFields}</CardContent>
+					</div>
+				</Card>
+			)}
+
+			<SaveSchemeModal
+				isOpen={showSaveSchemeModal}
+				onClose={() => setShowSaveSchemeModal(false)}
+				onSave={handleSaveSchemeConfirm}
+				currentSchemeColors={schemeColorsToSave}
+				currentSchemeType={schemeTypeToSave || 'categorical'}
+				currentSchemeHasMidpoint={schemeHasMidpointToSave}
+			/>
 		</TooltipProvider>
 	);
 }

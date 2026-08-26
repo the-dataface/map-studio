@@ -159,6 +159,7 @@ const createDefaultDimensionSettings = (): DimensionSettings => {
       colorMaxColor: '#08519c',
       categoricalColors: [] as CategoricalColor[],
       labelTemplate: '',
+      symbolTextBy: '',
     },
     choropleth: defaultChoropleth,
     custom: { ...defaultChoropleth },
@@ -198,6 +199,18 @@ const createDefaultStylingSettings = (): StylingSettings => ({
     labelOffsetY: 0,
     labelAlignment: 'auto',
     customSvgPath: '',
+    symbolText: {
+      fontFamily: 'Inter',
+      fontBold: true,
+      fontItalic: false,
+      fontSize: 10,
+      color: '#ffffff',
+      outlineColor: '#000000',
+      outlineThickness: 0,
+      offsetX: 0,
+      offsetY: 0,
+      scaleWithSymbol: true,
+    },
   },
   choropleth: {
     labelFontFamily: 'Inter',
@@ -236,11 +249,21 @@ const loadStylingSettings = (): StylingSettings => {
 
     if (savedSettingsRaw) {
       const parsed = JSON.parse(savedSettingsRaw) as StylingSettings
+      const defaults = createDefaultStylingSettings()
       return {
+        ...defaults,
         ...parsed,
         base: {
+          ...defaults.base,
           ...parsed.base,
           savedStyles,
+        },
+        symbol: {
+          ...defaults.symbol,
+          ...parsed.symbol,
+          symbolText: parsed.symbol?.symbolText
+            ? { ...defaults.symbol.symbolText!, ...parsed.symbol.symbolText }
+            : defaults.symbol.symbolText,
         },
       }
     }

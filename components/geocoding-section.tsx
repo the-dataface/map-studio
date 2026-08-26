@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dialog';
 import type { DataRow, GeocodedRow } from '@/app/(studio)/types';
 import { cn } from '@/lib/utils';
+import { studioPanelClass, studioOutlineButtonClass, studioPrimaryButtonClass, StudioExpandableHeader } from '@/components/studio-panel';
 import { toast } from '@/components/ui/use-toast';
 
 interface GeocodingSectionProps {
@@ -723,64 +724,48 @@ export function GeocodingSection({
 
 	return (
 		<>
-			<Card className="shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden">
-				<CardHeader
-					className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ease-in-out py-5 px-6 rounded-t-xl relative"
-					onClick={() => setIsExpanded(!isExpanded)}>
-					<div className="flex items-center justify-between">
-						<div className="flex items-center gap-2">
-							<CardTitle className="text-gray-900 dark:text-white transition-colors duration-200">Geocoding</CardTitle>
-							{geocodingStatus.total > 0 && (
-								<div className="flex items-center gap-3 text-xs animate-in fade-in-50 slide-in-from-left-2 duration-300">
-									{geocodingStatus.cached > 0 && (
-										<div className="flex items-center gap-1">
-											<Database className="h-3 w-3 text-blue-500 transition-transform duration-200 hover:scale-110" />
-											<span className="text-blue-700 dark:text-blue-300 transition-colors duration-200">
-												{geocodingStatus.cached}
-											</span>
-										</div>
-									)}
-									{geocodingStatus.success > 0 && (
-										<div className="flex items-center gap-1">
-											<Check className="h-3 w-3 text-green-500 transition-transform duration-200 hover:scale-110" />
-											<span className="text-green-700 dark:text-green-300 transition-colors duration-200">
-												{geocodingStatus.success}
-											</span>
-										</div>
-									)}
-									{geocodingStatus.failed > 0 && (
-										<div className="flex items-center gap-1">
-											<X className="h-3 w-3 text-red-500 transition-transform duration-200 hover:scale-110" />
-											<span className="text-red-700 dark:text-red-300 transition-colors duration-200">
-												{geocodingStatus.failed}
-											</span>
-										</div>
-									)}
-									{geocodingStatus.processing > 0 && (
-										<div className="flex items-center gap-1">
-											<Loader2 className="h-3 w-3 text-orange-500 animate-spin" />
-											<span className="text-orange-700 dark:text-orange-300 transition-colors duration-200">
-												{geocodingStatus.processing}
-											</span>
-										</div>
-									)}
-								</div>
-							)}
-						</div>
-						<div className="transform transition-transform duration-200 ease-in-out">
-							{isExpanded ? (
-								<ChevronUp className="h-4 w-4 text-gray-600 dark:text-gray-400 transition-colors duration-200" />
-							) : (
-								<ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400 transition-colors duration-200" />
-							)}
-						</div>
-					</div>
-				</CardHeader>
+			<Card className={cn(studioPanelClass, 'overflow-hidden')}>
+				<StudioExpandableHeader
+					title="Geocoding"
+					isExpanded={isExpanded}
+					onToggle={() => setIsExpanded(!isExpanded)}
+					badges={
+						geocodingStatus.total > 0 ? (
+							<div className="flex items-center gap-3 text-xs">
+								{geocodingStatus.cached > 0 && (
+									<div className="flex items-center gap-1">
+										<Database className="h-3 w-3 text-blue-500" />
+										<span className="text-blue-700 dark:text-blue-300">{geocodingStatus.cached}</span>
+									</div>
+								)}
+								{geocodingStatus.success > 0 && (
+									<div className="flex items-center gap-1">
+										<Check className="h-3 w-3 text-green-500" />
+										<span className="text-green-700 dark:text-green-300">{geocodingStatus.success}</span>
+									</div>
+								)}
+								{geocodingStatus.failed > 0 && (
+									<div className="flex items-center gap-1">
+										<X className="h-3 w-3 text-red-500" />
+										<span className="text-red-700 dark:text-red-300">{geocodingStatus.failed}</span>
+									</div>
+								)}
+								{geocodingStatus.processing > 0 && (
+									<div className="flex items-center gap-1">
+										<Loader2 className="h-3 w-3 text-orange-500 animate-spin" />
+										<span className="text-orange-700 dark:text-orange-300">{geocodingStatus.processing}</span>
+									</div>
+								)}
+							</div>
+						) : undefined
+					}
+				/>
 
 				<div
-					className={`transition-all duration-300 ease-in-out ${
-						isExpanded ? 'max-h-[1200px] opacity-100' : 'max-h-0 opacity-0'
-					} overflow-hidden`}>
+					className={cn(
+						'studio-panel-expand-body transition-all duration-300 ease-in-out overflow-hidden',
+						isExpanded ? 'max-h-none opacity-100' : 'max-h-0 opacity-0'
+					)}>
 					<CardContent className="space-y-4 px-6 pb-6 pt-2">
 						<div className="animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
 							<h3 className="font-medium mb-1 text-gray-900 dark:text-white transition-colors duration-200">
@@ -820,16 +805,14 @@ export function GeocodingSection({
 
 							<div className="relative">
 								<div className="absolute inset-0 flex items-center">
-									<span className="w-full border-t border-gray-200 dark:border-gray-700 transition-colors duration-200" />
+									<span className="w-full border-t border-border" />
 								</div>
 								<div className="relative flex justify-center text-xs uppercase">
-									<span className="bg-white dark:bg-gray-800 px-2 text-gray-500 dark:text-gray-400 transition-colors duration-200">
-										OR
-									</span>
+									<span className="bg-background px-2 text-muted-foreground">OR</span>
 								</div>
 							</div>
 
-							<div className="grid grid-cols-2 gap-4">
+							<div className="space-y-4">
 								<div>
 									<label htmlFor="city-column" className="text-sm font-medium mb-2 block text-gray-900 dark:text-white transition-colors duration-200">
 										City column
@@ -890,17 +873,11 @@ export function GeocodingSection({
 							</div>
 						</div>
 
-						<div className="flex items-center justify-between pt-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300 delay-150">
-							<div className="text-sm text-gray-600 dark:text-gray-300 transition-colors duration-200">
-								{canGeocode ? 'Ready to generate coordinates' : 'Select address columns to enable geocoding'}
-							</div>
+						<div className="flex justify-end pt-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300 delay-150">
 							<Button
 								onClick={handleGeocodeClick}
 								disabled={!canGeocode || isGeocoding || !parsedData.length}
-								className={cn(
-									'flex items-center gap-2 transition-colors duration-200 hover:bg-blue-700 dark:hover:bg-blue-600 disabled:hover:bg-blue-600',
-									'group'
-								)}>
+								className={cn('flex items-center gap-2 group', studioPrimaryButtonClass)}>
 								<Search className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
 								{isGeocoding ? 'Geocoding...' : 'Geocode'}
 							</Button>
@@ -949,49 +926,41 @@ export function GeocodingSection({
 						)}
 
 						{/* Cache Pane - Displays current cache size */}
-						<div className="bg-white dark:bg-gray-900 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-3 transition-all duration-200 animate-in fade-in-50 slide-in-from-bottom-2 delay-200">
-							<div className="flex items-center justify-between">
-								<div className="text-xs text-gray-600 dark:text-gray-300 transition-colors duration-200">
-									{cacheConsent === false ? (
-										<span className="flex items-center gap-1">
-											<AlertCircle className="h-3 w-3 text-orange-500 animate-pulse" />
-											Caching disabled - slower geocoding
-										</span>
-									) : cacheConsent === true ? (
-										<>
-											Cache: {cacheSize} locations stored locally ({(cacheSize * 0.1).toFixed(1)} KB)
-										</>
-									) : (
-										<>Cache: Not configured</>
-									)}
-								</div>
-								<div className="flex gap-2">
-									{(cacheConsent === false || !permissionAsked) && (
-										<Button
-											variant="outline"
-											size="sm"
-											onClick={() => setShowConsentModal(true)}
-											className={cn(
-												'h-6 px-2 text-xs border-gray-300 dark:border-gray-600 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700',
-												'group'
-											)}>
-											<Database className="h-3 w-3 mr-1 transition-transform duration-300 group-hover:scale-110" />
-											Configure cache
-										</Button>
-									)}
+						<div className="space-y-2 rounded-none border border-dashed border-border bg-muted/20 p-3 transition-all duration-200 animate-in fade-in-50 slide-in-from-bottom-2 delay-200">
+							<div className="text-xs text-muted-foreground">
+								{cacheConsent === false ? (
+									<span className="flex items-center gap-1">
+										<AlertCircle className="h-3 w-3 text-orange-500 animate-pulse" />
+										Caching disabled - slower geocoding
+									</span>
+								) : cacheConsent === true ? (
+									<>
+										Cache: {cacheSize} locations stored locally ({(cacheSize * 0.1).toFixed(1)} KB)
+									</>
+								) : (
+									<>Cache: Not configured</>
+								)}
+							</div>
+							<div className="flex flex-wrap gap-2">
+								{(cacheConsent === false || !permissionAsked) && (
 									<Button
 										variant="outline"
 										size="sm"
-										onClick={clearAllCache}
-										className={cn(
-											'h-6 px-2 text-xs border-gray-300 dark:border-gray-600 transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-700',
-											'group'
-										)}
-										disabled={cacheSize === 0}>
-										<Trash2 className="h-3 w-3 mr-1 transition-transform duration-300 group-hover:rotate-3" />
-										Clear cache
+										onClick={() => setShowConsentModal(true)}
+										className={studioOutlineButtonClass}>
+										<Database className="h-3 w-3 mr-1" />
+										Configure cache
 									</Button>
-								</div>
+								)}
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={clearAllCache}
+									className={studioOutlineButtonClass}
+									disabled={cacheSize === 0}>
+									<Trash2 className="h-3 w-3 mr-1" />
+									Clear cache
+								</Button>
 							</div>
 						</div>
 

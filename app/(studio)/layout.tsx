@@ -1,16 +1,19 @@
 import type { ReactNode } from 'react'
 
 import { Header } from '@/components/header'
+import { StudioChromeProvider } from '@/lib/studio-chrome-context'
 
 import { StudioProviders } from './providers'
 
 export default function StudioLayout({ children }: { children: ReactNode }) {
   return (
     <StudioProviders>
-      <div className="min-h-screen bg-white transition-colors duration-200 dark:bg-gray-900">
-        <Header />
-        <main>{children}</main>
-      </div>
+      <StudioChromeProvider>
+        <div className="flex h-screen flex-col overflow-hidden bg-background">
+          <Header />
+          <main className="min-h-0 flex-1 overflow-hidden">{children}</main>
+        </div>
+      </StudioChromeProvider>
     </StudioProviders>
   )
 }

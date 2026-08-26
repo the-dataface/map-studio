@@ -6,6 +6,17 @@ const REVERSE_STATE_MAP: Record<string, string> = Object.fromEntries(
   Object.entries(STATE_CODE_MAP).map(([abbr, full]) => [full.toLowerCase(), abbr])
 )
 
+const US_STATE_ALIASES: Record<string, string> = {
+  dc: 'DC',
+  'd.c.': 'DC',
+  'd c': 'DC',
+  'district of columbia': 'DC',
+  'washington dc': 'DC',
+  'washington d.c.': 'DC',
+  'washington, dc': 'DC',
+  'washington, d.c.': 'DC',
+}
+
 const REVERSE_PROVINCE_MAP: Record<string, string> = Object.fromEntries(
   Object.entries(PROVINCE_CODE_MAP).map(([abbr, full]) => [full.toLowerCase(), abbr])
 )
@@ -108,6 +119,11 @@ export const normalizeGeoIdentifier = (value: string, geoType: GeographyKey): st
     }
 
     const lowerValue = trimmed.toLowerCase()
+    const alias = US_STATE_ALIASES[lowerValue]
+    if (alias) {
+      return alias
+    }
+
     const abbreviation = REVERSE_STATE_MAP[lowerValue]
     if (abbreviation) {
       return abbreviation

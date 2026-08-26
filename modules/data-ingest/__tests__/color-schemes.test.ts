@@ -24,6 +24,7 @@ const createSettings = (): DimensionSettings => ({
     colorMaxColor: '',
     categoricalColors: [],
     labelTemplate: '',
+    symbolTextBy: '',
   },
   choropleth: {
     stateColumn: '',

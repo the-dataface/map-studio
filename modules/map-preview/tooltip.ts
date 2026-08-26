@@ -6,6 +6,7 @@ import type {
   GeocodedRow,
   GeographyKey,
 } from '@/app/(studio)/types'
+import { SYMBOL_TEXT_ROW_INDEX } from '@/lib/symbol-text-content'
 
 type DataRecord = DataRow | GeocodedRow
 
@@ -35,6 +36,9 @@ export function getMappedDimensionColumns(
     if (symbol.longitude) columns.push(symbol.longitude)
     if (symbol.sizeBy) columns.push(symbol.sizeBy)
     if (symbol.colorBy) columns.push(symbol.colorBy)
+    if (symbol.symbolTextBy && symbol.symbolTextBy !== SYMBOL_TEXT_ROW_INDEX) {
+      columns.push(symbol.symbolTextBy)
+    }
     // Extract columns from label template
     if (symbol.labelTemplate) {
       const templateColumns = extractColumnsFromTemplate(symbol.labelTemplate)

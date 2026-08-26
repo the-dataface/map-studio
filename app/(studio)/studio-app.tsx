@@ -91,8 +91,8 @@ export default function StudioApp() {
   const [geocodingExpanded, setGeocodingExpanded] = useState(true)
   const [projectionExpanded, setProjectionExpanded] = useState(true)
   const [dataPreviewExpanded, setDataPreviewExpanded] = useState(true)
-  const [dimensionMappingExpanded, setDimensionMappingExpanded] = useState(true)
-  const [mapStylingExpanded, setMapStylingExpanded] = useState(true)
+  const [dimensionMappingExpanded, setDimensionMappingExpanded] = useState(false)
+  const [mapStylingExpanded, setMapStylingExpanded] = useState(false)
   const [mapPreviewExpanded, setMapPreviewExpanded] = useState(true)
   const [mapInView, setMapInView] = useState(false)
 
