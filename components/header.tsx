@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { Save, Upload, Loader2 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
@@ -11,6 +10,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { StudioModeTabs } from '@/components/studio-mode-tabs'
+import { BrandLockup } from '@/components/brand/brand-lockup'
 import { useStudioChrome } from '@/lib/studio-chrome-context'
 import { studioPrimaryButtonClass } from '@/components/studio-panel'
 import { cn } from '@/lib/utils'
@@ -23,27 +23,25 @@ export function Header() {
   return (
     <header
       id="studio-header"
-      className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border sticky top-0 z-50">
-      <div className="relative w-full px-4 lg:px-6 h-12">
+      className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border sticky top-0 z-50 overflow-visible">
+      <div className="relative w-full px-4 lg:px-6 h-12 overflow-visible">
         <TooltipProvider delayDuration={300}>
           <div className="flex h-full items-center gap-3">
-            <div className="flex min-w-0 shrink-0 items-center gap-4">
-              <Link href="/">
-                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-foreground hover:opacity-80">
-                  Map Studio
-                </span>
-              </Link>
-              {chrome?.showModeTabs ? (
-                <StudioModeTabs
-                  mode={chrome.studioMode}
-                  onModeChange={chrome.setStudioMode}
-                  designEnabled={chrome.designModeEnabled}
-                />
-              ) : null}
-            </div>
+            <BrandLockup
+              intervalMs={12000}
+              afterDivider={
+                chrome?.showModeTabs ? (
+                  <StudioModeTabs
+                    mode={chrome.studioMode}
+                    onModeChange={chrome.setStudioMode}
+                    designEnabled={chrome.designModeEnabled}
+                  />
+                ) : null
+              }
+            />
 
             {chrome?.showProjectControls ? (
-              <div className="pointer-events-none absolute inset-x-0 flex justify-center px-36 sm:px-44">
+              <div className="pointer-events-none absolute inset-x-0 flex justify-center px-40 sm:px-52">
                 <input
                   type="text"
                   value={chrome.projectName}
