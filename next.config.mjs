@@ -6,6 +6,7 @@ const withBundleAnalyzer = bundleAnalyzer({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  transpilePackages: ['df-state-shapes'],
   async redirects() {
     return [
       {

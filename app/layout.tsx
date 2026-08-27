@@ -1,5 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
+import { headers } from "next/headers"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import {
@@ -15,6 +16,9 @@ import {
   Poppins,
   Source_Sans_3 as Source_Sans_Pro,
 } from "next/font/google"
+import { GeoProvider } from "@/components/brand/geo-provider"
+import { resolveRequestGeo } from "@/lib/brand/geo"
+import { loadShape } from "@/lib/brand/shape-svg"
 import "./globals.css"
 
 // Load Geist fonts for UI (already configured font objects)
@@ -45,12 +49,15 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const geo = resolveRequestGeo(headers())
+  const initialShape = loadShape(geo.kind, geo.code)
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${roboto.variable} ${openSans.variable} ${lato.variable} ${montserrat.variable} ${oswald.variable} ${playfairDisplay.variable} ${merriweather.variable} ${raleway.variable} ${poppins.variable} ${sourceSansPro.variable} font-sans`}
       >
-        {children}
+        <GeoProvider initialShape={initialShape}>{children}</GeoProvider>
       </body>
     </html>
   )
