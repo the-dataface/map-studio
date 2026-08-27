@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { FolderOpen, Plus } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -22,7 +23,15 @@ export function HubHero({ onNewMap, onOpenFromFile }: HubHeroProps) {
         </h1>
         <p className="mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground">
           Import a dataset, geocode locations, style choropleths or symbol maps, and export production-ready SVG in
-          minutes.
+          minutes. By{' '}
+          <Link
+            href="https://labs.thedataface.com"
+            className="text-foreground underline-offset-4 hover:underline"
+            target="_blank"
+            rel="noopener noreferrer">
+            DFLabs
+          </Link>
+          .
         </p>
         <div className="mt-6 flex flex-wrap items-center gap-2">
           <Button

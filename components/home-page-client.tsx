@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 
 import { AppProviders } from '@/components/app-providers'
+import { HubFooter } from '@/components/hub-footer'
 import { HubHeader } from '@/components/hub-header'
 import { HubHero } from '@/components/hub-hero'
 import { ProjectList } from '@/components/project-list'
@@ -96,7 +97,7 @@ export function HomePageClient() {
 
   return (
     <AppProviders>
-      <div className="min-h-screen bg-background">
+      <div className="flex min-h-screen flex-col bg-background">
         <HubHeader />
         <HubHero onNewMap={handleNewMap} onOpenFromFile={handleOpenFromFile} />
         <ProjectList
@@ -106,6 +107,7 @@ export function HomePageClient() {
           onDeleteProject={handleDeleteProject}
           onNewMap={handleNewMap}
         />
+        <HubFooter />
         <input
           ref={fileInputRef}
           type="file"
