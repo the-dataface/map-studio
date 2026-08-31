@@ -4,20 +4,25 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
 
 import type {
+	BoundaryConfig,
 	ColumnFormat,
 	ColumnType,
 	DataRow,
 	DimensionSettings,
 	GeocodedRow,
 	GeographyKey,
+	MapLibreConfig,
 	MapType,
 	ProjectionType,
+	RenderTarget,
 	StylingSettings,
 } from '@/app/(studio)/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Download, Copy, Maximize2, Minimize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { MapLibrePreview } from '@/components/maplibre-preview';
+import { RenderTargetToggle } from '@/components/render-target-toggle';
 import { resolveLabelMapType } from '@/lib/symbol-text-content';
 import { applyLabelOverrideUpdate } from '@/lib/label-overrides';
 import type { StylingSettingsUpdater } from '@/lib/label-overrides';
@@ -81,6 +86,10 @@ export interface MapPreviewProps {
 	selectedPathId?: string | null;
 	onSelectedPathIdChange?: (id: string | null) => void;
 	embedEditorsInSidebar?: boolean;
+	renderTarget?: RenderTarget;
+	onRenderTargetChange?: (target: RenderTarget) => void;
+	boundaryConfig?: BoundaryConfig;
+	maplibreConfig?: MapLibreConfig;
 }
 
 const MAP_WIDTH = 975;
@@ -111,6 +120,10 @@ export function MapPreview({
 	selectedPathId: selectedPathIdProp,
 	onSelectedPathIdChange,
 	embedEditorsInSidebar = false,
+	renderTarget = 'svg',
+	onRenderTargetChange,
+	boundaryConfig,
+	maplibreConfig,
 }: MapPreviewProps) {
 	const internalSvgRef = useRef<SVGSVGElement>(null);
 	const svgRef = externalSvgRef || internalSvgRef;
@@ -179,10 +192,12 @@ export function MapPreview({
 	}, [activeTool, setSelectedLabelId, setSelectedPathId]);
 	const { geoAtlasData, isLoading } = useGeoAtlasData({
 		selectedGeography,
+		enabled: renderTarget === 'svg',
 		notify: (options) => {
 			toast(options as Parameters<typeof toast>[0]);
 		},
 	});
+	const showMapLibre = renderTarget === 'maplibre' && mapType === 'choropleth' && boundaryConfig && maplibreConfig;
 
 	// Handler for label position updates
 	const handleLabelPositionUpdate = useCallback(
@@ -617,6 +632,9 @@ export function MapPreview({
 	]);
 
 	useEffect(() => {
+		if (renderTarget !== 'svg') {
+			return;
+		}
 		const hasCustomMap = customMapData && customMapData.trim().length > 0;
 		if (!svgRef.current || !mapContainerRef.current) {
 			return;
@@ -988,6 +1006,7 @@ export function MapPreview({
 		handleLabelClick,
 		handlePathPointUpdate,
 		selectedPathId,
+		renderTarget,
 	]);
 
 	// Path drawing preview — isolated so mouse moves don't rebuild the full map
@@ -1139,7 +1158,7 @@ export function MapPreview({
 
 	const mapId = `map-preview-${selectedGeography}`;
 
-	if (isLoading) {
+	if (renderTarget === 'svg' && isLoading) {
 		return (
 			<Card className="studio-panel-flat w-full h-full flex flex-col">
 				{!isHeroLayout ? (
@@ -1156,6 +1175,9 @@ export function MapPreview({
 
 	const mapHeaderActions = (
 		<TooltipProvider delayDuration={300}>
+			{onRenderTargetChange ? (
+				<RenderTargetToggle value={renderTarget} onChange={onRenderTargetChange} />
+			) : null}
 			{onToggleFocusMode ? (
 				<Tooltip>
 					<TooltipTrigger asChild>
@@ -1175,7 +1197,7 @@ export function MapPreview({
 					<TooltipContent side="bottom">{isFocusMode ? 'Show inspector' : 'Focus map'}</TooltipContent>
 				</Tooltip>
 			) : null}
-			{!isHeroLayout ? (
+			{!isHeroLayout && renderTarget === 'svg' ? (
 				<>
 					<Tooltip>
 						<TooltipTrigger asChild>
@@ -1249,6 +1271,21 @@ export function MapPreview({
 					{isHeroLayout ? (
 						<div className="absolute top-3 right-3 z-50 flex items-center gap-1.5">{mapHeaderActions}</div>
 					) : null}
+					{showMapLibre ? (
+						<MapLibrePreview
+							choroplethData={choroplethData}
+							dimensionSettings={dimensionSettings}
+							stylingSettings={stylingSettings}
+							boundaryConfig={boundaryConfig!}
+							maplibreConfig={maplibreConfig!}
+							selectedGeography={selectedGeography}
+						/>
+					) : renderTarget === 'maplibre' ? (
+						<div className="flex h-full min-h-[420px] items-center justify-center px-6 text-center text-sm text-muted-foreground">
+							MapLibre canvas supports choropleth maps in this phase. Switch to choropleth map type or use the SVG canvas.
+						</div>
+					) : (
+						<>
 					<svg
 						ref={svgRef}
 						className="relative z-0 w-full h-full"
@@ -1300,6 +1337,8 @@ export function MapPreview({
 							onUpdateStylingSettings={onUpdateStylingSettings || (() => {})}
 							variant="floating"
 						/>
+					)}
+						</>
 					)}
 				</div>
 			</CardContent>

@@ -252,3 +252,58 @@ export interface StylingSettings {
 		opacity?: number;
 	};
 }
+
+// --- V2: shared boundary + render target config ---
+
+export type RenderTarget = 'svg' | 'maplibre';
+
+export type BoundaryLevel = 'world' | 'country' | 'admin1' | 'admin2' | 'custom';
+
+export type BoundaryJoinKey = 'name' | 'iso' | 'fips' | 'hasc' | 'geoid';
+
+export interface BoundaryScope {
+	countries?: string[];
+	region?: string;
+	bbox?: [number, number, number, number];
+}
+
+export interface BoundaryConfig {
+	level: BoundaryLevel;
+	scope: BoundaryScope;
+	joinColumn: string;
+	joinKey: BoundaryJoinKey;
+	source?: 'natural-earth' | 'geoboundaries' | 'census' | 'topojson' | 'custom';
+	customGeoJson?: string;
+}
+
+export interface BasemapStyle {
+	id: string;
+	name: string;
+	url: string;
+	attribution: string;
+}
+
+export interface MapLibreViewport {
+	center: [number, number];
+	zoom: number;
+	bearing?: number;
+	pitch?: number;
+}
+
+export interface MapLibreConfig {
+	viewport: MapLibreViewport;
+	basemapStyleId: string;
+	interactivity: {
+		allowZoom: boolean;
+		allowPan: boolean;
+		showTooltips: boolean;
+	};
+}
+
+export interface MatchReport {
+	matched: number;
+	totalDataRows: number;
+	totalFeatures: number;
+	unmatchedDataValues: string[];
+	unmatchedFeatureCount: number;
+}

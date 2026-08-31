@@ -79,6 +79,12 @@ function MapStudioContent() {
 		setSelectedProjection,
 		clipToCountry,
 		setClipToCountry,
+		renderTarget,
+		setRenderTarget,
+		boundaryConfig,
+		setBoundaryConfig,
+		maplibreConfig,
+		setMaplibreConfig,
 		columnTypes,
 		setColumnTypes,
 		columnFormats,
@@ -1188,6 +1194,9 @@ function MapStudioContent() {
 								onClipToCountryChange={setClipToCountry}
 								isExpanded={projectionExpanded}
 								setIsExpanded={setProjectionExpanded}
+								boundaryConfig={boundaryConfig}
+								onBoundaryChange={setBoundaryConfig}
+								renderTarget={renderTarget}
 							/>
 						)}
 
@@ -1307,6 +1316,10 @@ function MapStudioContent() {
 									selectedPathId={selectedPathId}
 									onSelectedPathIdChange={setSelectedPathId}
 									embedEditorsInSidebar
+									renderTarget={renderTarget}
+									onRenderTargetChange={setRenderTarget}
+									boundaryConfig={boundaryConfig}
+									maplibreConfig={maplibreConfig}
 								/>
 							</Suspense>
 							{studioMode === 'design' && hasAnyData() && (

@@ -3,18 +3,26 @@
 import { create } from 'zustand'
 
 import type {
+  BoundaryConfig,
   CategoricalColor,
   ColumnFormat,
   ColumnType,
   DataState,
   DimensionSettings,
   GeographyKey,
+  MapLibreConfig,
   MapType,
   ProjectionType,
+  RenderTarget,
   SavedStyle,
   StylingSettings,
   ColorScaleType,
 } from '@/app/(studio)/types'
+import {
+  boundaryConfigFromGeographyKey,
+  syncGeographyFromBoundary,
+} from '@/modules/boundaries/compatibility'
+import { DEFAULT_MAPLIBRE_CONFIG } from '@/modules/map-render/maplibre/basemap-styles'
 
 type Updater<T> = T | ((previous: T) => T)
 
@@ -31,6 +39,9 @@ type StateSnapshot = {
   selectedGeography: GeographyKey
   selectedProjection: ProjectionType
   clipToCountry: boolean
+  renderTarget: RenderTarget
+  boundaryConfig: BoundaryConfig
+  maplibreConfig: MapLibreConfig
   columnTypes: ColumnType
   columnFormats: ColumnFormat
   dimensionSettings: DimensionSettings
@@ -48,6 +59,9 @@ const createStateSnapshot = (state: {
   selectedGeography: GeographyKey
   selectedProjection: ProjectionType
   clipToCountry: boolean
+  renderTarget: RenderTarget
+  boundaryConfig: BoundaryConfig
+  maplibreConfig: MapLibreConfig
   columnTypes: ColumnType
   columnFormats: ColumnFormat
   dimensionSettings: DimensionSettings
@@ -61,6 +75,9 @@ const createStateSnapshot = (state: {
   selectedGeography: state.selectedGeography,
   selectedProjection: state.selectedProjection,
   clipToCountry: state.clipToCountry,
+  renderTarget: state.renderTarget,
+  boundaryConfig: JSON.parse(JSON.stringify(state.boundaryConfig)),
+  maplibreConfig: JSON.parse(JSON.stringify(state.maplibreConfig)),
   columnTypes: JSON.parse(JSON.stringify(state.columnTypes)),
   columnFormats: JSON.parse(JSON.stringify(state.columnFormats)),
   dimensionSettings: JSON.parse(JSON.stringify(state.dimensionSettings)),
@@ -76,6 +93,9 @@ const applyStateSnapshot = (snapshot: StateSnapshot): Partial<StudioState> => ({
   selectedGeography: snapshot.selectedGeography,
   selectedProjection: snapshot.selectedProjection,
   clipToCountry: snapshot.clipToCountry,
+  renderTarget: snapshot.renderTarget,
+  boundaryConfig: snapshot.boundaryConfig,
+  maplibreConfig: snapshot.maplibreConfig,
   columnTypes: snapshot.columnTypes,
   columnFormats: snapshot.columnFormats,
   dimensionSettings: snapshot.dimensionSettings,
@@ -306,6 +326,12 @@ interface StudioState {
   setSelectedProjection: (value: ProjectionType) => void
   clipToCountry: boolean
   setClipToCountry: (value: boolean) => void
+  renderTarget: RenderTarget
+  setRenderTarget: (value: RenderTarget) => void
+  boundaryConfig: BoundaryConfig
+  setBoundaryConfig: (value: Updater<BoundaryConfig>) => void
+  maplibreConfig: MapLibreConfig
+  setMaplibreConfig: (value: Updater<MapLibreConfig>) => void
   columnTypes: ColumnType
   setColumnTypes: (value: Updater<ColumnType>) => void
   columnFormats: ColumnFormat
@@ -353,13 +379,39 @@ export const useStudioStore = create<StudioState>()((set) => ({
   setActiveMapType: (value) => set({ activeMapType: value }),
 
   selectedGeography: 'usa-states',
-  setSelectedGeography: (value) => set({ selectedGeography: value }),
+  setSelectedGeography: (value) =>
+    set((state) => ({
+      selectedGeography: value,
+      boundaryConfig: {
+        ...boundaryConfigFromGeographyKey(value),
+        joinColumn: state.boundaryConfig.joinColumn || state.dimensionSettings.choropleth.stateColumn,
+      },
+    })),
 
   selectedProjection: 'albersUsa',
   setSelectedProjection: (value) => set({ selectedProjection: value }),
 
   clipToCountry: false,
   setClipToCountry: (value) => set({ clipToCountry: value }),
+
+  renderTarget: 'svg',
+  setRenderTarget: (value) => set({ renderTarget: value }),
+
+  boundaryConfig: boundaryConfigFromGeographyKey('usa-states'),
+  setBoundaryConfig: (value) =>
+    set((state) => {
+      const next = resolveValue(value, state.boundaryConfig)
+      return {
+        boundaryConfig: next,
+        selectedGeography: syncGeographyFromBoundary(next, state.selectedGeography),
+      }
+    }),
+
+  maplibreConfig: DEFAULT_MAPLIBRE_CONFIG,
+  setMaplibreConfig: (value) =>
+    set((state) => ({
+      maplibreConfig: resolveValue(value, state.maplibreConfig),
+    })),
 
   columnTypes: {},
   setColumnTypes: (value) =>
@@ -375,9 +427,16 @@ export const useStudioStore = create<StudioState>()((set) => ({
 
   dimensionSettings: createDefaultDimensionSettings(),
   setDimensionSettings: (value) =>
-    set((state) => ({
-      dimensionSettings: resolveValue(value, state.dimensionSettings),
-    })),
+    set((state) => {
+      const next = resolveValue(value, state.dimensionSettings)
+      return {
+        dimensionSettings: next,
+        boundaryConfig: {
+          ...state.boundaryConfig,
+          joinColumn: next.choropleth.stateColumn || state.boundaryConfig.joinColumn,
+        },
+      }
+    }),
 
   stylingSettings: loadStylingSettings(),
   setStylingSettings: (value) =>
@@ -408,6 +467,9 @@ export const useStudioStore = create<StudioState>()((set) => ({
       selectedGeography: 'usa-states',
       selectedProjection: 'albersUsa',
       clipToCountry: false,
+      renderTarget: 'svg',
+      boundaryConfig: boundaryConfigFromGeographyKey('usa-states'),
+      maplibreConfig: DEFAULT_MAPLIBRE_CONFIG,
       columnTypes: {},
       columnFormats: {},
       dimensionSettings: createDefaultDimensionSettings(),

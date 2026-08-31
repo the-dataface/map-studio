@@ -8,6 +8,7 @@ import type { TopoJSONData } from './types'
 interface UseGeoAtlasOptions {
   selectedGeography: GeographyKey
   notify: (options: { title?: string; description?: string; variant?: string; duration?: number; icon?: unknown }) => void
+  enabled?: boolean
 }
 
 const CANADA_OBJECT_NORMALISERS = [/prov/i, /adm1/i, /can_adm1/i, /canada_provinces/i, /admin1/i]
@@ -62,7 +63,7 @@ async function fetchTopoJSONFromAPI(geography: GeographyKey): Promise<TopoJSONDa
 // Increment this when data sources change to force React Query to fetch fresh data
 const TOPOJSON_CACHE_VERSION = 'v3'
 
-export function useGeoAtlasData({ selectedGeography, notify }: UseGeoAtlasOptions) {
+export function useGeoAtlasData({ selectedGeography, notify, enabled = true }: UseGeoAtlasOptions) {
   const {
     data: geoAtlasData,
     isLoading,
@@ -70,6 +71,7 @@ export function useGeoAtlasData({ selectedGeography, notify }: UseGeoAtlasOption
   } = useQuery({
     queryKey: ['topojson', TOPOJSON_CACHE_VERSION, selectedGeography],
     queryFn: () => fetchTopoJSONFromAPI(selectedGeography),
+    enabled,
     staleTime: 24 * 60 * 60 * 1000, // 24 hours
     gcTime: 7 * 24 * 60 * 60 * 1000, // 7 days
     retry: 2,

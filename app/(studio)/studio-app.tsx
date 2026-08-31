@@ -76,6 +76,12 @@ export default function StudioApp() {
     setSelectedProjection,
     clipToCountry,
     setClipToCountry,
+    renderTarget,
+    setRenderTarget,
+    boundaryConfig,
+    setBoundaryConfig,
+    maplibreConfig,
+    setMaplibreConfig,
     columnTypes,
     setColumnTypes,
     columnFormats,
@@ -320,6 +326,9 @@ export default function StudioApp() {
           onClipToCountryChange={setClipToCountry}
           isExpanded={projectionExpanded}
           setIsExpanded={setProjectionExpanded}
+          boundaryConfig={boundaryConfig}
+          onBoundaryChange={setBoundaryConfig}
+          renderTarget={renderTarget}
         />
 
         {hasData && (
@@ -402,6 +411,10 @@ export default function StudioApp() {
             clipToCountry={clipToCountry}
             isExpanded={mapPreviewExpanded}
             setIsExpanded={setMapPreviewExpanded}
+            renderTarget={renderTarget}
+            onRenderTargetChange={setRenderTarget}
+            boundaryConfig={boundaryConfig}
+            maplibreConfig={maplibreConfig}
           />
         </Suspense>
       </div>
