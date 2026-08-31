@@ -19,6 +19,16 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  experimental: {
+    // Runtime reads from these paths (layout brand shapes, OG image fonts) are not
+    // picked up by Next's static file tracer unless explicitly included.
+    outputFileTracingIncludes: {
+      '/*': [
+        './node_modules/df-state-shapes/assets/**/*',
+        './node_modules/geist/dist/fonts/**/*',
+      ],
+    },
+  },
   // Webpack configuration for bundle size tracking and code splitting
   webpack: (config, { isServer }) => {
     if (!isServer) {
