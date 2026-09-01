@@ -30,7 +30,7 @@ export const DEFAULT_MAPLIBRE_CONFIG = {
     center: [-98.5795, 39.8283] as [number, number],
     zoom: 3,
   },
-  basemapStyleId: 'liberty',
+  basemapStyleId: 'positron',
   interactivity: {
     allowZoom: true,
     allowPan: true,

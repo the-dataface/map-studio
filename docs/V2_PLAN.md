@@ -70,6 +70,68 @@ Users set this at project creation, via a toggle in the map chrome, or through t
 
 Switching render targets carries shared config forward. Renderer-specific settings are preserved but may become dormant when inactive.
 
+### Canvas types (user-facing)
+
+Render targets are exposed in the UI as **canvas types**, not engine names:
+
+| Internal | User label | Description |
+|---|---|---|
+| `svg` | **Print layout** | Fixed-size map for SVG/PNG export and Figma |
+| `maplibre` | **Interactive map** | Zoomable map on a real basemap |
+| (custom boundary) | **Custom boundaries** | User-provided region shapes (SVG today) |
+
+Canvas type is chosen once in the **Map setup** tab. Projection appears only for Print layout and Custom boundaries; Interactive map uses viewport + basemap.
+
+---
+
+## Studio workflow (Data → Map setup → Design)
+
+Three tabs replace the old two-tab Data / Design split:
+
+| Tab | Responsibility |
+|---|---|
+| **Data** | Upload / sample data, layer list, per-layer preview, column typing, geocoding (Points layers) |
+| **Map setup** | Canvas type, region, projection/basemap, per-layer dimension mapping, reference layer toggles |
+| **Design** | Map preview, base + per-layer styling accordions, export actions |
+
+Dimension mapping moved out of Design — it is configuration, not polish. Design shows a read-only canvas badge with a link back to Map setup.
+
+Keyboard shortcuts: `1` Data · `2` Map setup · `3` Design.
+
+---
+
+## Layer model
+
+Fixed dataset slots (`symbolData`, `choroplethData`, `customData`) are replaced by true layers:
+
+```ts
+type LayerType = 'points' | 'areas'
+type CanvasType = 'print' | 'interactive' | 'custom'
+
+interface MapLayer {
+  id: string
+  name: string
+  type: LayerType
+  visible: boolean
+  order: number
+  data: DataState
+  columnTypes: ColumnType
+  columnFormats: ColumnFormat
+  dimensions: SymbolDimensionSettings | ChoroplethDimensionSettings
+  styling: PointsLayerStyle | AreasLayerStyle
+}
+```
+
+Terminology: Symbol → **Points**, Choropleth → **Areas**.
+
+Legacy projects migrate on load: existing symbol/choropleth data becomes one Points and/or one Areas layer. `syncLegacyFromLayers` keeps renderers working during the transition.
+
+Multiple visible Points layers render together; the top visible Areas layer drives choropleth fill (z-order by `order`).
+
+### Reference layers
+
+Curated context overlays (US state borders, major cities, graticule) live in `referenceLayers[]` — separate from user data layers. Toggles in Map setup; rendering expands over time.
+
 ---
 
 ## What V1 keeps (SVG renderer)

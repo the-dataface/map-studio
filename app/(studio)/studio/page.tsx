@@ -5,15 +5,14 @@ import { useState, useEffect, useCallback, useRef, Suspense, lazy, useMemo } fro
 import { useSearchParams, useRouter } from 'next/navigation';
 import { DataInput } from '@/components/data-input';
 import { GeocodingSection } from '@/components/geocoding-section';
-import { MapProjectionSelection } from '@/components/map-projection-selection';
+import { MapSetupPanel } from '@/components/map-setup-panel';
 import { FloatingToolbar } from '@/components/floating-toolbar';
 
 // Lazy load heavy components for better initial load performance
 const DataPreview = lazy(() => import('@/components/data-preview').then((mod) => ({ default: mod.DataPreview })));
-const DimensionMapping = lazy(() =>
-	import('@/components/dimension-mapping').then((mod) => ({ default: mod.DimensionMapping }))
+const LayerStylingInspector = lazy(() =>
+	import('@/components/layer-styling-inspector').then((mod) => ({ default: mod.LayerStylingInspector }))
 );
-const MapStyling = lazy(() => import('@/components/map-styling').then((mod) => ({ default: mod.MapStyling })));
 const MapPreview = lazy(() => import('@/components/map-preview').then((mod) => ({ default: mod.MapPreview })));
 const LabelEditorToolbar = lazy(() =>
 	import('@/components/label-editor-toolbar').then((mod) => ({ default: mod.LabelEditorToolbar }))
@@ -42,16 +41,15 @@ import { resolveActiveMapType } from '@/modules/data-ingest/map-type';
 import {
 	inferColumnTypesFromData,
 	mergeInferredTypes,
-	resetDimensionForMapType,
 } from '@/modules/data-ingest/dimension-schema';
 import { saveProject, getProject, exportProject, generatePreviewThumbnail, type SavedProject } from '@/lib/projects';
 import { useRegisterStudioChrome, type StudioMode } from '@/lib/studio-chrome-context';
 import { DesignTabHint } from '@/components/design-tab-hint';
 import { DataCanvasEmpty } from '@/components/data-canvas-empty';
-import { CustomMapInput } from '@/components/custom-map-input';
 import { cn } from '@/lib/utils';
 import type { StylingSettingsUpdater } from '@/lib/label-overrides';
 import { resolveLabelMapType } from '@/lib/symbol-text-content';
+import { getSelectedLayer, projectHasLayerData } from '@/modules/layers/selectors';
 
 // Mark page as dynamic to prevent static generation
 export const dynamic = 'force-dynamic';
@@ -93,6 +91,25 @@ function MapStudioContent() {
 		setDimensionSettings,
 		stylingSettings,
 		setStylingSettings,
+		layers,
+		selectedLayerId,
+		canvasType,
+		customBoundary,
+		printConfig,
+		referenceLayers,
+		setSelectedLayerId,
+		setCanvasType,
+		setCustomBoundary,
+		setPrintConfig,
+		toggleReferenceLayer,
+		addLayer,
+		removeLayer,
+		setLayerData,
+		setLayerDimensions,
+		setLayerColumnTypes,
+		setLayerColumnFormats,
+		toggleLayerVisibility,
+		hydrateFromProject,
 		resetDataStates,
 		resetAll,
 		pushHistory,
@@ -105,9 +122,11 @@ function MapStudioContent() {
 
 	const [dataInputExpanded, setDataInputExpanded] = useState(true);
 	const [customMapInputExpanded, setCustomMapInputExpanded] = useState(false);
-	const [showGeocoding, setShowGeocoding] = useState(false);
 	const [geocodingExpanded, setGeocodingExpanded] = useState(true);
-	const [projectionExpanded, setProjectionExpanded] = useState(true);
+	const [canvasExpanded, setCanvasExpanded] = useState(true);
+	const [regionExpanded, setRegionExpanded] = useState(true);
+	const [layersExpanded, setLayersExpanded] = useState(true);
+	const [setupPreviewExpanded, setSetupPreviewExpanded] = useState(true);
 	const [dataPreviewExpanded, setDataPreviewExpanded] = useState(true);
 	const [dimensionMappingExpanded, setDimensionMappingExpanded] = useState(false);
 	const [mapStylingExpanded, setMapStylingExpanded] = useState(false);
@@ -153,7 +172,6 @@ function MapStudioContent() {
 			setCurrentProjectId(null);
 			setProjectName('Untitled Project');
 			setDataInputExpanded(true);
-			setShowGeocoding(false);
 		}
 	}, [projectId, resetAll]);
 
@@ -358,40 +376,18 @@ function MapStudioContent() {
 	// Load project data into store
 	const loadProject = useCallback(
 		(project: SavedProject) => {
-			setSymbolData(project.symbolData);
-			setChoroplethData(project.choroplethData);
-			setCustomData(project.customData);
-			setActiveMapType(project.activeMapType);
-			setSelectedGeography(project.selectedGeography);
-			setSelectedProjection(project.selectedProjection);
-			setClipToCountry(project.clipToCountry);
-			setColumnTypes(project.columnTypes as ColumnType);
-			setColumnFormats(project.columnFormats);
-			setDimensionSettings(project.dimensionSettings);
-			setStylingSettings(project.stylingSettings);
-			setShowGeocoding(project.symbolData.parsedData.length > 0);
+			hydrateFromProject(project);
 			setDataInputExpanded(false);
-			setStudioMode('design');
 		},
-		[
-			setSymbolData,
-			setChoroplethData,
-			setCustomData,
-			setActiveMapType,
-			setSelectedGeography,
-			setSelectedProjection,
-			setClipToCountry,
-			setColumnTypes,
-			setColumnFormats,
-			setDimensionSettings,
-			setStylingSettings,
-		]
+		[hydrateFromProject]
 	);
 
 	// Check if any data exists at all
 	const hasAnyData = () => {
-		return hasDataForType('symbol') || hasDataForType('choropleth') || hasDataForType('custom');
+		return projectHasLayerData(layers) || customBoundary.trim().length > 0 || customData.customMapData.length > 0;
 	};
+
+	const selectedLayer = getSelectedLayer(layers, selectedLayerId);
 
 	// Save project
 	const handleSaveProject = useCallback(async () => {
@@ -451,6 +447,15 @@ function MapStudioContent() {
 				dimensionSettings,
 				stylingSettings,
 				preview,
+				layers,
+				selectedLayerId,
+				canvasType,
+				customBoundary,
+				printConfig,
+				referenceLayers,
+				renderTarget,
+				boundaryConfig,
+				maplibreConfig,
 			};
 
 			const saved = saveProject(project);
@@ -557,6 +562,15 @@ function MapStudioContent() {
 				dimensionSettings,
 				stylingSettings,
 				preview,
+				layers,
+				selectedLayerId,
+				canvasType,
+				customBoundary,
+				printConfig,
+				referenceLayers,
+				renderTarget,
+				boundaryConfig,
+				maplibreConfig,
 			};
 
 			exportProject(project);
@@ -596,31 +610,37 @@ function MapStudioContent() {
 
 	// Map Projection and Geography states
 	// Helpers to keep component API aligned with legacy props
-	const updateDimensionSettings = (newSettings: Pick<DimensionSettings, 'symbol' | 'choropleth'>) => {
-		setDimensionSettings((prev: DimensionSettings) => ({
-			...prev,
-			symbol: newSettings.symbol,
-			choropleth: newSettings.choropleth,
-		}));
-		// Push history immediately for dimension changes
-		pushHistory();
-	};
-
-	const updateStylingSettings = (newSettings: StylingSettingsUpdater) => {
-		setStylingSettings(newSettings);
-		// Use debounced history push for styling changes
-		pushStylingHistory();
-	};
+	const updateDimensionSettings = useCallback(
+		(newSettings: Pick<DimensionSettings, 'symbol' | 'choropleth'>) => {
+			setDimensionSettings((prev: DimensionSettings) => ({
+				...prev,
+				symbol: newSettings.symbol,
+				choropleth: newSettings.choropleth,
+			}))
+			pushHistory()
+		},
+		[setDimensionSettings, pushHistory],
+	)
 
 	const updateColumnTypes = (newTypes: ColumnType) => {
 		setColumnTypes(newTypes);
+		if (selectedLayer) {
+			setLayerColumnTypes(selectedLayer.id, newTypes);
+		}
 	};
 
 	const updateColumnFormats = (newFormats: ColumnFormat) => {
 		setColumnFormats(newFormats);
+		if (selectedLayer) {
+			setLayerColumnFormats(selectedLayer.id, newFormats);
+		}
 	};
 
-	// NEW: Function to update selectedGeography in both places
+	const updateStylingSettings = (newSettings: StylingSettingsUpdater) => {
+		setStylingSettings(newSettings);
+		pushStylingHistory();
+	};
+
 	const updateSelectedGeography = (newGeography: GeographyKey) => {
 		setSelectedGeography(newGeography);
 		setDimensionSettings((prev: DimensionSettings) => ({
@@ -632,6 +652,7 @@ function MapStudioContent() {
 	};
 
 	const getCurrentData = () => {
+		if (selectedLayer) return selectedLayer.data;
 		switch (activeMapType) {
 			case 'symbol':
 				return symbolData;
@@ -664,8 +685,22 @@ function MapStudioContent() {
 		setStudioMode('design');
 	}, []);
 
-	const hasDataLoaded =
-		hasDataForType('symbol') || hasDataForType('choropleth') || hasDataForType('custom');
+	const pointsLayers = layers.filter(
+		(l) => l.type === 'points' && (l.data.parsedData.length > 0 || l.data.geocodedData.length > 0),
+	);
+
+	const geocodeLayer =
+		selectedLayer?.type === 'points'
+			? selectedLayer
+			: pointsLayers[0] ?? null;
+
+	const showGeocodingPanel = pointsLayers.length > 0;
+
+	const hasDataLoaded = projectHasLayerData(layers) || customBoundary.trim().length > 0;
+
+	const goToMapSetupFromHint = useCallback(() => {
+		setStudioMode('map-setup');
+	}, []);
 
 	const studioChrome = useMemo(
 		() => ({
@@ -680,6 +715,7 @@ function MapStudioContent() {
 			studioMode,
 			setStudioMode,
 			designModeEnabled: hasDataLoaded,
+			mapSetupModeEnabled: hasDataLoaded,
 		}),
 		[
 			hasDataLoaded,
@@ -695,58 +731,33 @@ function MapStudioContent() {
 	useRegisterStudioChrome(studioChrome);
 
 	const handleDataLoad = (
-		mapType: 'symbol' | 'choropleth' | 'custom',
+		mapType: 'symbol' | 'choropleth',
 		parsedData: DataRow[],
 		columns: string[],
 		rawData: string,
-		customMapDataParam?: string
+		layerName?: string,
 	) => {
+		const layerType = mapType === 'symbol' ? 'points' : 'areas';
 		const newDataState: DataState = {
 			rawData,
 			parsedData,
 			geocodedData: [],
 			columns,
-			customMapData: customMapDataParam || '',
+			customMapData: '',
 		};
 
-		const nextMapType = resolveActiveMapType({
-			loadedType: mapType as MapType,
-			parsedDataLength: parsedData.length,
-			customMapData: customMapDataParam,
-			existingChoroplethData: choroplethData,
-			existingCustomData: customData,
-		});
-
-		switch (mapType) {
-			case 'symbol':
-				setSymbolData(newDataState);
-				setShowGeocoding(parsedData.length > 0);
-				break;
-			case 'choropleth':
-				setChoroplethData(newDataState);
-				break;
-			case 'custom':
-				setCustomData(newDataState);
-				break;
-		}
+		const targetLayerId = addLayer(layerType, newDataState, layerName);
 
 		if (parsedData.length > 0) {
 			const inferredTypes = inferColumnTypesFromData(parsedData, columns);
+			if (targetLayerId) {
+				setLayerColumnTypes(targetLayerId, (prev) => mergeInferredTypes(prev, inferredTypes));
+			}
 			setColumnTypes((prev: ColumnType) => mergeInferredTypes(prev, inferredTypes));
 		}
 
-		setActiveMapType(nextMapType);
 		setDataInputExpanded(false);
 
-		// Only reset dimension mappings when loading genuinely new data type,
-		// not when refreshing choropleth data on an existing custom map project
-		const isCustomMapRefresh =
-			nextMapType === 'custom' && customData.customMapData.length > 0 && mapType === 'choropleth';
-		if (!isCustomMapRefresh) {
-			setDimensionSettings((prev: DimensionSettings) => resetDimensionForMapType(prev, nextMapType));
-		}
-
-		// Only re-infer geography when loading data with rows (skip custom-only SVG loads)
 		if (parsedData.length > 0) {
 			const { geography, projection } = inferGeographyAndProjection({
 				columns,
@@ -757,130 +768,133 @@ function MapStudioContent() {
 				updateSelectedGeography(geography);
 			}
 
-			if (projection !== selectedProjection) {
-				setSelectedProjection(projection);
-			}
+			setPrintConfig((prev) => ({ ...prev, projection }));
+			setSelectedProjection(projection);
 		}
 
-		// Push history after data load completes
 		setTimeout(() => pushHistory(), 100);
 	};
 
-	const handleClearData = (mapType: MapType) => {
-		switch (mapType) {
-			case 'symbol':
-				setSymbolData(emptyDataState());
-				setShowGeocoding(false);
-				break;
-			case 'choropleth':
-				setChoroplethData(emptyDataState());
-				break;
-			case 'custom':
-				setCustomData(emptyDataState());
-				break;
-		}
-
-		setDimensionSettings((prev: DimensionSettings) => resetDimensionForMapType(prev, mapType));
-
-		const hasSymbol = mapType !== 'symbol' ? hasDataForType('symbol') : false;
-		const hasChoropleth = mapType !== 'choropleth' ? hasDataForType('choropleth') : false;
-		const hasCustom = mapType !== 'custom' ? hasDataForType('custom') : false;
-
-		if (hasChoropleth && hasCustom) {
-			setActiveMapType('custom');
-		} else if (hasChoropleth) {
-			setActiveMapType('choropleth');
-		} else if (hasCustom) {
-			setActiveMapType('custom');
-		} else if (hasSymbol) {
-			setActiveMapType('symbol');
-		} else {
-			setDataInputExpanded(true);
-			setActiveMapType('symbol');
-		}
-
-		// Push history after data clear completes
+	const handleCustomBoundaryLoad = (customMapData: string) => {
+		setCustomBoundary(customMapData);
+		setCanvasType('custom');
 		setTimeout(() => pushHistory(), 100);
 	};
 
-	const updateGeocodedData = (geocodedData: GeocodedRow[]) => {
-		// Update symbol data with geocoded coordinates
-		if (symbolData.parsedData.length > 0) {
-			const newColumns = [...symbolData.columns];
+	const handleClearAllData = () => {
+		resetDataStates();
+		setCustomBoundary('');
+		setStudioMode('data');
+		setTimeout(() => pushHistory(), 100);
+	};
 
-			// Possible names for latitude/longitude columns (case-insensitive)
-			const latNames = ['latitude', 'lat', 'Latitude', 'Lat'];
-			const lngNames = ['longitude', 'long', 'lng', 'lon', 'Longitude', 'Long', 'Lng', 'Lon'];
+	const handleLayerGeocodedData = useCallback(
+		(layerId: string, geocodedData: GeocodedRow[]) => {
+			const layer = layers.find((l) => l.id === layerId);
+			if (!layer) return;
 
-			// Find first matching column for latitude/longitude
-			const latCol =
-				newColumns.find((col) => latNames.includes(col.trim().toLowerCase())) ||
-				newColumns.find((col) => latNames.some((name) => col.trim().toLowerCase() === name.toLowerCase()));
-			const lngCol =
-				newColumns.find((col) => lngNames.includes(col.trim().toLowerCase())) ||
-				newColumns.find((col) => lngNames.some((name) => col.trim().toLowerCase() === name.toLowerCase()));
+			const latNames = ['latitude', 'lat'];
+			const lngNames = ['longitude', 'long', 'lng', 'lon'];
+			const newColumns = [...layer.data.columns];
 
-			let chosenLatCol = latCol;
-			let chosenLngCol = lngCol;
+			let latCol = newColumns.find((col) => latNames.includes(col.trim().toLowerCase()));
+			let lngCol = newColumns.find((col) => lngNames.includes(col.trim().toLowerCase()));
 
-			// If no suitable column exists and geocoded data is present, add 'latitude'/'longitude'
-			if (!chosenLatCol && geocodedData.some((row) => row.latitude !== undefined)) {
-				newColumns.push('latitude');
-				chosenLatCol = 'latitude';
+			const sampleRow = geocodedData.find((row) => row.geocoded) ?? geocodedData[0];
+			if (sampleRow) {
+				for (const key of Object.keys(sampleRow)) {
+					if (
+						!latCol &&
+						latNames.includes(key.trim().toLowerCase()) &&
+						sampleRow[key] !== undefined &&
+						sampleRow[key] !== ''
+					) {
+						latCol = key;
+					}
+					if (
+						!lngCol &&
+						lngNames.includes(key.trim().toLowerCase()) &&
+						sampleRow[key] !== undefined &&
+						sampleRow[key] !== ''
+					) {
+						lngCol = key;
+					}
+				}
 			}
-			if (!chosenLngCol && geocodedData.some((row) => row.longitude !== undefined)) {
-				newColumns.push('longitude');
-				chosenLngCol = 'longitude';
+
+			if (!latCol && geocodedData.some((row) => row.latitude !== undefined)) {
+				latCol = 'latitude';
+			}
+			if (!lngCol && geocodedData.some((row) => row.longitude !== undefined)) {
+				lngCol = 'longitude';
 			}
 
-			// Update column types to include the chosen columns as coordinate type
-			const newColumnTypes = { ...columnTypes };
-			if (chosenLatCol) {
-				newColumnTypes[chosenLatCol] = 'coordinate';
+			if (latCol && !newColumns.includes(latCol)) {
+				newColumns.push(latCol);
 			}
-			if (chosenLngCol) {
-				newColumnTypes[chosenLngCol] = 'coordinate';
+			if (lngCol && !newColumns.includes(lngCol)) {
+				newColumns.push(lngCol);
 			}
 
-			// Update both column types and symbol data
-			setColumnTypes(newColumnTypes);
-			setSymbolData((prev) => ({
+			setLayerData(layerId, (prev) => ({
 				...prev,
 				geocodedData,
 				columns: newColumns,
 			}));
 
-			// Directly update dimension settings for symbol map with chosen columns
-			setDimensionSettings((prevSettings: DimensionSettings) => ({
-				...prevSettings,
-				symbol: {
-					...prevSettings.symbol,
-					latitude: chosenLatCol || prevSettings.symbol.latitude,
-					longitude: chosenLngCol || prevSettings.symbol.longitude,
-				},
-			}));
+			if (latCol || lngCol) {
+				setLayerColumnTypes(layerId, (prev) => ({
+					...prev,
+					...(latCol ? { [latCol]: 'coordinate' as const } : {}),
+					...(lngCol ? { [lngCol]: 'coordinate' as const } : {}),
+				}));
+			}
 
-			// Push history after geocoding completes
-			setTimeout(() => pushHistory(), 100);
-		}
-	};
+			if (layer.type === 'points' && (latCol || lngCol)) {
+				setLayerDimensions(layerId, (prev) => ({
+					...prev,
+					...(latCol ? { latitude: latCol } : {}),
+					...(lngCol ? { longitude: lngCol } : {}),
+				}));
+			}
+
+			const isComplete = geocodedData.length > 0 && geocodedData.every((row) => !row.processing);
+			if (isComplete) {
+				setTimeout(() => pushHistory(), 100);
+			}
+		},
+		[layers, setLayerData, setLayerColumnTypes, setLayerDimensions, pushHistory],
+	);
 
 	// Get both symbol and choropleth data for the map preview
 	const getSymbolDisplayData = () => {
+		const visiblePoints = layers.filter((l) => l.type === 'points' && l.visible);
+		if (visiblePoints.length > 0) {
+			return visiblePoints.flatMap((l) =>
+				l.data.geocodedData.length > 0 ? l.data.geocodedData : l.data.parsedData,
+			);
+		}
 		return symbolData.geocodedData.length > 0 ? symbolData.geocodedData : symbolData.parsedData;
 	};
 
 	const getChoroplethDisplayData = () => {
+		const visibleAreas = layers.filter((l) => l.type === 'areas' && l.visible);
+		if (visibleAreas.length > 0) {
+			const topArea = visibleAreas[visibleAreas.length - 1];
+			return topArea.data.geocodedData.length > 0 ? topArea.data.geocodedData : topArea.data.parsedData;
+		}
 		return choroplethData.geocodedData.length > 0 ? choroplethData.geocodedData : choroplethData.parsedData;
 	};
 
 	// NEW: Enhanced function to determine which data to display in preview
 	const getCurrentDisplayData = () => {
-		// If custom map is active and choropleth data exists, show choropleth data
+		if (selectedLayer) {
+			const data = selectedLayer.data;
+			return data.geocodedData.length > 0 ? data.geocodedData : data.parsedData;
+		}
 		if (activeMapType === 'custom' && hasDataForType('choropleth')) {
 			return getChoroplethDisplayData();
 		}
-		// Otherwise use the current data based on active map type
 		const currentData = getCurrentData();
 		return currentData.geocodedData.length > 0 ? currentData.geocodedData : currentData.parsedData;
 	};
@@ -912,11 +926,6 @@ function MapStudioContent() {
 			.map((r: DataRow) => Object.values(r).map((v) => (typeof v === 'string' || typeof v === 'number' ? v : '')));
 	}, [activeMapType, symbolData.parsedData, choroplethData.parsedData]);
 
-	useEffect(() => {
-		// Only show geocoding panel when symbol data exists
-		setShowGeocoding(symbolData.parsedData.length > 0);
-	}, [symbolData.parsedData]);
-
 	// Effect to handle projection changes based on geography
 	useEffect(() => {
 		const isUSGeography =
@@ -924,15 +933,15 @@ function MapStudioContent() {
 
 		if (!isUSGeography && (selectedProjection === 'albersUsa' || selectedProjection === 'albers')) {
 			setSelectedProjection('mercator');
+			return;
 		}
 
-		// If geography is not a single country, disable clipping
 		const isSingleCountryGeography =
 			selectedGeography === 'usa-nation' || selectedGeography === 'canada-nation' || selectedGeography === 'world';
-		if (!isSingleCountryGeography) {
+		if (!isSingleCountryGeography && clipToCountry) {
 			setClipToCountry(false);
 		}
-	}, [selectedGeography, selectedProjection]);
+	}, [selectedGeography, selectedProjection, clipToCountry, setSelectedProjection, setClipToCountry]);
 
 	// Ref for map preview
 	const mapPreviewRef = useRef<HTMLDivElement>(null);
@@ -1007,21 +1016,20 @@ function MapStudioContent() {
 	const handleCollapseAll = () => {
 		setDataInputExpanded(false);
 		setGeocodingExpanded(false);
-		setProjectionExpanded(false);
+		setCanvasExpanded(false);
+		setRegionExpanded(false);
+		setLayersExpanded(false);
 		setDataPreviewExpanded(false);
-		setDimensionMappingExpanded(false);
-		setMapStylingExpanded(false);
 		window.dispatchEvent(new CustomEvent('collapse-all-panels'));
 	};
 
-	// Compute if any panel except map preview is expanded
 	const anyPanelExpanded =
 		dataInputExpanded ||
 		geocodingExpanded ||
-		projectionExpanded ||
-		dataPreviewExpanded ||
-		dimensionMappingExpanded ||
-		mapStylingExpanded;
+		canvasExpanded ||
+		regionExpanded ||
+		layersExpanded ||
+		dataPreviewExpanded;
 
 	// Copy SVG to clipboard
 	const handleCopySVG = useCallback(async () => {
@@ -1066,7 +1074,6 @@ function MapStudioContent() {
 		setCurrentProjectId(null);
 		setProjectName('Untitled Project');
 		setDataInputExpanded(true);
-		setShowGeocoding(false);
 		setMapPreviewExpanded(false);
 		setStudioMode('data');
 		draftSessionRef.current =
@@ -1110,6 +1117,11 @@ function MapStudioContent() {
 					return;
 				}
 				if (e.key === '2' && hasDataLoaded) {
+					e.preventDefault();
+					setStudioMode('map-setup');
+					return;
+				}
+				if (e.key === '3' && hasDataLoaded) {
 					e.preventDefault();
 					setStudioMode('design');
 					return;
@@ -1175,49 +1187,39 @@ function MapStudioContent() {
 				className={cn('studio-data-view', studioMode !== 'data' && 'hidden')}>
 				<div className="studio-data-shell">
 					<aside className="studio-data-sidebar" aria-label="Data configuration">
-						<DataInput
-							onDataLoad={handleDataLoad}
-							isExpanded={dataInputExpanded}
-							setIsExpanded={setDataInputExpanded}
-							onClearData={handleClearData}
-						/>
+						<div className="studio-sidebar-scroll">
+							<DataInput
+								onDataLoad={handleDataLoad}
+								isExpanded={dataInputExpanded}
+								setIsExpanded={setDataInputExpanded}
+								pointsLayerCount={layers.filter((l) => l.type === 'points').length}
+								areasLayerCount={layers.filter((l) => l.type === 'areas').length}
+							/>
 
-						{hasAnyData() && !hasDataForType('custom') && (
-							<MapProjectionSelection
-								geography={selectedGeography}
-								projection={selectedProjection}
-								onGeographyChange={updateSelectedGeography}
-								onProjectionChange={setSelectedProjection}
-								columns={getCurrentColumns()}
-								sampleRows={getCurrentSampleRows()}
-								clipToCountry={clipToCountry}
-								onClipToCountryChange={setClipToCountry}
-								isExpanded={projectionExpanded}
-								setIsExpanded={setProjectionExpanded}
-								boundaryConfig={boundaryConfig}
-								onBoundaryChange={setBoundaryConfig}
-								renderTarget={renderTarget}
+							{showGeocodingPanel && geocodeLayer && (
+								<GeocodingSection
+									columns={geocodeLayer.data.columns}
+									parsedData={geocodeLayer.data.parsedData}
+									setGeocodedData={(geocoded) => {
+										handleLayerGeocodedData(geocodeLayer.id, geocoded);
+									}}
+									isGeocoding={isGeocoding}
+									setIsGeocoding={setIsGeocoding}
+									isExpanded={geocodingExpanded}
+									setIsExpanded={setGeocodingExpanded}
+									pointsLayers={pointsLayers.map((l) => ({ id: l.id, name: l.name }))}
+									selectedLayerId={geocodeLayer.id}
+									onSelectLayer={setSelectedLayerId}
+								/>
+							)}
+						</div>
+
+						{hasAnyData() && !onlyCustomDataLoaded && (
+							<DesignTabHint
+								variant="sidebar"
+								onGoToDesign={goToMapSetupFromHint}
 							/>
 						)}
-
-						{showGeocoding && (
-							<GeocodingSection
-								columns={symbolData.columns}
-								parsedData={symbolData.parsedData}
-								setGeocodedData={updateGeocodedData}
-								isGeocoding={isGeocoding}
-								setIsGeocoding={setIsGeocoding}
-								isExpanded={geocodingExpanded}
-								setIsExpanded={setGeocodingExpanded}
-							/>
-						)}
-
-						<CustomMapInput
-							onDataLoad={handleDataLoad}
-							isExpanded={customMapInputExpanded}
-							setIsExpanded={setCustomMapInputExpanded}
-							onClearData={handleClearData}
-						/>
 					</aside>
 
 					<div className="studio-data-canvas" aria-label="Data preview canvas">
@@ -1233,38 +1235,35 @@ function MapStudioContent() {
 										<DataPreview
 											variant="canvas"
 											data={getCurrentDisplayData()}
-											columns={getCurrentColumns()}
-											mapType={activeMapType}
-											onClearData={handleClearData}
-											symbolDataExists={hasDataForType('symbol')}
-											choroplethDataExists={hasDataForType('choropleth')}
-											customDataExists={hasDataForType('custom')}
-											columnTypes={columnTypes}
+											columns={selectedLayer?.data.columns ?? getCurrentColumns()}
+											mapType={selectedLayer?.type === 'points' ? 'symbol' : 'choropleth'}
+											onClearData={() => {}}
+											symbolDataExists={layers.some((l) => l.type === 'points' && l.data.parsedData.length > 0)}
+											choroplethDataExists={layers.some((l) => l.type === 'areas' && l.data.parsedData.length > 0)}
+											customDataExists={canvasType === 'custom'}
+											columnTypes={selectedLayer?.columnTypes ?? columnTypes}
 											onUpdateColumnTypes={updateColumnTypes}
 											onUpdateColumnFormats={updateColumnFormats}
-											columnFormats={columnFormats}
+											columnFormats={selectedLayer?.columnFormats ?? columnFormats}
 											symbolDataLength={symbolData.parsedData.length}
 											choroplethDataLength={choroplethData.parsedData.length}
-											customDataLoaded={customData.customMapData.length > 0}
-											onMapTypeChange={(newType) => {
-												setActiveMapType(newType);
-												if (hasAnyData()) {
-													setTimeout(() => pushHistory(), 100);
-												}
-											}}
+											customDataLoaded={customBoundary.length > 0}
+											onMapTypeChange={() => {}}
 											selectedGeography={dimensionSettings.selectedGeography}
 											isExpanded={dataPreviewExpanded}
 											setIsExpanded={setDataPreviewExpanded}
+											layers={layers
+												.filter((l) => l.data.parsedData.length > 0 || l.data.geocodedData.length > 0)
+												.map((l) => ({ id: l.id, name: l.name, type: l.type }))}
+											selectedLayerId={selectedLayerId}
+											onSelectLayer={setSelectedLayerId}
+											onDeleteLayer={(id) => {
+												removeLayer(id);
+												pushHistory();
+											}}
 										/>
 									</Suspense>
 								</div>
-
-								{hasAnyData() && !onlyCustomDataLoaded && (
-									<DesignTabHint
-										className="studio-data-canvas-hint"
-										onGoToDesign={goToDesignFromHint}
-									/>
-								)}
 							</>
 						) : (
 							<DataCanvasEmpty
@@ -1275,6 +1274,102 @@ function MapStudioContent() {
 					</div>
 				</div>
 			</section>
+
+			{hasAnyData() && (
+				<section
+					id="studio-panel-map-setup"
+					role="tabpanel"
+					aria-labelledby="studio-tab-map-setup"
+					tabIndex={studioMode === 'map-setup' ? 0 : -1}
+					className={cn('studio-data-view', studioMode !== 'map-setup' && 'hidden')}>
+					<div className="studio-data-shell">
+						<aside className="studio-data-sidebar max-w-md" aria-label="Setup">
+							<div className="studio-sidebar-scroll">
+								<MapSetupPanel
+									canvasType={canvasType}
+									onCanvasTypeChange={(type) => {
+										setCanvasType(type);
+										pushHistory();
+									}}
+									layers={layers}
+									selectedLayerId={selectedLayerId}
+									onSelectLayer={setSelectedLayerId}
+									onToggleLayerVisibility={toggleLayerVisibility}
+									boundaryConfig={boundaryConfig}
+									onBoundaryChange={setBoundaryConfig}
+									selectedGeography={selectedGeography}
+									onGeographyChange={updateSelectedGeography}
+									printConfig={printConfig}
+									onPrintConfigChange={(config) => {
+										setPrintConfig(config);
+										setSelectedProjection(config.projection);
+										setClipToCountry(config.clipToCountry);
+									}}
+									referenceLayers={referenceLayers}
+									onToggleReferenceLayer={toggleReferenceLayer}
+									dimensionSettings={dimensionSettings}
+									onUpdateDimensionSettings={updateDimensionSettings}
+									columnTypes={columnTypes}
+									columnFormats={columnFormats}
+									stylingSettings={stylingSettings}
+									onCustomBoundaryLoad={handleCustomBoundaryLoad}
+									onClearCustomBoundary={() => {
+										setCustomBoundary('');
+										setCanvasType('print');
+									}}
+									canvasExpanded={canvasExpanded}
+									setCanvasExpanded={setCanvasExpanded}
+									regionExpanded={regionExpanded}
+									setRegionExpanded={setRegionExpanded}
+									layersExpanded={layersExpanded}
+									setLayersExpanded={setLayersExpanded}
+								/>
+							</div>
+
+							<DesignTabHint
+								variant="sidebar"
+								title="Ready to map?"
+								buttonLabel="Design"
+								onGoToDesign={goToDesignFromHint}
+							/>
+						</aside>
+						<div className="studio-data-canvas studio-design-map min-h-0">
+							<Suspense
+								fallback={
+									<div className="flex h-full items-center justify-center bg-muted/20 p-12 text-xs text-muted-foreground">
+										Loading map preview…
+									</div>
+								}>
+								<MapPreview
+									symbolData={getSymbolDisplayData()}
+									choroplethData={getChoroplethDisplayData()}
+									mapType={activeMapType}
+									dimensionSettings={dimensionSettings}
+									stylingSettings={stylingSettings}
+									symbolDataExists={layers.some((l) => l.type === 'points' && l.visible && l.data.parsedData.length > 0)}
+									choroplethDataExists={layers.some((l) => l.type === 'areas' && l.visible && l.data.parsedData.length > 0)}
+									columnTypes={columnTypes}
+									columnFormats={columnFormats}
+									customMapData={customBoundary || customData.customMapData}
+									selectedGeography={selectedGeography}
+									selectedProjection={printConfig.projection}
+									clipToCountry={printConfig.clipToCountry}
+									isExpanded={setupPreviewExpanded}
+									setIsExpanded={setSetupPreviewExpanded}
+									isFocusMode={false}
+									onToggleFocusMode={() => {}}
+									renderTarget={renderTarget}
+									boundaryConfig={boundaryConfig}
+									maplibreConfig={maplibreConfig}
+									previewContext="setup"
+									canvasType={canvasType}
+									referenceLayers={referenceLayers}
+								/>
+							</Suspense>
+						</div>
+					</div>
+				</section>
+			)}
 
 			{hasAnyData() && (
 				<section
@@ -1297,14 +1392,14 @@ function MapStudioContent() {
 									mapType={activeMapType}
 									dimensionSettings={dimensionSettings}
 									stylingSettings={stylingSettings}
-									symbolDataExists={hasDataForType('symbol')}
-									choroplethDataExists={hasDataForType('choropleth')}
+									symbolDataExists={layers.some((l) => l.type === 'points' && l.visible && l.data.parsedData.length > 0)}
+									choroplethDataExists={layers.some((l) => l.type === 'areas' && l.visible && l.data.parsedData.length > 0)}
 									columnTypes={columnTypes}
 									columnFormats={columnFormats}
-									customMapData={customData.customMapData}
+									customMapData={customBoundary || customData.customMapData}
 									selectedGeography={selectedGeography}
-									selectedProjection={selectedProjection}
-									clipToCountry={clipToCountry}
+									selectedProjection={printConfig.projection}
+									clipToCountry={printConfig.clipToCountry}
 									isExpanded={mapPreviewExpanded}
 									setIsExpanded={setMapPreviewExpanded}
 									isFocusMode={mapFocusMode}
@@ -1317,9 +1412,10 @@ function MapStudioContent() {
 									onSelectedPathIdChange={setSelectedPathId}
 									embedEditorsInSidebar
 									renderTarget={renderTarget}
-									onRenderTargetChange={setRenderTarget}
 									boundaryConfig={boundaryConfig}
 									maplibreConfig={maplibreConfig}
+									canvasType={canvasType}
+									referenceLayers={referenceLayers}
 								/>
 							</Suspense>
 							{studioMode === 'design' && hasAnyData() && (
@@ -1386,55 +1482,33 @@ function MapStudioContent() {
 										/>
 									</Suspense>
 								) : (
-									<>
-										<Suspense
-											fallback={
-												<div className="bg-muted/20 p-8 text-center text-xs text-muted-foreground">
-													Loading dimension mapping...
-												</div>
-											}>
-											<DimensionMapping
-												mapType={activeMapType}
-												symbolDataExists={hasDataForType('symbol')}
-												choroplethDataExists={hasDataForType('choropleth')}
-												customDataExists={hasDataForType('custom')}
-												columnTypes={columnTypes}
-												dimensionSettings={dimensionSettings}
-												onUpdateSettings={updateDimensionSettings}
-												columnFormats={columnFormats}
-												symbolParsedData={symbolData.parsedData}
-												symbolGeocodedData={symbolData.geocodedData}
-												symbolColumns={symbolData.columns}
-												choroplethParsedData={choroplethData.parsedData}
-												choroplethGeocodedData={choroplethData.geocodedData}
-												choroplethColumns={choroplethData.columns}
-												selectedGeography={dimensionSettings.selectedGeography}
-												stylingSettings={stylingSettings}
-												isExpanded={dimensionMappingExpanded}
-												setIsExpanded={setDimensionMappingExpanded}
-												variant="inspector"
-											/>
-										</Suspense>
-
-										<Suspense
-											fallback={
-												<div className="bg-muted/20 p-8 text-center text-xs text-muted-foreground">
-													Loading map styling...
-												</div>
-											}>
-											<MapStyling
-												stylingSettings={stylingSettings}
-												onUpdateStylingSettings={updateStylingSettings}
-												dimensionSettings={dimensionSettings}
-												symbolDataExists={hasDataForType('symbol')}
-												choroplethDataExists={hasDataForType('choropleth')}
-												customDataExists={hasDataForType('custom')}
-												isExpanded={mapStylingExpanded}
-												setIsExpanded={setMapStylingExpanded}
-												variant="inspector"
-											/>
-										</Suspense>
-									</>
+									<Suspense
+										fallback={
+											<div className="bg-muted/20 p-8 text-center text-xs text-muted-foreground">
+												Loading styling...
+											</div>
+										}>
+										<LayerStylingInspector
+											layers={layers}
+											stylingSettings={stylingSettings}
+											onUpdateStylingSettings={updateStylingSettings}
+											dimensionSettings={dimensionSettings}
+											onUpdateDimensionSettings={updateDimensionSettings}
+											columnTypes={columnTypes}
+											columnFormats={columnFormats}
+											symbolParsedData={symbolData.parsedData}
+											symbolGeocodedData={symbolData.geocodedData}
+											symbolColumns={symbolData.columns}
+											choroplethParsedData={choroplethData.parsedData}
+											choroplethGeocodedData={choroplethData.geocodedData}
+											choroplethColumns={choroplethData.columns}
+											selectedGeography={selectedGeography}
+											customDataExists={canvasType === 'custom'}
+											canvasType={canvasType}
+											maplibreConfig={maplibreConfig}
+											onMaplibreConfigChange={setMaplibreConfig}
+										/>
+									</Suspense>
 								)}
 							</aside>
 						)}

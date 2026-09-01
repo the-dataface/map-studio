@@ -1,38 +1,42 @@
 'use client'
 
-import { useEffect, useMemo, useRef } from 'react'
-import Map, { Layer, Source } from 'react-map-gl/maplibre'
-import type { MapRef } from 'react-map-gl/maplibre'
+import { useMemo } from 'react'
 import { geoBounds } from 'd3'
+import { Layer, Source } from 'react-map-gl/maplibre'
+import type { MapGeoJSONFeature } from 'maplibre-gl'
 import type { FeatureCollection } from 'geojson'
+import type { ReactNode } from 'react'
 
 import type { StylingSettings } from '@/app/(studio)/types'
-import { cn } from '@/lib/utils'
 
-import { getBasemapStyle } from './basemap-styles'
+import type { ChoroplethLabelCollection } from '../adapters/to-geojson-choropleth-labels'
 
-import 'maplibre-gl/dist/maplibre-gl.css'
+import { MapLibreCanvas } from './MapLibreCanvas'
+import { ChoroplethLabelMarkers } from './MapLibreHtmlLabels'
 
 interface MapLibreChoroplethProps {
   geoJson: FeatureCollection
+  labelGeoJson?: ChoroplethLabelCollection
   basemapStyleId: string
   stylingSettings: StylingSettings
   className?: string
   allowZoom?: boolean
   allowPan?: boolean
+  inspectMode?: boolean
+  getTooltipContent?: (feature: MapGeoJSONFeature) => ReactNode | null
 }
 
 export function MapLibreChoropleth({
   geoJson,
+  labelGeoJson,
   basemapStyleId,
   stylingSettings,
   className,
   allowZoom = true,
   allowPan = true,
+  inspectMode = false,
+  getTooltipContent,
 }: MapLibreChoroplethProps) {
-  const mapRef = useRef<MapRef>(null)
-  const basemap = getBasemapStyle(basemapStyleId)
-
   const bounds = useMemo(() => {
     if (!geoJson.features.length) {
       return null
@@ -44,53 +48,42 @@ export function MapLibreChoropleth({
     ] as [[number, number], [number, number]]
   }, [geoJson])
 
-  useEffect(() => {
-    if (!mapRef.current || !bounds) {
-      return
-    }
-
-    mapRef.current.fitBounds(bounds, { padding: 48, duration: 0 })
-  }, [bounds, geoJson])
-
   const strokeColor = stylingSettings.base.defaultStateStrokeColor
   const strokeWidth = stylingSettings.base.defaultStateStrokeWidth
 
   return (
-    <div className={cn('relative h-full min-h-[420px] w-full overflow-hidden rounded-md', className)}>
-      <Map
-        ref={mapRef}
-        initialViewState={{
-          longitude: -98.5795,
-          latitude: 39.8283,
-          zoom: 3,
-        }}
-        mapStyle={basemap.url}
-        scrollZoom={allowZoom}
-        dragPan={allowPan}
-        dragRotate={false}
-        pitchWithRotate={false}
-        style={{ width: '100%', height: '100%' }}
-      >
-        <Source id="choropleth-boundaries" type="geojson" data={geoJson}>
-          <Layer
-            id="choropleth-fill"
-            type="fill"
-            paint={{
-              'fill-color': ['coalesce', ['get', '__color'], stylingSettings.base.defaultStateFillColor],
-              'fill-opacity': 0.88,
-              'fill-outline-color': strokeColor,
-            }}
-          />
-          <Layer
-            id="choropleth-stroke"
-            type="line"
-            paint={{
-              'line-color': strokeColor,
-              'line-width': strokeWidth,
-            }}
-          />
-        </Source>
-      </Map>
-    </div>
+    <MapLibreCanvas
+      basemapStyleId={basemapStyleId}
+      allowZoom={allowZoom}
+      allowPan={allowPan}
+      inspectMode={inspectMode}
+      interactiveLayerIds={['choropleth-fill']}
+      getTooltipContent={getTooltipContent}
+      bounds={bounds}
+      className={className}
+    >
+      <Source id="choropleth-boundaries" type="geojson" data={geoJson}>
+        <Layer
+          id="choropleth-fill"
+          type="fill"
+          paint={{
+            'fill-color': ['coalesce', ['get', '__color'], stylingSettings.base.defaultStateFillColor],
+            'fill-opacity': 0.88,
+            'fill-outline-color': strokeColor,
+          }}
+        />
+        <Layer
+          id="choropleth-stroke"
+          type="line"
+          paint={{
+            'line-color': strokeColor,
+            'line-width': strokeWidth,
+          }}
+        />
+      </Source>
+      {labelGeoJson ? (
+        <ChoroplethLabelMarkers geoJson={labelGeoJson} stylingSettings={stylingSettings} />
+      ) : null}
+    </MapLibreCanvas>
   )
 }

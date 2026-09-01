@@ -1,4 +1,4 @@
-import type { DataRow, GeocodedRow, GeographyKey } from '@/app/(studio)/types'
+import type { DataRow, GeocodedRow, GeographyKey, MatchReport } from '@/app/(studio)/types'
 import { normalizeGeoIdentifier } from '@/modules/map-preview/geography'
 import { getNumericValue, getUniqueValues } from '@/modules/map-preview/helpers'
 
@@ -114,5 +114,52 @@ export function joinChoroplethData({
       unmatchedDataValues,
       unmatchedFeatureCount,
     },
+  }
+}
+
+/** Match report for region column only — used before color mapping is configured */
+export function computeStateColumnMatchReport(
+  features: BoundaryFeatureCollection,
+  choroplethData: DataRecord[],
+  stateColumn: string,
+  geographyKey: GeographyKey,
+): MatchReport {
+  const featureJoinKeys = new Set<string>()
+  features.features.forEach((feature) => {
+    featureJoinKeys.add(feature.properties.__joinKey)
+  })
+
+  const dataKeys = new Set<string>()
+  choroplethData.forEach((record) => {
+    const rawValue = String(record[stateColumn] ?? '').trim()
+    if (!rawValue) {
+      return
+    }
+    dataKeys.add(normalizeGeoIdentifier(rawValue, geographyKey))
+  })
+
+  let matched = 0
+  const unmatchedDataValues: string[] = []
+  dataKeys.forEach((key) => {
+    if (featureJoinKeys.has(key)) {
+      matched += 1
+    } else {
+      unmatchedDataValues.push(key)
+    }
+  })
+
+  let unmatchedFeatureCount = 0
+  featureJoinKeys.forEach((key) => {
+    if (!dataKeys.has(key)) {
+      unmatchedFeatureCount += 1
+    }
+  })
+
+  return {
+    matched,
+    totalDataRows: dataKeys.size,
+    totalFeatures: features.features.length,
+    unmatchedDataValues,
+    unmatchedFeatureCount,
   }
 }

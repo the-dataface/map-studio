@@ -307,3 +307,59 @@ export interface MatchReport {
 	unmatchedDataValues: string[];
 	unmatchedFeatureCount: number;
 }
+
+// --- V2: layers + canvas workflow ---
+
+export type LayerType = 'points' | 'areas';
+export type CanvasType = 'print' | 'interactive' | 'custom';
+
+export type PointsLayerStyle = StylingSettings['symbol'];
+export type AreasLayerStyle = StylingSettings['choropleth'];
+
+export interface MapLayer {
+	id: string;
+	name: string;
+	type: LayerType;
+	visible: boolean;
+	order: number;
+	data: DataState;
+	columnTypes: ColumnType;
+	columnFormats: ColumnFormat;
+	dimensions: SymbolDimensionSettings | ChoroplethDimensionSettings;
+	styling: PointsLayerStyle | AreasLayerStyle;
+}
+
+export interface PrintConfig {
+	projection: ProjectionType;
+	clipToCountry: boolean;
+}
+
+export interface ReferenceLayerConfig {
+	id: string;
+	enabled: boolean;
+	opacity?: number;
+}
+
+export const CANVAS_TYPE_LABELS: Record<CanvasType, string> = {
+	print: 'Print layout',
+	interactive: 'Interactive',
+	custom: 'Custom boundaries',
+};
+
+export const CANVAS_TYPE_DESCRIPTIONS: Record<CanvasType, string> = {
+	print: 'Fixed-size map for SVG/PNG export and Figma',
+	interactive: 'Zoomable map on a real basemap',
+	custom: 'Use your own region shapes (SVG)',
+};
+
+export function canvasTypeToRenderTarget(canvasType: CanvasType): RenderTarget {
+	return canvasType === 'interactive' ? 'maplibre' : 'svg';
+}
+
+export function renderTargetToCanvasType(
+	renderTarget: RenderTarget,
+	hasCustomBoundary: boolean,
+): CanvasType {
+	if (hasCustomBoundary) return 'custom';
+	return renderTarget === 'maplibre' ? 'interactive' : 'print';
+}

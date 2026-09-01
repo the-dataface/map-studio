@@ -4,24 +4,34 @@ import { create } from 'zustand'
 
 import type {
   BoundaryConfig,
+  CanvasType,
   CategoricalColor,
   ColumnFormat,
   ColumnType,
   DataState,
   DimensionSettings,
   GeographyKey,
+  MapLayer,
   MapLibreConfig,
   MapType,
+  PrintConfig,
   ProjectionType,
+  ReferenceLayerConfig,
   RenderTarget,
   SavedStyle,
   StylingSettings,
   ColorScaleType,
 } from '@/app/(studio)/types'
+import { canvasTypeToRenderTarget } from '@/app/(studio)/types'
 import {
   boundaryConfigFromGeographyKey,
   syncGeographyFromBoundary,
 } from '@/modules/boundaries/compatibility'
+import { createEmptyLayer, createLayerId } from '@/modules/layers/defaults'
+import { canvasTypeFromLegacy, createLayerFromData, ensureLayersFromLegacy } from '@/modules/layers/migration'
+import { mergeStylingFromLayers, syncLegacyFromLayers } from '@/modules/layers/legacy-sync'
+import { getPrimaryAreaLayer, getPrimaryPointLayer, getSelectedLayer, nextLayerOrder } from '@/modules/layers/selectors'
+import { DEFAULT_REFERENCE_LAYERS } from '@/modules/reference-layers/catalog'
 import { DEFAULT_MAPLIBRE_CONFIG } from '@/modules/map-render/maplibre/basemap-styles'
 
 type Updater<T> = T | ((previous: T) => T)
@@ -46,6 +56,12 @@ type StateSnapshot = {
   columnFormats: ColumnFormat
   dimensionSettings: DimensionSettings
   stylingSettings: StylingSettings
+  layers: MapLayer[]
+  selectedLayerId: string | null
+  canvasType: CanvasType
+  customBoundary: string
+  printConfig: PrintConfig
+  referenceLayers: ReferenceLayerConfig[]
 }
 
 const MAX_HISTORY_SIZE = 50
@@ -66,6 +82,12 @@ const createStateSnapshot = (state: {
   columnFormats: ColumnFormat
   dimensionSettings: DimensionSettings
   stylingSettings: StylingSettings
+  layers: MapLayer[]
+  selectedLayerId: string | null
+  canvasType: CanvasType
+  customBoundary: string
+  printConfig: PrintConfig
+  referenceLayers: ReferenceLayerConfig[]
 }): StateSnapshot => ({
   symbolData: JSON.parse(JSON.stringify(state.symbolData)),
   choroplethData: JSON.parse(JSON.stringify(state.choroplethData)),
@@ -82,6 +104,12 @@ const createStateSnapshot = (state: {
   columnFormats: JSON.parse(JSON.stringify(state.columnFormats)),
   dimensionSettings: JSON.parse(JSON.stringify(state.dimensionSettings)),
   stylingSettings: JSON.parse(JSON.stringify(state.stylingSettings)),
+  layers: JSON.parse(JSON.stringify(state.layers)),
+  selectedLayerId: state.selectedLayerId,
+  canvasType: state.canvasType,
+  customBoundary: state.customBoundary,
+  printConfig: JSON.parse(JSON.stringify(state.printConfig)),
+  referenceLayers: JSON.parse(JSON.stringify(state.referenceLayers)),
 })
 
 const applyStateSnapshot = (snapshot: StateSnapshot): Partial<StudioState> => ({
@@ -100,6 +128,12 @@ const applyStateSnapshot = (snapshot: StateSnapshot): Partial<StudioState> => ({
   columnFormats: snapshot.columnFormats,
   dimensionSettings: snapshot.dimensionSettings,
   stylingSettings: snapshot.stylingSettings,
+  layers: snapshot.layers,
+  selectedLayerId: snapshot.selectedLayerId,
+  canvasType: snapshot.canvasType,
+  customBoundary: snapshot.customBoundary,
+  printConfig: snapshot.printConfig,
+  referenceLayers: snapshot.referenceLayers,
 })
 
 const createEmptyDataState = (): DataState => ({
@@ -340,6 +374,29 @@ interface StudioState {
   setDimensionSettings: (value: Updater<DimensionSettings>) => void
   stylingSettings: StylingSettings
   setStylingSettings: (value: Updater<StylingSettings>) => void
+  layers: MapLayer[]
+  selectedLayerId: string | null
+  canvasType: CanvasType
+  customBoundary: string
+  printConfig: PrintConfig
+  referenceLayers: ReferenceLayerConfig[]
+  setSelectedLayerId: (id: string | null) => void
+  setCanvasType: (value: CanvasType) => void
+  setCustomBoundary: (value: string) => void
+  setPrintConfig: (value: Updater<PrintConfig>) => void
+  setReferenceLayers: (value: Updater<ReferenceLayerConfig[]>) => void
+  toggleReferenceLayer: (id: string, enabled?: boolean) => void
+  addLayer: (type: MapLayer['type'], data?: DataState, name?: string) => string
+  removeLayer: (id: string) => void
+  updateLayer: (id: string, patch: Partial<MapLayer>) => void
+  setLayerData: (id: string, value: Updater<DataState>) => void
+  setLayerDimensions: (id: string, value: Updater<MapLayer['dimensions']>) => void
+  setLayerStyling: (id: string, value: Updater<MapLayer['styling']>) => void
+  setLayerColumnTypes: (id: string, value: Updater<ColumnType>) => void
+  setLayerColumnFormats: (id: string, value: Updater<ColumnFormat>) => void
+  toggleLayerVisibility: (id: string) => void
+  reorderLayer: (id: string, newOrder: number) => void
+  hydrateFromProject: (project: Partial<LegacyProjectSlice & LayerProjectSlice>) => void
   resetDataStates: () => void
   resetAll: () => void
   // Undo/Redo
@@ -351,6 +408,55 @@ interface StudioState {
   canUndo: () => boolean
   canRedo: () => boolean
   clearHistory: () => void
+}
+
+interface LegacyProjectSlice {
+  symbolData: DataState
+  choroplethData: DataState
+  customData: DataState
+  activeMapType: MapType
+  columnTypes: ColumnType | Record<string, string>
+  columnFormats: ColumnFormat | Record<string, string>
+  dimensionSettings: DimensionSettings
+  stylingSettings: StylingSettings
+  renderTarget?: RenderTarget
+}
+
+interface LayerProjectSlice {
+  layers?: MapLayer[]
+  selectedLayerId?: string | null
+  canvasType?: CanvasType
+  customBoundary?: string
+  printConfig?: PrintConfig
+  referenceLayers?: ReferenceLayerConfig[]
+}
+
+const defaultPrintConfig = (): PrintConfig => ({
+  projection: 'albersUsa',
+  clipToCountry: false,
+})
+
+const withLayerSync = (
+  state: StudioState,
+  patch: Partial<StudioState> & { layers?: MapLayer[] },
+): Partial<StudioState> => {
+  const layers = patch.layers ?? state.layers
+  const selectedLayerId = patch.selectedLayerId ?? state.selectedLayerId
+  const customBoundary = patch.customBoundary ?? state.customBoundary
+  const selectedGeography = patch.selectedGeography ?? state.selectedGeography
+
+  const legacy = syncLegacyFromLayers(layers, selectedLayerId, customBoundary, selectedGeography)
+  const stylingSettings = mergeStylingFromLayers(state.stylingSettings, layers)
+
+  return {
+    ...patch,
+    layers,
+    selectedLayerId,
+    customBoundary,
+    ...legacy,
+    dimensionSettings: patch.dimensionSettings ?? legacy.dimensionSettings,
+    stylingSettings,
+  }
 }
 
 export const useStudioStore = create<StudioState>()((set) => ({
@@ -429,13 +535,37 @@ export const useStudioStore = create<StudioState>()((set) => ({
   setDimensionSettings: (value) =>
     set((state) => {
       const next = resolveValue(value, state.dimensionSettings)
-      return {
-        dimensionSettings: next,
+      const selected = getSelectedLayer(state.layers, state.selectedLayerId)
+      const primaryPoints = getPrimaryPointLayer(state.layers)
+      const primaryAreas = getPrimaryAreaLayer(state.layers)
+      const symbolTargetId =
+        selected?.type === 'points' ? selected.id : primaryPoints?.id
+      const areaTargetId =
+        selected?.type === 'areas' ? selected.id : primaryAreas?.id
+
+      const layers = state.layers.map((layer) => {
+        if (symbolTargetId && layer.id === symbolTargetId) {
+          return { ...layer, dimensions: { ...next.symbol } }
+        }
+        if (areaTargetId && layer.id === areaTargetId) {
+          return { ...layer, dimensions: { ...next.choropleth } }
+        }
+        return layer
+      })
+
+      const mergedSettings: DimensionSettings = {
+        ...next,
+        custom: { ...next.choropleth },
+      }
+
+      return withLayerSync(state, {
+        layers,
+        dimensionSettings: mergedSettings,
         boundaryConfig: {
           ...state.boundaryConfig,
-          joinColumn: next.choropleth.stateColumn || state.boundaryConfig.joinColumn,
+          joinColumn: next.choropleth.stateColumn,
         },
-      }
+      })
     }),
 
   stylingSettings: loadStylingSettings(),
@@ -443,15 +573,250 @@ export const useStudioStore = create<StudioState>()((set) => ({
     set((state) => {
       const next = resolveValue(value, state.stylingSettings)
       persistStylingSettings(next)
-      return { stylingSettings: next }
+
+      const layers = state.layers.map((layer) => {
+        if (layer.type === 'points') {
+          return { ...layer, styling: { ...next.symbol } }
+        }
+        if (layer.type === 'areas') {
+          return { ...layer, styling: { ...next.choropleth } }
+        }
+        return layer
+      })
+
+      return withLayerSync(state, { stylingSettings: next, layers })
+    }),
+
+  layers: [],
+  selectedLayerId: null,
+  canvasType: 'print' as CanvasType,
+  customBoundary: '',
+  printConfig: defaultPrintConfig(),
+  referenceLayers: DEFAULT_REFERENCE_LAYERS,
+
+  setSelectedLayerId: (id) =>
+    set((state) => {
+      const selected = id ? state.layers.find((layer) => layer.id === id) ?? null : null
+      let dimensionSettings = state.dimensionSettings
+
+      if (selected?.type === 'points') {
+        dimensionSettings = {
+          ...state.dimensionSettings,
+          symbol: { ...(selected.dimensions as DimensionSettings['symbol']) },
+        }
+      } else if (selected?.type === 'areas') {
+        dimensionSettings = {
+          ...state.dimensionSettings,
+          choropleth: { ...(selected.dimensions as DimensionSettings['choropleth']) },
+        }
+      }
+
+      return withLayerSync(state, { selectedLayerId: id, dimensionSettings })
+    }),
+
+  setCanvasType: (value) =>
+    set((state) => {
+      const renderTarget = canvasTypeToRenderTarget(value)
+      return withLayerSync(state, {
+        canvasType: value,
+        renderTarget,
+        customBoundary: value === 'custom' ? state.customBoundary : '',
+      })
+    }),
+
+  setCustomBoundary: (value) =>
+    set((state) =>
+      withLayerSync(state, {
+        customBoundary: value,
+        canvasType: value.trim() ? 'custom' : state.canvasType === 'custom' ? 'print' : state.canvasType,
+      }),
+    ),
+
+  setPrintConfig: (value) =>
+    set((state) => {
+      const next = resolveValue(value, state.printConfig)
+      return {
+        printConfig: next,
+        selectedProjection: next.projection,
+        clipToCountry: next.clipToCountry,
+      }
+    }),
+
+  setReferenceLayers: (value) =>
+    set((state) => ({
+      referenceLayers: resolveValue(value, state.referenceLayers),
+    })),
+
+  toggleReferenceLayer: (id, enabled) =>
+    set((state) => ({
+      referenceLayers: state.referenceLayers.map((layer) =>
+        layer.id === id ? { ...layer, enabled: enabled ?? !layer.enabled } : layer,
+      ),
+    })),
+
+  addLayer: (type, data, name) => {
+    const id = createLayerId()
+    set((state) => {
+      const order = nextLayerOrder(state.layers)
+      const layer = data
+        ? createLayerFromData(type, data, order, name)
+        : createEmptyLayer(type, order, name)
+      const layers = [...state.layers, { ...layer, id }]
+      const selectedLayerId = id
+      return withLayerSync(state, { layers, selectedLayerId })
+    })
+    return id
+  },
+
+  removeLayer: (id) =>
+    set((state) => {
+      const layers = state.layers.filter((layer) => layer.id !== id)
+      const selectedLayerId =
+        state.selectedLayerId === id ? (layers[0]?.id ?? null) : state.selectedLayerId
+      return withLayerSync(state, { layers, selectedLayerId })
+    }),
+
+  updateLayer: (id, patch) =>
+    set((state) => {
+      const layers = state.layers.map((layer) => (layer.id === id ? { ...layer, ...patch } : layer))
+      return withLayerSync(state, { layers })
+    }),
+
+  setLayerData: (id, value) =>
+    set((state) => {
+      const layers = state.layers.map((layer) =>
+        layer.id === id ? { ...layer, data: resolveValue(value, layer.data) } : layer,
+      )
+      return withLayerSync(state, { layers })
+    }),
+
+  setLayerDimensions: (id, value) =>
+    set((state) => {
+      const layers = state.layers.map((layer) =>
+        layer.id === id
+          ? { ...layer, dimensions: resolveValue(value, layer.dimensions) }
+          : layer,
+      )
+      return withLayerSync(state, { layers })
+    }),
+
+  setLayerStyling: (id, value) =>
+    set((state) => {
+      const layers = state.layers.map((layer) =>
+        layer.id === id ? { ...layer, styling: resolveValue(value, layer.styling) } : layer,
+      )
+      const stylingSettings = mergeStylingFromLayers(state.stylingSettings, layers)
+      persistStylingSettings(stylingSettings)
+      return withLayerSync(state, { layers, stylingSettings })
+    }),
+
+  setLayerColumnTypes: (id, value) =>
+    set((state) => {
+      const layers = state.layers.map((layer) =>
+        layer.id === id
+          ? { ...layer, columnTypes: resolveValue(value, layer.columnTypes) }
+          : layer,
+      )
+      return withLayerSync(state, { layers })
+    }),
+
+  setLayerColumnFormats: (id, value) =>
+    set((state) => {
+      const layers = state.layers.map((layer) =>
+        layer.id === id
+          ? { ...layer, columnFormats: resolveValue(value, layer.columnFormats) }
+          : layer,
+      )
+      return withLayerSync(state, { layers })
+    }),
+
+  toggleLayerVisibility: (id) =>
+    set((state) => {
+      const layers = state.layers.map((layer) =>
+        layer.id === id ? { ...layer, visible: !layer.visible } : layer,
+      )
+      return withLayerSync(state, { layers })
+    }),
+
+  reorderLayer: (id, newOrder) =>
+    set((state) => {
+      const target = state.layers.find((layer) => layer.id === id)
+      if (!target) return state
+      const others = state.layers.filter((layer) => layer.id !== id)
+      const layers = [...others, { ...target, order: newOrder }].sort((a, b) => a.order - b.order)
+      return withLayerSync(state, { layers })
+    }),
+
+  hydrateFromProject: (project) =>
+    set((state) => {
+      const legacySlice: LegacyProjectSlice = {
+        symbolData: project.symbolData ?? createEmptyDataState(),
+        choroplethData: project.choroplethData ?? createEmptyDataState(),
+        customData: project.customData ?? createEmptyDataState(),
+        activeMapType: project.activeMapType ?? 'symbol',
+        columnTypes: (project.columnTypes ?? {}) as ColumnType,
+        columnFormats: (project.columnFormats ?? {}) as ColumnFormat,
+        dimensionSettings: project.dimensionSettings ?? createDefaultDimensionSettings(),
+        stylingSettings: project.stylingSettings ?? createDefaultStylingSettings(),
+        renderTarget: project.renderTarget,
+      }
+
+      const layers =
+        project.layers && project.layers.length > 0
+          ? JSON.parse(JSON.stringify(project.layers))
+          : ensureLayersFromLegacy({
+              ...legacySlice,
+              columnTypes: legacySlice.columnTypes as ColumnType,
+              columnFormats: legacySlice.columnFormats as ColumnFormat,
+            })
+
+      const customBoundary =
+        project.customBoundary ??
+        (legacySlice.customData.customMapData.trim() ? legacySlice.customData.customMapData : '')
+
+      const canvasType =
+        project.canvasType ??
+        canvasTypeFromLegacy(legacySlice.customData, legacySlice.renderTarget)
+
+      const printConfig = project.printConfig ?? {
+        projection: (project as { selectedProjection?: ProjectionType }).selectedProjection ?? 'albersUsa',
+        clipToCountry: (project as { clipToCountry?: boolean }).clipToCountry ?? false,
+      }
+
+      const selectedLayerId = project.selectedLayerId ?? layers[0]?.id ?? null
+      const referenceLayers = project.referenceLayers ?? DEFAULT_REFERENCE_LAYERS
+      const renderTarget = project.renderTarget ?? canvasTypeToRenderTarget(canvasType)
+      const stylingSettings = project.stylingSettings
+        ? { ...createDefaultStylingSettings(), ...project.stylingSettings }
+        : mergeStylingFromLayers(createDefaultStylingSettings(), layers)
+
+      return withLayerSync(state, {
+        layers,
+        selectedLayerId,
+        canvasType,
+        customBoundary,
+        printConfig,
+        referenceLayers,
+        renderTarget,
+        stylingSettings,
+        selectedProjection: printConfig.projection,
+        clipToCountry: printConfig.clipToCountry,
+        boundaryConfig: (project as { boundaryConfig?: BoundaryConfig }).boundaryConfig ??
+          boundaryConfigFromGeographyKey(
+            legacySlice.dimensionSettings.selectedGeography ?? 'usa-states',
+          ),
+        maplibreConfig: (project as { maplibreConfig?: MapLibreConfig }).maplibreConfig ??
+          DEFAULT_MAPLIBRE_CONFIG,
+      })
     }),
 
   resetDataStates: () =>
-    set({
-      symbolData: createEmptyDataState(),
-      choroplethData: createEmptyDataState(),
-      customData: createEmptyDataState(),
-    }),
+    set((state) =>
+      withLayerSync(state, {
+        layers: [],
+        selectedLayerId: null,
+      }),
+    ),
 
   resetAll: () => {
     // Keep saved styles from localStorage but reset active styling
@@ -480,6 +845,12 @@ export const useStudioStore = create<StudioState>()((set) => ({
           savedStyles: currentStyling.base.savedStyles, // Keep user's saved style presets
         },
       },
+      layers: [],
+      selectedLayerId: null,
+      canvasType: 'print',
+      customBoundary: '',
+      printConfig: defaultPrintConfig(),
+      referenceLayers: DEFAULT_REFERENCE_LAYERS,
       history: [],
       historyIndex: -1,
     })

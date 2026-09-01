@@ -1,438 +1,330 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, react-hooks/exhaustive-deps, prefer-const */
-'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+'use client'
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { MapPin, BarChart3, CheckCircle, AlertCircle, Sparkles } from 'lucide-react'
+import type { DataRow } from '@/app/(studio)/types'
+import { parseDelimitedText } from '@/modules/data-ingest/csv'
+import { toast } from '@/components/ui/use-toast'
+import { cn } from '@/lib/utils'
+import {
+  studioPanelClass,
+  studioOutlineButtonClass,
+  StudioExpandableHeader,
+} from '@/components/studio-panel'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
-import { MapPin, BarChart3, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import type { DataRow } from '@/app/(studio)/types';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { toast } from '@/components/ui/use-toast'; // Import toast
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { parseDelimitedText } from '@/modules/data-ingest/csv';
-import { CHOROPLETH_SAMPLE_DATA, SYMBOL_SAMPLE_DATA } from '@/modules/data-ingest/sample-data';
-import { cn } from '@/lib/utils';
-import { studioPanelClass, studioPanelTitleClass, studioTabBarClass, studioTabTriggerClass, studioOutlineButtonClass, studioPrimaryButtonClass, studioHeaderIconButtonClass, StudioExpandableHeader } from '@/components/studio-panel';
+type LayerLoadType = 'points' | 'areas' | 'auto'
 
 interface DataInputProps {
-	onDataLoad: (
-		mapType: 'symbol' | 'choropleth' | 'custom',
-		parsedData: DataRow[],
-		columns: string[],
-		rawData: string,
-		customMapData?: string
-	) => void;
-	isExpanded: boolean;
-	setIsExpanded: (expanded: boolean) => void;
-	onClearData: (mapType: 'symbol' | 'choropleth' | 'custom') => void; // New prop
+  onDataLoad: (
+    mapType: 'symbol' | 'choropleth',
+    parsedData: DataRow[],
+    columns: string[],
+    rawData: string,
+    layerName?: string,
+  ) => void
+  isExpanded: boolean
+  setIsExpanded: (expanded: boolean) => void
+  pointsLayerCount?: number
+  areasLayerCount?: number
 }
 
-export function DataInput({ onDataLoad, isExpanded, setIsExpanded, onClearData }: DataInputProps) {
-	const [activeTab, setActiveTab] = useState<'symbol' | 'choropleth'>('symbol');
-	const [symbolRawData, setSymbolRawData] = useState('');
-	const [choroplethRawData, setChoroplethRawData] = useState('');
-	const fileInputRef = React.useRef<HTMLInputElement | null>(null);
-	const [isDragActive, setIsDragActive] = useState(false);
-	const [symbolPopoverOpen, setSymbolPopoverOpen] = useState(false);
-	const [choroplethPopoverOpen, setChoroplethPopoverOpen] = useState(false);
+const LAT_NAMES = ['latitude', 'lat']
+const LNG_NAMES = ['longitude', 'long', 'lng', 'lon']
 
-	const loadSampleData = () => {
-		if (activeTab === 'symbol') {
-			setSymbolRawData(SYMBOL_SAMPLE_DATA);
-		}
-	};
+function inferLayerType(columns: string[]): 'symbol' | 'choropleth' {
+  const normalized = columns.map((c) => c.trim().toLowerCase())
+  const hasLat = normalized.some((c) => LAT_NAMES.includes(c))
+  const hasLng = normalized.some((c) => LNG_NAMES.includes(c))
+  return hasLat && hasLng ? 'symbol' : 'choropleth'
+}
 
-	const loadChoroplethSampleData = () => {
-		setChoroplethRawData(CHOROPLETH_SAMPLE_DATA);
-	};
+function nameFromFilename(filename: string): string {
+  const base = filename.replace(/\.[^.]+$/, '').trim()
+  if (!base) return filename
+  return base
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
 
-	// Add a validation function
-	const handleLoadData = () => {
-		if (activeTab === 'symbol') {
-			const { data, columns } = parseDelimitedText(symbolRawData);
-			if (data.length > 0) {
-				onDataLoad('symbol', data, columns, symbolRawData);
-				toast({
-					description: `${data.length} rows of symbol data loaded successfully.`,
-					variant: 'success',
-					icon: <CheckCircle className="h-5 w-5" />,
-				});
-			}
-		} else if (activeTab === 'choropleth') {
-			const { data, columns } = parseDelimitedText(choroplethRawData);
-			if (data.length > 0) {
-				onDataLoad('choropleth', data, columns, choroplethRawData);
-				toast({
-					description: `${data.length} rows of choropleth data loaded successfully.`,
-					variant: 'success',
-					icon: <CheckCircle className="h-5 w-5" />,
-				});
-			}
-		}
-	};
+const sampleDataFiles = [
+  { label: 'US companies', file: '/sample-data/symbol-us.csv', type: 'symbol' as const },
+  { label: 'Canadian companies', file: '/sample-data/symbol-canada.csv', type: 'symbol' as const },
+  { label: 'World cities', file: '/sample-data/symbol-world.csv', type: 'symbol' as const },
+  { label: 'US states', file: '/sample-data/choropleth-us.csv', type: 'choropleth' as const },
+  { label: 'Canadian provinces', file: '/sample-data/choropleth-canada.csv', type: 'choropleth' as const },
+  { label: 'World countries', file: '/sample-data/choropleth-world.csv', type: 'choropleth' as const },
+]
 
-	const isLoadButtonDisabled = () => {
-		return activeTab === 'symbol' ? !symbolRawData.trim() : !choroplethRawData.trim();
-	};
+export function DataInput({
+  onDataLoad,
+  isExpanded,
+  setIsExpanded,
+  pointsLayerCount = 0,
+  areasLayerCount = 0,
+}: DataInputProps) {
+  const [rawData, setRawData] = useState('')
+  const [layerName, setLayerName] = useState('')
+  const [layerType, setLayerType] = useState<LayerLoadType>('auto')
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null)
+  const [isDragActive, setIsDragActive] = useState(false)
 
-	useEffect(() => {
-		const handler = () => setIsExpanded(false);
-		window.addEventListener('collapse-all-panels', handler);
-		return () => window.removeEventListener('collapse-all-panels', handler);
-	}, [setIsExpanded]);
+  const resolveMapType = (columns: string[], forcedType?: 'symbol' | 'choropleth') =>
+    forcedType ?? (layerType === 'auto' ? inferLayerType(columns) : layerType === 'points' ? 'symbol' : 'choropleth')
 
-	const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-		e.preventDefault();
-		e.stopPropagation();
-		setIsDragActive(true);
-	};
+  const namePlaceholder = useMemo(() => {
+    if (layerType === 'areas') return `Areas ${areasLayerCount + 1}`
+    if (layerType === 'points') return `Points ${pointsLayerCount + 1}`
+    return 'Layer name'
+  }, [layerType, pointsLayerCount, areasLayerCount])
 
-	const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-		e.preventDefault();
-		e.stopPropagation();
-		setIsDragActive(false);
-	};
+  const loadParsedData = (
+    data: DataRow[],
+    columns: string[],
+    text: string,
+    forcedType?: 'symbol' | 'choropleth',
+    name?: string,
+  ) => {
+    if (data.length === 0) {
+      toast({
+        description: 'No data found.',
+        variant: 'destructive',
+        icon: <AlertCircle className="h-5 w-5" />,
+      })
+      return
+    }
 
-	const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-		e.preventDefault();
-		e.stopPropagation();
-		setIsDragActive(false);
-		const file = e.dataTransfer.files?.[0];
-		if (file) {
-			handleFileFromDrop(file);
-		}
-	};
+    const mapType = resolveMapType(columns, forcedType)
+    const resolvedName = (name ?? layerName).trim() || undefined
+    onDataLoad(mapType, data, columns, text, resolvedName)
+    toast({
+      description: `${data.length} rows added as ${mapType === 'symbol' ? 'Points' : 'Areas'} layer.`,
+      variant: 'success',
+      icon: <CheckCircle className="h-5 w-5" />,
+    })
+    setRawData('')
+    setLayerName('')
+    setIsExpanded(false)
+  }
 
-	const handleFileFromDrop = (file: File) => {
-		const reader = new FileReader();
-		reader.onload = (event) => {
-			const text = event.target?.result as string;
-			let data: DataRow[] = [];
-			let columns: string[] = [];
-			let rawData = text;
-			let error = '';
-			try {
-				if (file.name.endsWith('.json')) {
-					const json = JSON.parse(text);
-					if (Array.isArray(json) && json.length > 0 && typeof json[0] === 'object') {
-						data = json;
-						columns = Object.keys(json[0]);
-					} else {
-						error = 'JSON file must be an array of objects.';
-					}
-				} else {
-					const parsed = parseDelimitedText(text);
-					data = parsed.data;
-					columns = parsed.columns;
-				}
-			} catch (e: any) {
-				error = 'Failed to parse file: ' + (e.message || e.toString());
-			}
-			if (error) {
-				toast({
-					description: error,
-					variant: 'destructive',
-					icon: <AlertCircle className="h-5 w-5" />,
-				});
-				return;
-			}
-			if (data.length > 0) {
-				if (activeTab === 'symbol') {
-					onDataLoad('symbol', data, columns, rawData);
-					toast({
-						description: `${data.length} rows of symbol data loaded from file${file.name ? `: ${file.name}` : ''}.`,
-						variant: 'success',
-						icon: <CheckCircle className="h-5 w-5" />,
-					});
-				} else if (activeTab === 'choropleth') {
-					onDataLoad('choropleth', data, columns, rawData);
-					toast({
-						description: `${data.length} rows of choropleth data loaded from file${file.name ? `: ${file.name}` : ''}.`,
-						variant: 'success',
-						icon: <CheckCircle className="h-5 w-5" />,
-					});
-				}
-			} else {
-				toast({
-					description: 'No data found in file.',
-					variant: 'destructive',
-					icon: <AlertCircle className="h-5 w-5" />,
-				});
-			}
-		};
-		reader.readAsText(file);
-	};
+  const handleLoadData = () => {
+    const { data, columns } = parseDelimitedText(rawData)
+    loadParsedData(data, columns, rawData)
+  }
 
-	const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const file = e.target.files?.[0];
-		if (!file) return;
-		handleFileFromDrop(file);
-		// Reset file input value so the same file can be uploaded again if needed
-		if (fileInputRef.current) fileInputRef.current.value = '';
-	};
+  const parseFileText = (text: string, fileName: string, autoLoad = true) => {
+    let data: DataRow[] = []
+    let columns: string[] = []
+    let error = ''
 
-	// Remove old sampleDataSets and add a new config for sample file names
-	const sampleDataFiles = {
-		symbol: [
-			{ label: 'Canadian companies', file: '/sample-data/symbol-canada.csv' },
-			{ label: 'US companies', file: '/sample-data/symbol-us.csv' },
-			{ label: 'World cities', file: '/sample-data/symbol-world.csv' },
-		],
-		choropleth: [
-			{ label: 'Canadian provinces', file: '/sample-data/choropleth-canada.csv' },
-			{ label: 'US states', file: '/sample-data/choropleth-us.csv' },
-			{ label: 'World countries', file: '/sample-data/choropleth-world.csv' },
-		],
-	};
+    try {
+      if (fileName.endsWith('.json')) {
+        const json = JSON.parse(text)
+        if (Array.isArray(json) && json.length > 0 && typeof json[0] === 'object') {
+          data = json
+          columns = Object.keys(json[0])
+        } else {
+          error = 'JSON file must be an array of objects.'
+        }
+      } else {
+        const parsed = parseDelimitedText(text)
+        data = parsed.data
+        columns = parsed.columns
+      }
+    } catch (e: any) {
+      error = 'Failed to parse file: ' + (e.message || e.toString())
+    }
 
-	// Add async loader for sample data
-	const loadSampleDataFile = async (
-		file: string,
-		setRawData: (data: string) => void,
-		setPopoverOpen: (open: boolean) => void
-	) => {
-		try {
-			const res = await fetch(file);
-			if (!res.ok) throw new Error('Failed to load sample data');
-			const text = await res.text();
-			setRawData(text);
-			setPopoverOpen(false);
-		} catch (e) {
-			toast({
-				description: 'Failed to load sample data.',
-				variant: 'destructive',
-				icon: <AlertCircle className="h-5 w-5" />,
-			});
-		}
-	};
+    if (error) {
+      toast({ description: error, variant: 'destructive', icon: <AlertCircle className="h-5 w-5" /> })
+      return
+    }
 
-	const renderClearButton = (onClear: () => void, disabled: boolean, label: string) => (
-		<Tooltip>
-			<TooltipTrigger asChild>
-				<Button
-					variant="outline"
-					size="icon"
-					type="button"
-					onClick={onClear}
-					disabled={disabled}
-					className={cn(
-						studioHeaderIconButtonClass,
-						'hover:!bg-destructive/10 hover:!text-destructive hover:!border-destructive/30 disabled:hover:!bg-transparent'
-					)}
-					aria-label={label}>
-					<Trash2 className="h-3.5 w-3.5" />
-				</Button>
-			</TooltipTrigger>
-			<TooltipContent side="bottom">{label}</TooltipContent>
-		</Tooltip>
-	);
+    const derivedName = nameFromFilename(fileName)
+    setLayerName(derivedName)
 
-	return (
-		<TooltipProvider>
-		<Card
-			className={cn(studioPanelClass, 'overflow-hidden')}
-			onDragOver={handleDragOver}
-			onDragLeave={handleDragLeave}
-			onDrop={handleDrop}
-			style={{ position: 'relative' }}>
-			{/* Drag overlay */}
-			{isDragActive && (
-				<div
-					className="absolute inset-0 z-50 flex items-center justify-center bg-background/90 border-2 border-dashed border-primary/40 rounded-none pointer-events-none"
-					style={{
-						borderStyle: 'dashed',
-						borderWidth: 2,
-						borderColor: '#60a5fa', // blue-400
-						background: 'rgba(59,130,246,0.08)', // blue-600/10
-					}}>
-					<div className="text-lg font-medium text-blue-600 dark:text-blue-300 text-center">
-						Drop CSV, TSV, or JSON file here
-					</div>
-				</div>
-			)}
-			{/* Fade/dim content when drag overlay is active */}
-			<div style={{ filter: isDragActive ? 'opacity(0.2)' : 'none', transition: 'filter 0.2s' }}>
-				<StudioExpandableHeader
-					title="Data input"
-					isExpanded={isExpanded}
-					onToggle={() => setIsExpanded(!isExpanded)}
-				/>
+    if (autoLoad) {
+      loadParsedData(data, columns, text, undefined, derivedName)
+    }
+  }
 
-				<div
-					className={cn(
-						'studio-panel-expand-body transition-all duration-300 ease-in-out overflow-hidden',
-						isExpanded ? 'max-h-none opacity-100' : 'max-h-0 opacity-0'
-					)}>
-					<CardContent className="space-y-4 px-4 pb-4 pt-2">
-						<Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'symbol' | 'choropleth')}>
-							<TabsList className={studioTabBarClass}>
-								<TabsTrigger value="symbol" className={studioTabTriggerClass}>
-									<MapPin className="w-3 h-3 mr-1.5" />
-									Symbol map
-								</TabsTrigger>
-								<TabsTrigger value="choropleth" className={studioTabTriggerClass}>
-									<BarChart3 className="w-3 h-3 mr-1.5" />
-									Choropleth
-								</TabsTrigger>
-							</TabsList>
+  const handleFileFromDrop = (file: File) => {
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const text = event.target?.result as string
+      setRawData(text)
+      parseFileText(text, file.name)
+    }
+    reader.readAsText(file)
+  }
 
-							<div className="mt-4">
-								<TabsContent
-									value="symbol"
-									className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
-									<div className="space-y-2">
-										<label htmlFor="symbol-data-input" className="text-sm font-medium text-foreground">
-											Paste CSV or TSV data
-										</label>
-										<div className="flex flex-nowrap items-center gap-2">
-												<Button
-													variant="outline"
-													size="sm"
-													type="button"
-													onClick={() => fileInputRef.current?.click()}
-													className={studioOutlineButtonClass}>
-													Upload file
-												</Button>
-												<input
-													ref={fileInputRef}
-													type="file"
-													accept=".csv,.tsv,.json,text/csv,text/tab-separated-values,application/json"
-													style={{ display: 'none' }}
-													onChange={handleFileUpload}
-													aria-label="Upload CSV or TSV file"
-												/>
-												<Popover open={symbolPopoverOpen} onOpenChange={setSymbolPopoverOpen}>
-													<PopoverTrigger asChild>
-														<Button
-															variant="outline"
-															size="sm"
-															type="button"
-															className={studioOutlineButtonClass}>
-															Load sample data
-														</Button>
-													</PopoverTrigger>
-													<PopoverContent className="w-72 p-2">
-														<div className="font-medium mb-2">Choose a sample dataset:</div>
-														<div className="space-y-1">
-															{sampleDataFiles.symbol.map((sample) => (
-																<Button
-																	key={sample.label}
-																	variant="ghost"
-																	size="sm"
-																	className="w-full justify-start"
-																	onClick={() =>
-																		loadSampleDataFile(sample.file, setSymbolRawData, setSymbolPopoverOpen)
-																	}>
-																	{sample.label}
-																</Button>
-															))}
-														</div>
-													</PopoverContent>
-												</Popover>
-												{renderClearButton(
-													() => setSymbolRawData(''),
-													!symbolRawData.trim(),
-													'Clear data'
-												)}
-										</div>
-										<Textarea
-											id="symbol-data-input"
-											placeholder={`Paste your data here...\nHeaders should be in the first row.\nSupports both comma-separated (CSV) and tab-separated (TSV) formats.`}
-											value={symbolRawData}
-											onChange={(e) => setSymbolRawData(e.target.value)}
-											className="min-h-[120px] font-mono text-sm bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 transition-all duration-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 whitespace-pre-line"
-										/>
-									</div>
-								</TabsContent>
+  const loadSampleDataFile = async (sample: (typeof sampleDataFiles)[number]) => {
+    try {
+      const res = await fetch(sample.file)
+      if (!res.ok) throw new Error('Failed to load sample data')
+      const text = await res.text()
+      const { data, columns } = parseDelimitedText(text)
+      setLayerName(sample.label)
+      loadParsedData(data, columns, text, sample.type, sample.label)
+    } catch {
+      toast({
+        description: 'Failed to load sample data.',
+        variant: 'destructive',
+        icon: <AlertCircle className="h-5 w-5" />,
+      })
+    }
+  }
 
-								<TabsContent
-									value="choropleth"
-									className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">
-									<div className="space-y-2">
-										<label htmlFor="choropleth-data-input" className="text-sm font-medium text-foreground">
-											Paste choropleth data
-										</label>
-										<div className="flex flex-nowrap items-center gap-2">
-												<Button
-													variant="outline"
-													size="sm"
-													type="button"
-													onClick={() => fileInputRef.current?.click()}
-													className={studioOutlineButtonClass}>
-													Upload file
-												</Button>
-												<input
-													ref={fileInputRef}
-													type="file"
-													accept=".csv,.tsv,.json,text/csv,text/tab-separated-values,application/json"
-													style={{ display: 'none' }}
-													onChange={handleFileUpload}
-													aria-label="Upload CSV or TSV file"
-												/>
-												<Popover open={choroplethPopoverOpen} onOpenChange={setChoroplethPopoverOpen}>
-													<PopoverTrigger asChild>
-														<Button
-															variant="outline"
-															size="sm"
-															type="button"
-															className={studioOutlineButtonClass}>
-															Load sample data
-														</Button>
-													</PopoverTrigger>
-													<PopoverContent className="w-72 p-2">
-														<div className="font-medium mb-2">Choose a sample dataset:</div>
-														<div className="space-y-1">
-															{sampleDataFiles.choropleth.map((sample) => (
-																<Button
-																	key={sample.label}
-																	variant="ghost"
-																	size="sm"
-																	className="w-full justify-start"
-																	onClick={() =>
-																		loadSampleDataFile(sample.file, setChoroplethRawData, setChoroplethPopoverOpen)
-																	}>
-																	{sample.label}
-																</Button>
-															))}
-														</div>
-													</PopoverContent>
-												</Popover>
-												{renderClearButton(
-													() => setChoroplethRawData(''),
-													!choroplethRawData.trim(),
-													'Clear data'
-												)}
-										</div>
-										<Textarea
-											id="choropleth-data-input"
-											placeholder={`Paste your choropleth data here...\nHeaders should be in the first row.\nSupports both comma-separated (CSV) and tab-separated (TSV) formats.`}
-											value={choroplethRawData}
-											onChange={(e) => setChoroplethRawData(e.target.value)}
-											className="min-h-[120px] font-mono text-sm bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 transition-all duration-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 whitespace-pre-line"
-										/>
-									</div>
-								</TabsContent>
-							</div>
-						</Tabs>
+  useEffect(() => {
+    const handler = () => setIsExpanded(false)
+    window.addEventListener('collapse-all-panels', handler)
+    return () => window.removeEventListener('collapse-all-panels', handler)
+  }, [setIsExpanded])
 
-						<div className="space-y-3 border-t border-border/40 pt-4">
-							<p className="text-xs text-muted-foreground">
-								Copy and paste data directly from Google Sheet, Excel, or any CSV/TSV source.
-							</p>
-							<Button
-								onClick={handleLoadData}
-								disabled={isLoadButtonDisabled()}
-								className={cn('w-full sm:w-auto', studioPrimaryButtonClass)}>
-								Load data
-							</Button>
-						</div>
-					</CardContent>
-				</div>
-			</div>
-		</Card>
-		</TooltipProvider>
-	);
+  return (
+    <Card
+      className={cn(studioPanelClass, 'relative overflow-hidden')}
+      onDragOver={(e) => {
+        e.preventDefault()
+        setIsDragActive(true)
+      }}
+      onDragLeave={(e) => {
+        e.preventDefault()
+        setIsDragActive(false)
+      }}
+      onDrop={(e) => {
+        e.preventDefault()
+        setIsDragActive(false)
+        const file = e.dataTransfer.files?.[0]
+        if (file) handleFileFromDrop(file)
+      }}
+    >
+      {isDragActive && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center border-2 border-dashed border-primary/40 bg-background/90">
+          <div className="text-center text-sm font-medium text-primary">Drop CSV, TSV, or JSON file here</div>
+        </div>
+      )}
+
+      <StudioExpandableHeader
+        title="Add layer"
+        isExpanded={isExpanded}
+        onToggle={() => setIsExpanded(!isExpanded)}
+      />
+
+      <div
+        className={cn(
+          'studio-panel-expand-body transition-all duration-300 overflow-hidden',
+          isExpanded ? 'max-h-none opacity-100' : 'max-h-0 opacity-0',
+        )}
+      >
+        <CardContent className="space-y-4 px-4 pb-4 pt-2">
+          <div>
+            <label className="mb-2 block text-sm font-medium">Layer type</label>
+            <ToggleGroup
+              type="single"
+              value={layerType}
+              onValueChange={(v) => {
+                if (v === 'points' || v === 'areas' || v === 'auto') setLayerType(v)
+              }}
+              className="justify-start"
+            >
+              <ToggleGroupItem value="auto" className="text-xs">
+                <Sparkles className="mr-1 h-3 w-3" />
+                Auto
+              </ToggleGroupItem>
+              <ToggleGroupItem value="points" className="text-xs">
+                <MapPin className="mr-1 h-3 w-3" />
+                Points
+              </ToggleGroupItem>
+              <ToggleGroupItem value="areas" className="text-xs">
+                <BarChart3 className="mr-1 h-3 w-3" />
+                Areas
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+
+          <div>
+            <label htmlFor="layer-name" className="mb-2 block text-sm font-medium">
+              Layer name
+            </label>
+            <Input
+              id="layer-name"
+              value={layerName}
+              onChange={(e) => setLayerName(e.target.value)}
+              placeholder={namePlaceholder}
+              className="text-sm"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="paste-data" className="mb-2 block text-sm font-medium">
+              Paste data
+            </label>
+            <Textarea
+              id="paste-data"
+              placeholder="Paste CSV or TSV data here…"
+              value={rawData}
+              onChange={(e) => setRawData(e.target.value)}
+              className="min-h-[100px] font-mono text-sm"
+            />
+          </div>
+
+          <Button type="button" onClick={handleLoadData} disabled={!rawData.trim()} className="w-full">
+            Load data
+          </Button>
+
+          <Button
+            variant="outline"
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className={cn('w-full', studioOutlineButtonClass)}
+          >
+            Upload file
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.tsv,.json,text/csv,text/tab-separated-values,application/json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) handleFileFromDrop(file)
+              if (fileInputRef.current) fileInputRef.current.value = ''
+            }}
+          />
+
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">or</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium">Load sample data</label>
+            <ScrollArea className="h-[140px] rounded-md border border-border">
+              <div className="flex flex-col p-1">
+                {sampleDataFiles.map((sample) => (
+                  <button
+                    key={sample.label}
+                    type="button"
+                    className="rounded px-3 py-2 text-left text-sm hover:bg-muted/60"
+                    onClick={() => loadSampleDataFile(sample)}
+                  >
+                    {sample.label}
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        </CardContent>
+      </div>
+    </Card>
+  )
 }

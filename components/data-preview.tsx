@@ -8,8 +8,18 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { ChevronDown, ChevronUp, Download, Copy, Trash2 } from 'lucide-react';
-import type { DataRow, GeocodedRow } from '@/app/(studio)/types';
+import type { DataRow, GeocodedRow, LayerType } from '@/app/(studio)/types';
 import { MapPin, BarChart3, Hash, Type, Calendar, Flag, XCircle, Database, Loader2, Check } from 'lucide-react';
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
@@ -35,6 +45,11 @@ interface DataPreviewProps {
 	isExpanded: boolean;
 	setIsExpanded: (expanded: boolean) => void;
 	variant?: StudioPanelVariant | 'canvas';
+	/** Layer-mode: one tab per layer instead of symbol/choropleth tabs */
+	layers?: Array<{ id: string; name: string; type: LayerType }>;
+	selectedLayerId?: string | null;
+	onSelectLayer?: (id: string) => void;
+	onDeleteLayer?: (id: string) => void;
 }
 
 interface ColumnType {
@@ -493,8 +508,14 @@ export function DataPreview({
 	isExpanded,
 	setIsExpanded,
 	variant = 'panel',
+	layers,
+	selectedLayerId,
+	onSelectLayer,
+	onDeleteLayer,
 }: DataPreviewProps) {
 	const isCanvas = variant === 'canvas';
+	const isLayerMode = isCanvas && layers && layers.length > 0 && onSelectLayer;
+	const [deleteLayerId, setDeleteLayerId] = useState<string | null>(null);
 	const [inferredTypes, setInferredTypes] = useState<ColumnType>({});
 
 	// NEW: Enhanced tab logic - always show choropleth tab as active when custom map has choropleth data
@@ -1325,29 +1346,79 @@ export function DataPreview({
 						variant="ghost"
 						size="icon"
 						className={cn(studioHeaderIconButtonClass, 'border-0 hover:!bg-destructive/10 hover:!text-destructive')}
-						onClick={handleClearData}
-						aria-label="Clear data">
+						onClick={() => {
+							if (isLayerMode && selectedLayerId && onDeleteLayer) {
+								setDeleteLayerId(selectedLayerId);
+							} else {
+								handleClearData();
+							}
+						}}
+						aria-label="Delete layer">
 						<Trash2 className="h-4 w-4" />
 					</Button>
 				</TooltipTrigger>
-				<TooltipContent side="bottom">
-					Clear {mapType === 'custom' && choroplethDataExists ? 'choropleth' : mapType} data
-				</TooltipContent>
+				<TooltipContent side="bottom">Delete layer</TooltipContent>
 			</Tooltip>
 		</>
 	);
+
+	const renderLayerTab = (layer: { id: string; name: string; type: LayerType }) => {
+		const active = layer.id === selectedLayerId;
+		const Icon = layer.type === 'points' ? MapPin : BarChart3;
+		return (
+			<button
+				key={layer.id}
+				type="button"
+				onClick={() => onSelectLayer?.(layer.id)}
+				className={studioTabButtonClass(active)}
+			>
+				<Icon className="mr-1 h-3 w-3" />
+				{layer.name}
+			</button>
+		);
+	};
 
 	return (
 		<TooltipProvider>
 			{isCanvas ? (
 				<div className="flex h-full min-h-0 flex-col">
 					<div className="flex items-center justify-between gap-2 border-b border-border px-2 py-2">
-						<div className={studioTabBarClass}>
-							{renderTabButton('symbol', <MapPin className="w-3 h-3" />, 'Symbol map', internalActiveTab === 'symbol')}
-							{renderTabButton('choropleth', <BarChart3 className="w-3 h-3" />, 'Choropleth', internalActiveTab === 'choropleth')}
+						<div className={cn(studioTabBarClass, 'overflow-x-auto')}>
+							{isLayerMode
+								? layers!.map(renderLayerTab)
+								: (
+									<>
+										{renderTabButton('symbol', <MapPin className="w-3 h-3" />, 'Symbol map', internalActiveTab === 'symbol')}
+										{renderTabButton('choropleth', <BarChart3 className="w-3 h-3" />, 'Choropleth', internalActiveTab === 'choropleth')}
+									</>
+								)}
 						</div>
 						<div className="flex items-center gap-0.5">{canvasToolbarActions}</div>
 					</div>
+					<AlertDialog open={deleteLayerId !== null} onOpenChange={(open) => !open && setDeleteLayerId(null)}>
+						<AlertDialogContent>
+							<AlertDialogHeader>
+								<AlertDialogTitle>Delete layer?</AlertDialogTitle>
+								<AlertDialogDescription>
+									This removes the layer and its data from your project. This cannot be undone.
+								</AlertDialogDescription>
+							</AlertDialogHeader>
+							<AlertDialogFooter>
+								<AlertDialogCancel>Cancel</AlertDialogCancel>
+								<AlertDialogAction
+									className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+									onClick={() => {
+										if (deleteLayerId && onDeleteLayer) {
+											onDeleteLayer(deleteLayerId);
+										}
+										setDeleteLayerId(null);
+									}}
+								>
+									Delete
+								</AlertDialogAction>
+							</AlertDialogFooter>
+						</AlertDialogContent>
+					</AlertDialog>
 					<div className="studio-data-preview-scroll">
 						<table className="studio-data-preview-table w-full min-w-full font-mono text-sm">
 									<thead className="sticky top-0 z-20 bg-background">

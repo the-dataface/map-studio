@@ -34,6 +34,7 @@ export function Header() {
                   <StudioModeTabs
                     mode={chrome.studioMode}
                     onModeChange={chrome.setStudioMode}
+                    mapSetupEnabled={chrome.mapSetupModeEnabled}
                     designEnabled={chrome.designModeEnabled}
                   />
                 ) : null

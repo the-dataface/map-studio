@@ -41,7 +41,7 @@ import { getNumericBounds, getUniqueStringValues } from '@/modules/data-ingest/v
 import { renderLabelPreview, formatLegendValue } from '@/modules/data-ingest/formatting';
 import { SYMBOL_TEXT_ROW_INDEX } from '@/lib/symbol-text-content';
 import { cn } from '@/lib/utils';
-import { studioPanelClass, studioSubPanelClass, studioSubPanelHeaderClass, studioSubPanelTitleClass, studioSubPanelContentClass, studioTabBarClass, studioTabButtonClass, studioTabToggleClass, studioTabTriggerClass, studioInspectorTabRowClass, studioInspectorSubpaneClass, StudioExpandableHeader, StudioInspectorBlock, StudioInspectorSection, type StudioPanelVariant } from '@/components/studio-panel';
+import { studioPanelClass, studioTabBarClass, studioTabButtonClass, studioTabToggleClass, studioTabTriggerClass, studioInspectorTabRowClass, studioInspectorSubpaneClass, studioCollapsibleSectionListClass, StudioExpandableHeader, StudioInspectorBlock, StudioCollapsibleSection, type StudioPanelVariant } from '@/components/studio-panel';
 
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { TagIcon } from 'lucide-react'; // Import TagIcon
@@ -81,6 +81,18 @@ interface DimensionMappingProps {
 	isExpanded: boolean;
 	setIsExpanded: (expanded: boolean) => void;
 	variant?: StudioPanelVariant;
+	/** When true, render fields only — no outer card wrapper */
+	embedded?: boolean;
+	/** When true, hide symbol/choropleth tabs and use activeLayerType */
+	layerMode?: boolean;
+	activeLayerType?: 'points' | 'areas';
+	/** When true, show column mapping only — color scheme controls live in Design */
+	mappingOnly?: boolean;
+	/** When true, show color scheme controls only (Design tab) */
+	colorSchemeOnly?: boolean;
+	/** When true, skip auto-populating the region column (user cleared it) */
+	stateColumnDismissed?: boolean;
+	onStateColumnDismiss?: () => void;
 }
 
 // Helper function to return a colored icon (used for dropdown items and section headers)
@@ -102,6 +114,9 @@ const getColoredTypeIcon = (type: string) => {
 			colorClasses = 'text-blue-600 dark:text-blue-400';
 			break;
 		case 'state':
+		case 'province':
+		case 'county':
+		case 'country':
 			IconComponent = Flag;
 			colorClasses = 'text-orange-600 dark:text-orange-400';
 			break;
@@ -134,23 +149,49 @@ export function DimensionMapping({
 	isExpanded,
 	setIsExpanded,
 	variant = 'panel',
+	embedded = false,
+	layerMode = false,
+	activeLayerType = 'points',
+	mappingOnly = false,
+	colorSchemeOnly = false,
+	stateColumnDismissed = false,
+	onStateColumnDismiss,
 }: DimensionMappingProps) {
+	const showColumnMapping = !colorSchemeOnly;
+	const showColorSchemeControls = !mappingOnly || colorSchemeOnly;
+	const subPanelListClass = cn(
+		embedded || variant === 'inspector'
+			? cn('space-y-0', embedded && '-mx-4', studioCollapsibleSectionListClass)
+			: 'space-y-4',
+		'animate-in fade-in-50 slide-in-from-bottom-2 duration-300',
+	);
 	// Add this log at the beginning of the function
 	const [expandedPanels, setExpandedPanels] = useState<{ [key: string]: boolean }>({
 		coordinates: true,
-		size: false,
-		color: false,
+		size: true,
+		color: true,
 		state: true,
-		fill: false,
-		labels: false,
-		symbolText: false,
+		fill: true,
+		labels: true,
+		symbolText: true,
 	});
 
 	// Internal state for active tab, synchronized with mapType prop on initial load/change
-	// If mapType is "custom", we treat it as "choropleth" for dimension mapping UI purposes
-	const [internalActiveTab, setInternalActiveTab] = useState<'symbol' | 'choropleth'>(
-		mapType === 'custom' ? 'choropleth' : mapType
-	);
+	const resolvedTab: 'symbol' | 'choropleth' =
+		layerMode
+			? activeLayerType === 'points'
+				? 'symbol'
+				: 'choropleth'
+			: mapType === 'custom'
+				? 'choropleth'
+				: mapType;
+	const [internalActiveTab, setInternalActiveTab] = useState<'symbol' | 'choropleth'>(resolvedTab);
+
+	useEffect(() => {
+		if (layerMode) {
+			setInternalActiveTab(activeLayerType === 'points' ? 'symbol' : 'choropleth');
+		}
+	}, [layerMode, activeLayerType]);
 
 	// State for selected color scheme preset
 	const [selectedSymbolColorScheme, setSelectedSymbolColorScheme] = useState<string>('');
@@ -282,9 +323,36 @@ export function DimensionMapping({
 	};
 
 	// Renamed updateSetting to handleDimensionSettingChange
+	const collapsePanelForKey = (section: 'symbol' | 'choropleth', key: string) => {
+		const panelForKey: Record<string, string> = {
+			latitude: 'coordinates',
+			longitude: 'coordinates',
+			sizeBy: 'size',
+			colorBy: section === 'choropleth' ? 'fill' : 'color',
+			stateColumn: 'state',
+			labelTemplate: 'labels',
+			symbolTextBy: 'symbolText',
+		};
+		const panelKey = panelForKey[key];
+		if (panelKey) {
+			setExpandedPanels((prev) => ({ ...prev, [panelKey]: false }));
+		}
+	};
+
 	const handleDimensionSettingChange = (section: 'symbol' | 'choropleth', key: string, value: any) => {
 		// Preserve null for numeric fields (empty = unset); only coerce on explicit 0
 		const processedValue = value;
+
+		if (key === 'stateColumn' && !processedValue) {
+			onStateColumnDismiss?.();
+		}
+
+		const applyUpdate = (settings: DimensionSettings) => {
+			onUpdateSettings(settings);
+			if (processedValue) {
+				collapsePanelForKey(section, key);
+			}
+		};
 
 		const newSettings = {
 			...dimensionSettings,
@@ -296,7 +364,7 @@ export function DimensionMapping({
 
 		if (key === 'sizeBy' && processedValue) {
 			const stats = getColumnStats(processedValue, section);
-			onUpdateSettings({
+			applyUpdate({
 				...newSettings,
 				[section]: {
 					...newSettings[section],
@@ -335,7 +403,7 @@ export function DimensionMapping({
 					midColor = d3.color(d3Scale(0.5))?.hex() || '#808080';
 				}
 
-				onUpdateSettings({
+				applyUpdate({
 					...newSettings,
 					[section]: {
 						...newSettings[section],
@@ -367,7 +435,7 @@ export function DimensionMapping({
 					color: defaultColors[idx % defaultColors.length],
 				}));
 
-				onUpdateSettings({
+				applyUpdate({
 					...newSettings,
 					[section]: {
 						...newSettings[section],
@@ -378,7 +446,7 @@ export function DimensionMapping({
 				});
 			}
 		} else {
-			onUpdateSettings(newSettings);
+			applyUpdate(newSettings);
 		}
 	};
 
@@ -789,16 +857,16 @@ export function DimensionMapping({
 			const updatedChoroplethSettings = { ...(dimensionSettings.choropleth || {}) };
 			let changed = false;
 
-			if (bestLatColumn && bestLatColumn !== updatedSymbolSettings.latitude) {
+			if (bestLatColumn && !updatedSymbolSettings.latitude) {
 				updatedSymbolSettings.latitude = bestLatColumn;
 				changed = true;
 			}
-			if (bestLngColumn && bestLngColumn !== updatedSymbolSettings.longitude) {
+			if (bestLngColumn && !updatedSymbolSettings.longitude) {
 				updatedSymbolSettings.longitude = bestLngColumn;
 				changed = true;
 			}
-			// Safely access stateColumn
-			if (stateColumn && stateColumn !== (updatedChoroplethSettings.stateColumn || '')) {
+			// Only auto-populate state column when not yet mapped and user hasn't dismissed it
+			if (stateColumn && !updatedChoroplethSettings.stateColumn && !stateColumnDismissed) {
 				updatedChoroplethSettings.stateColumn = stateColumn;
 				changed = true;
 			}
@@ -822,6 +890,7 @@ export function DimensionMapping({
 		columnTypes,
 		dimensionSettings, // This dependency is fine here as it's for initial auto-population of coordinates
 		onUpdateSettings,
+		stateColumnDismissed,
 	]);
 
 	// Main useEffect for auto-population of values and dynamic midpoint color updates
@@ -961,96 +1030,54 @@ export function DimensionMapping({
 	]);
 
 	// Update the renderSubPanel function to add dynamic height and scrollability for color panel
-	const renderTypeIcons = (allowedTypes: string[]) => (
-		<div className="flex items-center gap-1">
-			{allowedTypes.map((type) => (
-				<span key={type}>{getColoredTypeIcon(type)}</span>
-			))}
-		</div>
-	);
+	const normalizeTypeForIcon = (type: string) => {
+		if (['state', 'province', 'county', 'country'].includes(type)) return 'state';
+		return type;
+	};
+
+	const renderTypeIcons = (allowedTypes: string[]) => {
+		const uniqueTypes = [...new Set(allowedTypes.map(normalizeTypeForIcon))];
+		return (
+			<div className="flex items-center gap-1">
+				{uniqueTypes.map((type) => (
+					<span key={type}>{getColoredTypeIcon(type)}</span>
+				))}
+			</div>
+		);
+	};
 
 	const renderSubPanel = (
 		key: string,
 		title: string,
-		icon: React.ReactNode,
+		_icon: React.ReactNode,
 		badge: string,
 		children: React.ReactNode,
 		allowedTypes?: string[]
 	) => {
 		const typeIcons = allowedTypes?.length ? renderTypeIcons(allowedTypes) : undefined;
-
-		if (variant === 'inspector') {
-			return (
-				<StudioInspectorSection
-					key={key}
-					title={title}
-					badge={
-						badge ? (
-							<Badge variant="outline" className="text-xs font-normal ml-1">
-								{badge}
-							</Badge>
-						) : undefined
-					}
-					typeIcons={typeIcons}>
-					{children}
-				</StudioInspectorSection>
-			);
-		}
-
 		const isExpanded = expandedPanels[key];
 		const isColorPanel = key === 'color' || key === 'fill';
-		const isLabelsPanel = key === 'labels'; // NEW: Check for labels panel
+		const isLabelsPanel = key === 'labels';
 
 		return (
-			<div className={studioSubPanelClass}>
-				<div
-					className={studioSubPanelHeaderClass}
-					onClick={() => togglePanel(key)}
-					onKeyDown={(e) => {
-						if (e.key === 'Enter' || e.key === ' ') {
-							e.preventDefault();
-							togglePanel(key);
-						}
-					}}
-					role="button"
-					tabIndex={0}
-					aria-expanded={isExpanded}
-					aria-controls={`panel-${key}`}>
-					<div className="flex items-center justify-between gap-2">
-						<div className="flex items-center gap-2 min-w-0">
-							<div className="text-foreground transform scale-75">{icon}</div>
-							<span className={studioSubPanelTitleClass}>{title}</span>
-							{badge && (
-								<Badge variant="outline" className="text-xs font-normal ml-1">
-									{badge}
-								</Badge>
-							)}
-						</div>
-						<div className="flex shrink-0 items-center gap-2">
-							{typeIcons}
-							<div className="transition-transform duration-200">
-								{isExpanded ? (
-									<ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
-								) : (
-									<ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-								)}
-							</div>
-						</div>
-					</div>
-				</div>
-				<div
-					className={`transition-all duration-300 ease-in-out overflow-hidden ${
-						isExpanded ? (isColorPanel || isLabelsPanel ? 'max-h-[600px]' : 'max-h-[500px]') : 'max-h-0' // Adjust max-height for labels panel
-					} ${isExpanded ? 'opacity-100' : 'opacity-0'}`}>
-					<div
-						className={cn(
-							studioSubPanelContentClass,
-							(isColorPanel || isLabelsPanel) && isExpanded ? 'overflow-y-auto max-h-[560px]' : ''
-						)}>
-						{children}
-					</div>
-				</div>
-			</div>
+			<StudioCollapsibleSection
+				key={key}
+				title={title}
+				isExpanded={isExpanded}
+				onToggle={() => togglePanel(key)}
+				badge={
+					badge ? (
+						<Badge variant="outline" className="font-mono text-[10px] font-normal tracking-wide">
+							{badge}
+						</Badge>
+					) : undefined
+				}
+				typeIcons={typeIcons}
+				contentClassName={
+					(isColorPanel || isLabelsPanel) && isExpanded ? 'max-h-[560px] overflow-y-auto' : undefined
+				}>
+				{children}
+			</StudioCollapsibleSection>
 		);
 	};
 
@@ -1333,7 +1360,7 @@ export function DimensionMapping({
 
 	const dimensionFields = (
 		<>
-			{isInspector ? (
+			{!layerMode && (isInspector ? (
 				<div className={studioInspectorTabRowClass}>
 					<Tabs
 						value={internalActiveTab}
@@ -1369,16 +1396,12 @@ export function DimensionMapping({
 						internalActiveTab === 'choropleth'
 					)}
 				</div>
-			)}
+			))}
 
 						{internalActiveTab === 'symbol' && (
-							<div
-								className={cn(
-									isInspector ? 'space-y-0' : 'space-y-4',
-									'animate-in fade-in-50 slide-in-from-bottom-2 duration-300'
-								)}>
+							<div className={subPanelListClass}>
 								{/* Coordinates Panel */}
-								{renderSubPanel(
+								{!colorSchemeOnly && renderSubPanel(
 									'coordinates',
 									'Coordinates',
 									<MapPin className="w-4 h-4" />,
@@ -1387,7 +1410,7 @@ export function DimensionMapping({
 												dimensionSettings.symbol.longitude
 										  )}`
 										: 'Not mapped',
-									<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+									<div className="flex flex-col gap-3">
 										{renderCoordinateField(
 											'Latitude',
 											dimensionSettings.symbol.latitude,
@@ -1403,7 +1426,7 @@ export function DimensionMapping({
 								)}
 
 								{/* Size Panel */}
-								{renderSubPanel(
+								{!colorSchemeOnly && renderSubPanel(
 									'size',
 									'Size',
 									<RulerIcon className="w-4 h-4" />,
@@ -1492,10 +1515,11 @@ export function DimensionMapping({
 								{/* Color Panel */}
 								{renderSubPanel(
 									'color',
-									'Color',
+									colorSchemeOnly ? 'Color scheme' : 'Color',
 									<Palette className="w-4 h-4" />,
 									dimensionSettings.symbol.colorBy ? toSentenceCase(dimensionSettings.symbol.colorBy) : 'Not mapped',
 									<div className="space-y-4">
+										{showColumnMapping && (
 										<div className="space-y-3">
 											{renderDropdown(
 												dimensionSettings.symbol.colorBy,
@@ -1527,9 +1551,10 @@ export function DimensionMapping({
 												</ToggleGroup>
 											)}
 										</div>
+										)}
 
-										{/* MOVED: Color Scheme Preset Dropdown for Symbol */}
-										{dimensionSettings.symbol.colorBy && (
+										{/* Color scheme controls — configured in Design tab when mappingOnly */}
+										{showColorSchemeControls && dimensionSettings.symbol.colorBy && (
 											<div className="space-y-2">
 												<div className="flex items-center justify-between">
 													<Label className="text-sm font-medium">Color scheme presets</Label>
@@ -1787,7 +1812,7 @@ export function DimensionMapping({
 											</div>
 										)}
 
-										{dimensionSettings.symbol.colorBy && (
+										{showColorSchemeControls && dimensionSettings.symbol.colorBy && (
 											<div className={studioInspectorSubpaneClass}>
 												{/* Existing linear/categorical content */}
 												{dimensionSettings.symbol.colorScale === 'linear' ? (
@@ -2006,7 +2031,7 @@ export function DimensionMapping({
 									['number', 'text', 'date', 'state']
 								)}
 
-								{renderSubPanel(
+								{!colorSchemeOnly && renderSubPanel(
 									'symbolText',
 									'Symbol text',
 									<Hash className="w-4 h-4" />,
@@ -2034,7 +2059,7 @@ export function DimensionMapping({
 								)}
 
 								{/* NEW: Labels Panel */}
-								{renderSubPanel(
+								{!colorSchemeOnly && renderSubPanel(
 									'labels',
 									'Labels',
 									<TagIcon className="w-4 h-4" />,
@@ -2105,13 +2130,9 @@ export function DimensionMapping({
 						)}
 
 						{internalActiveTab === 'choropleth' && (
-							<div
-								className={cn(
-									isInspector ? 'space-y-0' : 'space-y-4',
-									'animate-in fade-in-50 slide-in-from-bottom-2 duration-300'
-								)}>
+							<div className={subPanelListClass}>
 								{/* State Panel */}
-								{renderSubPanel(
+								{!colorSchemeOnly && renderSubPanel(
 									'state',
 									subnationalLabel, // Use dynamic label instead of "State"
 									<Flag className="w-4 h-4" />,
@@ -2124,6 +2145,32 @@ export function DimensionMapping({
 											(value) => handleDimensionSettingChange(internalActiveTab, 'stateColumn', value),
 											['state', 'province', 'county', 'country', 'text']
 										)}
+										{(() => {
+											const stateCol = dimensionSettings[internalActiveTab].stateColumn;
+											if (!stateCol) {
+												return (
+													<p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+														Select a region column to join your data to the map boundaries.
+													</p>
+												);
+											}
+											const colType = columnTypes[stateCol];
+											if (colType === 'text') {
+												return (
+													<p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+														This column is typed as text — joins may fail if values don&apos;t match boundary names exactly.
+													</p>
+												);
+											}
+											if (colType && !['state', 'province', 'county', 'country'].includes(colType)) {
+												return (
+													<p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+														This column type may not join correctly to map regions.
+													</p>
+												);
+											}
+											return null;
+										})()}
 									</div>,
 									['state', 'province', 'county', 'country', 'text']
 								)}
@@ -2131,12 +2178,13 @@ export function DimensionMapping({
 								{/* Fill Panel */}
 								{renderSubPanel(
 									'fill',
-									'Fill',
+									colorSchemeOnly ? 'Color scheme' : 'Fill',
 									<Palette className="w-4 h-4" />,
 									dimensionSettings[internalActiveTab].colorBy
 										? toSentenceCase(dimensionSettings[internalActiveTab].colorBy)
 										: 'Not mapped',
 									<div className="space-y-4">
+										{showColumnMapping && (
 										<div className="space-y-3">
 											{renderDropdown(
 												dimensionSettings[internalActiveTab].colorBy,
@@ -2168,9 +2216,10 @@ export function DimensionMapping({
 												</ToggleGroup>
 											)}
 										</div>
+										)}
 
-										{/* MOVED: Color Scheme Preset Dropdown for Choropleth / Custom */}
-										{dimensionSettings[internalActiveTab].colorBy && (
+										{/* Color scheme controls — configured in Design tab when mappingOnly */}
+										{showColorSchemeControls && dimensionSettings[internalActiveTab].colorBy && (
 											<div className="space-y-2">
 												<div className="flex items-center justify-between">
 													<Label className="text-sm font-medium">Color scheme presets</Label>
@@ -2433,7 +2482,7 @@ export function DimensionMapping({
 											</div>
 										)}
 
-										{dimensionSettings[internalActiveTab].colorBy && (
+										{showColorSchemeControls && dimensionSettings[internalActiveTab].colorBy && (
 											<div className={studioInspectorSubpaneClass}>
 												{/* Existing linear/categorical content */}
 												{dimensionSettings[internalActiveTab].colorScale === 'linear' ? (
@@ -2671,7 +2720,7 @@ export function DimensionMapping({
 								)}
 
 								{/* NEW: Labels Panel */}
-								{renderSubPanel(
+								{!colorSchemeOnly && renderSubPanel(
 									'labels',
 									'Labels',
 									<TagIcon className="w-4 h-4" />,
@@ -2749,7 +2798,9 @@ export function DimensionMapping({
 
 	return (
 		<TooltipProvider>
-			{isInspector ? (
+			{embedded ? (
+				dimensionFields
+			) : isInspector ? (
 				<StudioInspectorBlock
 					title="Dimension mapping"
 					isExpanded={isExpanded}

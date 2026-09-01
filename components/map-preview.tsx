@@ -14,6 +14,7 @@ import type {
 	MapLibreConfig,
 	MapType,
 	ProjectionType,
+	ReferenceLayerConfig,
 	RenderTarget,
 	StylingSettings,
 } from '@/app/(studio)/types';
@@ -21,6 +22,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Download, Copy, Maximize2, Minimize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { REFERENCE_LAYER_CATALOG } from '@/modules/reference-layers/catalog';
 import { MapLibrePreview } from '@/components/maplibre-preview';
 import { RenderTargetToggle } from '@/components/render-target-toggle';
 import { resolveLabelMapType } from '@/lib/symbol-text-content';
@@ -90,6 +92,10 @@ export interface MapPreviewProps {
 	onRenderTargetChange?: (target: RenderTarget) => void;
 	boundaryConfig?: BoundaryConfig;
 	maplibreConfig?: MapLibreConfig;
+	/** Setup tab: simplified preview — inspect-only for print/custom, pan+inspect for interactive */
+	previewContext?: 'setup' | 'design';
+	canvasType?: 'print' | 'interactive' | 'custom';
+	referenceLayers?: ReferenceLayerConfig[];
 }
 
 const MAP_WIDTH = 975;
@@ -124,12 +130,22 @@ export function MapPreview({
 	onRenderTargetChange,
 	boundaryConfig,
 	maplibreConfig,
+	previewContext = 'design',
+	canvasType = 'print',
+	referenceLayers = [],
 }: MapPreviewProps) {
 	const internalSvgRef = useRef<SVGSVGElement>(null);
 	const svgRef = externalSvgRef || internalSvgRef;
 	const mapContainerRef = useRef<HTMLDivElement>(null);
 	const { toast } = useToast();
-	const [activeTool, setActiveTool] = useState<MapTool>('inspect');
+	const isSetupPreview = previewContext === 'setup';
+	const isInteractiveSetup = isSetupPreview && canvasType === 'interactive';
+	const isInteractiveCanvas = canvasType === 'interactive';
+	const enabledReferenceLayers = referenceLayers.filter((layer) => layer.enabled);
+	const enabledReferenceLayerLabels = enabledReferenceLayers
+		.map((layer) => REFERENCE_LAYER_CATALOG.find((def) => def.id === layer.id)?.label)
+		.filter(Boolean);
+	const [activeTool, setActiveTool] = useState<MapTool>(canvasType === 'interactive' ? 'move' : 'inspect');
 	const [internalSelectedLabelId, setInternalSelectedLabelId] = useState<string | null>(null);
 	const [internalSelectedPathId, setInternalSelectedPathId] = useState<string | null>(null);
 	const selectedLabelId = selectedLabelIdProp ?? internalSelectedLabelId;
@@ -197,7 +213,11 @@ export function MapPreview({
 			toast(options as Parameters<typeof toast>[0]);
 		},
 	});
-	const showMapLibre = renderTarget === 'maplibre' && mapType === 'choropleth' && boundaryConfig && maplibreConfig;
+	const showMapLibre =
+		renderTarget === 'maplibre' &&
+		maplibreConfig &&
+		(boundaryConfig ||
+			(dimensionSettings.symbol.latitude && dimensionSettings.symbol.longitude));
 
 	// Handler for label position updates
 	const handleLabelPositionUpdate = useCallback(
@@ -657,8 +677,11 @@ export function MapPreview({
 		const shouldRenderChoropleth =
 			choroplethDataExists &&
 			dimensionSettings?.choropleth?.stateColumn &&
-			dimensionSettings?.choropleth?.colorBy &&
-			choroplethData.length > 0;
+			choroplethData.length > 0 &&
+			(isSetupPreview || dimensionSettings?.choropleth?.colorBy);
+
+		const shouldApplyChoroplethColors =
+			shouldRenderChoropleth && Boolean(dimensionSettings?.choropleth?.colorBy);
 
 		// Calculate legend flags
 		const shouldShowSymbolSizeLegend =
@@ -667,7 +690,7 @@ export function MapPreview({
 			dimensionSettings.symbol.sizeMinValue !== dimensionSettings.symbol.sizeMaxValue;
 
 		const shouldShowSymbolColorLegend = shouldRenderSymbols && dimensionSettings.symbol.colorBy;
-		const shouldShowChoroplethColorLegend = shouldRenderChoropleth && dimensionSettings.choropleth.colorBy;
+		const shouldShowChoroplethColorLegend = shouldApplyChoroplethColors && dimensionSettings.choropleth.colorBy;
 
 		const legendHeight = estimateLegendHeight({
 			showSymbolSizeLegend: !!shouldShowSymbolSizeLegend,
@@ -862,7 +885,7 @@ export function MapPreview({
 		}
 
 		// Apply choropleth colors if applicable
-		if (shouldRenderChoropleth) {
+		if (shouldApplyChoroplethColors) {
 			const choroplethScaleResult = applyChoroplethColors({
 				svg,
 				choroplethData,
@@ -1272,17 +1295,49 @@ export function MapPreview({
 						<div className="absolute top-3 right-3 z-50 flex items-center gap-1.5">{mapHeaderActions}</div>
 					) : null}
 					{showMapLibre ? (
-						<MapLibrePreview
-							choroplethData={choroplethData}
-							dimensionSettings={dimensionSettings}
-							stylingSettings={stylingSettings}
-							boundaryConfig={boundaryConfig!}
-							maplibreConfig={maplibreConfig!}
-							selectedGeography={selectedGeography}
-						/>
+						<div className="relative h-full min-h-[420px] w-full">
+							<MapLibrePreview
+								mapType={mapType}
+								symbolData={symbolData}
+								choroplethData={choroplethData}
+								dimensionSettings={dimensionSettings}
+								stylingSettings={stylingSettings}
+								boundaryConfig={boundaryConfig!}
+								columnTypes={columnTypes}
+								columnFormats={columnFormats}
+								activeTool={activeTool}
+								maplibreConfig={{
+									...maplibreConfig!,
+									interactivity: {
+										...maplibreConfig!.interactivity,
+										allowPan: isInteractiveCanvas
+											? activeTool === 'move'
+											: maplibreConfig!.interactivity.allowPan,
+										allowZoom: true,
+									},
+								}}
+								selectedGeography={selectedGeography}
+								previewContext={previewContext}
+							/>
+							{mapVisible && isInteractiveCanvas && isSetupPreview && (
+								<MapControlBar
+									activeTool={activeTool}
+									onToolChange={setActiveTool}
+									tools={['move', 'inspect']}
+								/>
+							)}
+							{mapVisible && isInteractiveCanvas && !isSetupPreview && (
+								<MapControlBar activeTool={activeTool} onToolChange={setActiveTool} />
+							)}
+							{enabledReferenceLayerLabels.length > 0 ? (
+								<div className="pointer-events-none absolute bottom-3 left-3 z-40 max-w-sm rounded-md border border-border bg-background/95 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur-sm">
+									Context layers enabled ({enabledReferenceLayerLabels.join(', ')}) — map overlay rendering coming soon.
+								</div>
+							) : null}
+						</div>
 					) : renderTarget === 'maplibre' ? (
 						<div className="flex h-full min-h-[420px] items-center justify-center px-6 text-center text-sm text-muted-foreground">
-							MapLibre canvas supports choropleth maps in this phase. Switch to choropleth map type or use the SVG canvas.
+							MapLibre canvas supports symbol and choropleth maps. Configure dimension mapping or switch to the SVG canvas.
 						</div>
 					) : (
 						<>
@@ -1301,7 +1356,21 @@ export function MapPreview({
 					<div id={`${mapId}-description`} className="sr-only">
 						{mapDescription}
 					</div>
-					{mapVisible && <MapControlBar activeTool={activeTool} onToolChange={setActiveTool} />}
+					{mapVisible && !isSetupPreview && (
+						<MapControlBar activeTool={activeTool} onToolChange={setActiveTool} />
+					)}
+					{mapVisible && isInteractiveSetup && (
+						<MapControlBar
+							activeTool={activeTool}
+							onToolChange={setActiveTool}
+							tools={['move', 'inspect']}
+						/>
+					)}
+					{isSetupPreview && enabledReferenceLayerLabels.length > 0 ? (
+						<div className="pointer-events-none absolute bottom-3 left-3 z-40 max-w-sm rounded-md border border-border bg-background/95 px-3 py-2 text-xs text-muted-foreground shadow-sm backdrop-blur-sm">
+							Context layers enabled ({enabledReferenceLayerLabels.join(', ')}) — map overlay rendering coming soon.
+						</div>
+					) : null}
 					<MapTooltip
 						x={tooltipState.x}
 						y={tooltipState.y}
