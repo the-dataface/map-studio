@@ -252,3 +252,114 @@ export interface StylingSettings {
 		opacity?: number;
 	};
 }
+
+// --- V2: shared boundary + render target config ---
+
+export type RenderTarget = 'svg' | 'maplibre';
+
+export type BoundaryLevel = 'world' | 'country' | 'admin1' | 'admin2' | 'custom';
+
+export type BoundaryJoinKey = 'name' | 'iso' | 'fips' | 'hasc' | 'geoid';
+
+export interface BoundaryScope {
+	countries?: string[];
+	region?: string;
+	bbox?: [number, number, number, number];
+}
+
+export interface BoundaryConfig {
+	level: BoundaryLevel;
+	scope: BoundaryScope;
+	joinColumn: string;
+	joinKey: BoundaryJoinKey;
+	source?: 'natural-earth' | 'geoboundaries' | 'census' | 'topojson' | 'custom';
+	customGeoJson?: string;
+}
+
+export interface BasemapStyle {
+	id: string;
+	name: string;
+	url: string;
+	attribution: string;
+}
+
+export interface MapLibreViewport {
+	center: [number, number];
+	zoom: number;
+	bearing?: number;
+	pitch?: number;
+}
+
+export interface MapLibreConfig {
+	viewport: MapLibreViewport;
+	basemapStyleId: string;
+	interactivity: {
+		allowZoom: boolean;
+		allowPan: boolean;
+		showTooltips: boolean;
+	};
+}
+
+export interface MatchReport {
+	matched: number;
+	totalDataRows: number;
+	totalFeatures: number;
+	unmatchedDataValues: string[];
+	unmatchedFeatureCount: number;
+}
+
+// --- V2: layers + canvas workflow ---
+
+export type LayerType = 'points' | 'areas';
+export type CanvasType = 'print' | 'interactive' | 'custom';
+
+export type PointsLayerStyle = StylingSettings['symbol'];
+export type AreasLayerStyle = StylingSettings['choropleth'];
+
+export interface MapLayer {
+	id: string;
+	name: string;
+	type: LayerType;
+	visible: boolean;
+	order: number;
+	data: DataState;
+	columnTypes: ColumnType;
+	columnFormats: ColumnFormat;
+	dimensions: SymbolDimensionSettings | ChoroplethDimensionSettings;
+	styling: PointsLayerStyle | AreasLayerStyle;
+}
+
+export interface PrintConfig {
+	projection: ProjectionType;
+	clipToCountry: boolean;
+}
+
+export interface ReferenceLayerConfig {
+	id: string;
+	enabled: boolean;
+	opacity?: number;
+}
+
+export const CANVAS_TYPE_LABELS: Record<CanvasType, string> = {
+	print: 'Print layout',
+	interactive: 'Interactive',
+	custom: 'Custom boundaries',
+};
+
+export const CANVAS_TYPE_DESCRIPTIONS: Record<CanvasType, string> = {
+	print: 'Fixed-size map for SVG/PNG export and Figma',
+	interactive: 'Zoomable map on a real basemap',
+	custom: 'Use your own region shapes (SVG)',
+};
+
+export function canvasTypeToRenderTarget(canvasType: CanvasType): RenderTarget {
+	return canvasType === 'interactive' ? 'maplibre' : 'svg';
+}
+
+export function renderTargetToCanvasType(
+	renderTarget: RenderTarget,
+	hasCustomBoundary: boolean,
+): CanvasType {
+	if (hasCustomBoundary) return 'custom';
+	return renderTarget === 'maplibre' ? 'interactive' : 'print';
+}

@@ -234,6 +234,69 @@ export function StudioInspectorSection({
   )
 }
 
+interface StudioCollapsibleSectionProps {
+  title: string
+  isExpanded: boolean
+  onToggle: () => void
+  badge?: React.ReactNode
+  typeIcons?: React.ReactNode
+  children: React.ReactNode
+  className?: string
+  contentClassName?: string
+}
+
+/** Wrapper for a stack of edge-to-edge collapsible sub-panes */
+export const studioCollapsibleSectionListClass =
+  'divide-y divide-border border-y border-border'
+
+/** Collapsible sub-pane — light all-caps mono header with left caret */
+export function StudioCollapsibleSection({
+  title,
+  isExpanded,
+  onToggle,
+  badge,
+  typeIcons,
+  children,
+  className,
+  contentClassName,
+}: StudioCollapsibleSectionProps) {
+  return (
+    <section className={cn('studio-collapsible-section', className)}>
+      <button
+        type="button"
+        className={cn(
+          'flex w-full cursor-pointer items-center gap-2 bg-muted/20 px-4 py-2 text-left transition-colors duration-150 hover:bg-muted/40',
+        )}
+        onClick={onToggle}
+        aria-expanded={isExpanded}
+      >
+        <ChevronDown
+          className={cn(
+            'h-3 w-3 shrink-0 text-muted-foreground transition-transform duration-200',
+            isExpanded && '-rotate-180',
+          )}
+        />
+        <span className={cn(studioInspectorSectionTitleClass, 'min-w-0 flex-1 truncate')}>
+          {title}
+        </span>
+        {badge ? <span className="shrink-0 font-sans font-normal normal-case">{badge}</span> : null}
+        {typeIcons ? <span className="ml-auto flex shrink-0 items-center gap-1">{typeIcons}</span> : null}
+      </button>
+      {isExpanded ? (
+        <div
+          className={cn(
+            studioInspectorSectionContentClass,
+            'border-t border-border',
+            contentClassName,
+          )}
+        >
+          {children}
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
 /** @deprecated use studioExpandableHeaderClass */
 export const studioPanelHeaderClass = studioExpandableHeaderClass
 

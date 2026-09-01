@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react'
 
-export type StudioMode = 'data' | 'design'
+export type StudioMode = 'data' | 'map-setup' | 'design'
 
 export interface StudioChromeState {
   projectName: string
@@ -24,6 +24,7 @@ export interface StudioChromeState {
   studioMode: StudioMode
   setStudioMode: (mode: StudioMode) => void
   designModeEnabled: boolean
+  mapSetupModeEnabled: boolean
 }
 
 interface StudioChromeContextValue {
@@ -78,6 +79,7 @@ export function useRegisterStudioChrome(chrome: StudioChromeState | null) {
       studioMode: chromeRef.current!.studioMode,
       setStudioMode: (mode) => chromeRef.current?.setStudioMode(mode),
       designModeEnabled: chromeRef.current!.designModeEnabled,
+      mapSetupModeEnabled: chromeRef.current!.mapSetupModeEnabled,
     })
 
     return () => setChrome(null)
@@ -90,6 +92,7 @@ export function useRegisterStudioChrome(chrome: StudioChromeState | null) {
     chrome?.showModeTabs,
     chrome?.studioMode,
     chrome?.designModeEnabled,
+    chrome?.mapSetupModeEnabled,
     setChrome,
   ])
 }

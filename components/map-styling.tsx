@@ -69,7 +69,8 @@ import {
 	studioPrimaryButtonClass,
 	StudioExpandableHeader,
 	StudioInspectorBlock,
-	StudioInspectorSection,
+	StudioCollapsibleSection,
+	studioCollapsibleSectionListClass,
 	type StudioPanelVariant,
 } from '@/components/studio-panel';
 
@@ -198,6 +199,8 @@ interface MapStylingProps {
 	isExpanded: boolean;
 	setIsExpanded: (expanded: boolean) => void;
 	variant?: StudioPanelVariant;
+	/** When set in inspector mode, only render this section (avoids nested duplicate blocks). */
+	inspectorScope?: 'all' | 'base' | 'symbol' | 'symbol-labels' | 'symbol-text' | 'choropleth' | 'choropleth-labels';
 }
 
 const googleFontFamilies = [
@@ -224,23 +227,25 @@ export function MapStyling({
 	isExpanded,
 	setIsExpanded,
 	variant = 'panel',
+	inspectorScope = 'all',
 }: MapStylingProps) {
 	const [activeTab, setActiveTab] = useState(stylingSettings.activeTab);
 	const [expandedPanels, setExpandedPanels] = useState<{ [key: string]: boolean }>({
-		savedStyles: false, // Collapsed by default
-		background: false, // Collapsed by default
-		nation: false, // Collapsed by default
-		states: false, // Collapsed by default
-		symbols: false, // Collapsed by default
-		symbolLabels: false, // Collapsed by default
-		symbolText: false,
-		choroplethLabels: false, // Collapsed by default
+		savedStyles: true,
+		background: true,
+		nation: true,
+		states: true,
+		subnational: true,
+		symbols: true,
+		symbolLabels: true,
+		symbolText: true,
+		choroplethLabels: true,
 	});
 	const [newStyleName, setNewStyleName] = useState('');
 	const [inspectorBlocksExpanded, setInspectorBlocksExpanded] = useState({
-		base: false,
-		symbol: false,
-		choropleth: false,
+		base: true,
+		symbol: true,
+		choropleth: true,
 	});
 
 	useEffect(() => {
@@ -355,66 +360,27 @@ export function MapStyling({
 	const renderSubPanel = (
 		key: string,
 		title: string,
-		icon: React.ReactNode,
+		_icon: React.ReactNode,
 		children: React.ReactNode,
 		badge?: string
 	) => {
-		if (variant === 'inspector') {
-			return (
-				<StudioInspectorSection key={key} title={title} badge={
-						badge ? (
-							<span className="text-[10px] font-normal text-muted-foreground border border-border px-1.5 py-0.5 ml-1">
-								{badge}
-							</span>
-						) : undefined
-					}>
-					{children}
-				</StudioInspectorSection>
-			);
-		}
-
 		const isPanelExpanded = expandedPanels[key];
+
 		return (
-			<div className={studioSubPanelClass}>
-				<div
-					className={studioSubPanelHeaderClass}
-					onClick={() => togglePanel(key)}
-					onKeyDown={(e) => {
-						if (e.key === 'Enter' || e.key === ' ') {
-							e.preventDefault();
-							togglePanel(key);
-						}
-					}}
-					role="button"
-					tabIndex={0}
-					aria-expanded={isPanelExpanded}
-					aria-controls={`panel-${key}`}>
-					<div className="flex items-center justify-between">
-						<div className="flex items-center gap-2">
-							<div className="text-foreground transform scale-75">{icon}</div>
-							<span className={studioSubPanelTitleClass}>{title}</span>
-							{badge && (
-								<span className="text-[10px] font-normal text-muted-foreground border border-border px-1.5 py-0.5 ml-1">
-									{badge}
-								</span>
-							)}
-						</div>
-						<div className="transition-transform duration-200">
-							{isPanelExpanded ? (
-								<ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
-							) : (
-								<ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
-							)}
-						</div>
-					</div>
-				</div>
-				<div
-					className={`transition-all duration-300 ease-in-out overflow-hidden ${
-						isPanelExpanded ? 'max-h-none opacity-100' : 'max-h-0 opacity-0'
-					}`}>
-					<div className={studioSubPanelContentClass}>{children}</div>
-				</div>
-			</div>
+			<StudioCollapsibleSection
+				key={key}
+				title={title}
+				isExpanded={isPanelExpanded}
+				onToggle={() => togglePanel(key)}
+				badge={
+					badge ? (
+						<span className="shrink-0 rounded-none border border-border px-1.5 py-0.5 font-mono text-[10px] font-normal tracking-wide text-muted-foreground">
+							{badge}
+						</span>
+					) : undefined
+				}>
+				{children}
+			</StudioCollapsibleSection>
 		);
 	};
 
@@ -477,14 +443,14 @@ export function MapStyling({
 	const renderStyleGroup = (title: string, show: boolean, children: React.ReactNode) => {
 		if (!show) return null;
 		if (isInspector) {
-			return <div className="space-y-0">{children}</div>;
+			return <div className={cn('space-y-0', studioCollapsibleSectionListClass)}>{children}</div>;
 		}
 		return (
 			<div className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300">{children}</div>
 		);
 	};
 
-	const renderMapStylingFields = (scope: 'panel' | 'base' | 'symbol' | 'choropleth') => (
+	const renderMapStylingFields = (scope: 'panel' | 'base' | 'symbol' | 'symbol-labels' | 'symbol-text' | 'choropleth' | 'choropleth-labels') => (
 		<>
 			{scope === 'panel' && !isInspector ? (
 						<ToggleGroup
@@ -762,9 +728,12 @@ export function MapStyling({
 
 			{renderStyleGroup(
 				'Symbol map',
-				scope === 'panel' ? showSymbolContent : scope === 'symbol',
+				scope === 'panel'
+					? showSymbolContent
+					: scope === 'symbol' || scope === 'symbol-labels' || scope === 'symbol-text',
 				<>
-								{renderSubPanel(
+								{(scope === 'panel' || scope === 'symbol') &&
+								renderSubPanel(
 									'symbols',
 									'Symbols', // Sentence case
 									<Circle className="w-4 h-4" />,
@@ -986,7 +955,8 @@ export function MapStyling({
 									</div>
 								)}
 
-								{renderSubPanel(
+								{(scope === 'panel' || scope === 'symbol-labels') &&
+								renderSubPanel(
 									'symbolLabels',
 									'Labels', // Sentence case
 									<Type className="w-4 h-4" />,
@@ -1179,7 +1149,8 @@ export function MapStyling({
 									</div>
 								)}
 
-								{renderSubPanel(
+								{(scope === 'panel' || scope === 'symbol-text') &&
+								renderSubPanel(
 									'symbolText',
 									'Symbol text',
 									<Hash className="w-4 h-4" />,
@@ -1347,9 +1318,12 @@ export function MapStyling({
 
 			{renderStyleGroup(
 				'Choropleth',
-				scope === 'panel' ? showChoroplethContent : scope === 'choropleth',
+				scope === 'panel'
+					? showChoroplethContent
+					: scope === 'choropleth' || scope === 'choropleth-labels',
 				<>
-								{renderSubPanel(
+								{(scope === 'panel' || scope === 'choropleth-labels') &&
+								renderSubPanel(
 									'choroplethLabels',
 									'Labels', // Sentence case
 									<Type className="w-4 h-4" />,
@@ -1522,6 +1496,7 @@ export function MapStyling({
 		<TooltipProvider>
 			{isInspector ? (
 				<>
+					{(inspectorScope === 'all' || inspectorScope === 'base') && (
 					<StudioInspectorBlock
 						title="Base map"
 						isExpanded={inspectorBlocksExpanded.base}
@@ -1530,26 +1505,45 @@ export function MapStyling({
 						}>
 						{renderMapStylingFields('base')}
 					</StudioInspectorBlock>
-					{symbolDataExists ? (
+					)}
+					{(inspectorScope === 'all' || inspectorScope === 'symbol') && symbolDataExists ? (
+						inspectorScope === 'all' ? (
 						<StudioInspectorBlock
-							title="Symbol map"
+							title="Symbols"
 							isExpanded={inspectorBlocksExpanded.symbol}
 							onToggle={() =>
 								setInspectorBlocksExpanded((prev) => ({ ...prev, symbol: !prev.symbol }))
 							}>
 							{renderMapStylingFields('symbol')}
 						</StudioInspectorBlock>
+						) : (
+							renderMapStylingFields('symbol')
+						)
 					) : null}
-					{choroplethDataExists || customDataExists ? (
+					{(inspectorScope === 'all' || inspectorScope === 'symbol-labels') && symbolDataExists
+						? renderMapStylingFields('symbol-labels')
+						: null}
+					{(inspectorScope === 'all' || inspectorScope === 'symbol-text') && symbolDataExists
+						? renderMapStylingFields('symbol-text')
+						: null}
+					{(inspectorScope === 'all' || inspectorScope === 'choropleth') && (choroplethDataExists || customDataExists) ? (
+						inspectorScope === 'all' ? (
 						<StudioInspectorBlock
-							title="Choropleth"
+							title="Fill"
 							isExpanded={inspectorBlocksExpanded.choropleth}
 							onToggle={() =>
 								setInspectorBlocksExpanded((prev) => ({ ...prev, choropleth: !prev.choropleth }))
 							}>
 							{renderMapStylingFields('choropleth')}
 						</StudioInspectorBlock>
+						) : (
+							renderMapStylingFields('choropleth')
+						)
 					) : null}
+					{(inspectorScope === 'all' || inspectorScope === 'choropleth-labels') &&
+					(choroplethDataExists || customDataExists)
+						? renderMapStylingFields('choropleth-labels')
+						: null}
 				</>
 			) : (
 				<Card className={cn(studioPanelClass, 'overflow-hidden')}>

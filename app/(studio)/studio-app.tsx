@@ -76,6 +76,12 @@ export default function StudioApp() {
     setSelectedProjection,
     clipToCountry,
     setClipToCountry,
+    renderTarget,
+    setRenderTarget,
+    boundaryConfig,
+    setBoundaryConfig,
+    maplibreConfig,
+    setMaplibreConfig,
     columnTypes,
     setColumnTypes,
     columnFormats,
@@ -292,7 +298,6 @@ export default function StudioApp() {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4">
         <DataInput
           onDataLoad={handleDataLoad}
-          onClearData={handleClearData}
           isExpanded={dataInputExpanded}
           setIsExpanded={setDataInputExpanded}
         />
@@ -320,6 +325,9 @@ export default function StudioApp() {
           onClipToCountryChange={setClipToCountry}
           isExpanded={projectionExpanded}
           setIsExpanded={setProjectionExpanded}
+          boundaryConfig={boundaryConfig}
+          onBoundaryChange={setBoundaryConfig}
+          renderTarget={renderTarget}
         />
 
         {hasData && (
@@ -402,6 +410,10 @@ export default function StudioApp() {
             clipToCountry={clipToCountry}
             isExpanded={mapPreviewExpanded}
             setIsExpanded={setMapPreviewExpanded}
+            renderTarget={renderTarget}
+            onRenderTargetChange={setRenderTarget}
+            boundaryConfig={boundaryConfig}
+            maplibreConfig={maplibreConfig}
           />
         </Suspense>
       </div>

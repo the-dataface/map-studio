@@ -7,6 +7,13 @@ import type {
   MapType,
   GeographyKey,
   ProjectionType,
+  BoundaryConfig,
+  MapLibreConfig,
+  RenderTarget,
+  CanvasType,
+  MapLayer,
+  PrintConfig,
+  ReferenceLayerConfig,
 } from '@/app/(studio)/types'
 
 export interface SavedProject {
@@ -25,7 +32,17 @@ export interface SavedProject {
   columnFormats: Record<string, string>
   dimensionSettings: DimensionSettings
   stylingSettings: StylingSettings
-  preview?: string // Base64 encoded SVG preview (optional)
+  preview?: string
+  // V2 layer model (optional for backward compat)
+  layers?: MapLayer[]
+  selectedLayerId?: string | null
+  canvasType?: CanvasType
+  customBoundary?: string
+  printConfig?: PrintConfig
+  referenceLayers?: ReferenceLayerConfig[]
+  renderTarget?: RenderTarget
+  boundaryConfig?: BoundaryConfig
+  maplibreConfig?: MapLibreConfig
 }
 
 const STORAGE_KEY = 'mapstudio_projects'

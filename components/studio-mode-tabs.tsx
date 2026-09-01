@@ -6,10 +6,16 @@ import type { StudioMode } from '@/lib/studio-chrome-context'
 interface StudioModeTabsProps {
   mode: StudioMode
   onModeChange: (mode: StudioMode) => void
+  mapSetupEnabled: boolean
   designEnabled: boolean
 }
 
-export function StudioModeTabs({ mode, onModeChange, designEnabled }: StudioModeTabsProps) {
+export function StudioModeTabs({
+  mode,
+  onModeChange,
+  mapSetupEnabled,
+  designEnabled,
+}: StudioModeTabsProps) {
   return (
     <div className={studioTabBarClass} role="tablist" aria-label="Studio mode">
       <button
@@ -26,12 +32,25 @@ export function StudioModeTabs({ mode, onModeChange, designEnabled }: StudioMode
       <button
         type="button"
         role="tab"
+        id="studio-tab-map-setup"
+        aria-selected={mode === 'map-setup'}
+        aria-controls="studio-panel-map-setup"
+        aria-disabled={!mapSetupEnabled}
+        disabled={!mapSetupEnabled}
+        title={mapSetupEnabled ? 'Setup mode (2)' : 'Load data to enable setup'}
+        className={studioTabButtonClass(mode === 'map-setup', !mapSetupEnabled)}
+        onClick={() => onModeChange('map-setup')}>
+        Setup
+      </button>
+      <button
+        type="button"
+        role="tab"
         id="studio-tab-design"
         aria-selected={mode === 'design'}
         aria-controls="studio-panel-design"
         aria-disabled={!designEnabled}
         disabled={!designEnabled}
-        title={designEnabled ? 'Design mode (2)' : 'Load data to enable design mode'}
+        title={designEnabled ? 'Design mode (3)' : 'Load data to enable design mode'}
         className={studioTabButtonClass(mode === 'design', !designEnabled)}
         onClick={() => onModeChange('design')}>
         Design

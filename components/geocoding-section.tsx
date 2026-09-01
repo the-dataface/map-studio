@@ -39,6 +39,9 @@ interface GeocodingSectionProps {
 	setIsGeocoding: (loading: boolean) => void;
 	isExpanded: boolean;
 	setIsExpanded: (expanded: boolean) => void;
+	pointsLayers?: Array<{ id: string; name: string }>;
+	selectedLayerId?: string;
+	onSelectLayer?: (id: string) => void;
 }
 
 interface GeocodingStatus {
@@ -135,6 +138,9 @@ export function GeocodingSection({
 	setIsGeocoding,
 	isExpanded,
 	setIsExpanded,
+	pointsLayers,
+	selectedLayerId,
+	onSelectLayer,
 }: GeocodingSectionProps) {
 	const [fullAddressColumn, setFullAddressColumn] = useState<string>('none');
 	const [cityColumn, setCityColumn] = useState<string>('none');
@@ -775,6 +781,26 @@ export function GeocodingSection({
 								Choose either a full address column or separate city and state columns to geocode your data.
 							</p>
 						</div>
+
+						{pointsLayers && pointsLayers.length > 0 && onSelectLayer && (
+							<div>
+								<label htmlFor="geocode-layer" className="mb-2 block text-sm font-medium">
+									Points layer
+								</label>
+								<Select value={selectedLayerId} onValueChange={onSelectLayer}>
+									<SelectTrigger id="geocode-layer">
+										<SelectValue placeholder="Select layer" />
+									</SelectTrigger>
+									<SelectContent>
+										{pointsLayers.map((layer) => (
+											<SelectItem key={layer.id} value={layer.id}>
+												{layer.name}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</div>
+						)}
 
 						<div className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-2 duration-300 delay-75">
 							<div>

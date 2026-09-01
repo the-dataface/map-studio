@@ -47,6 +47,13 @@ const nextConfig = {
               test: /node_modules/,
               priority: 20,
             },
+            // MapLibre chunk (large library)
+            maplibre: {
+              name: 'maplibre',
+              chunks: 'all',
+              test: /[\\/]node_modules[\\/](maplibre-gl|react-map-gl)[\\/]/,
+              priority: 30,
+            },
             // D3 chunk (large library)
             d3: {
               name: 'd3',

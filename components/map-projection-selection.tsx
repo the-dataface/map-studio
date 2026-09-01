@@ -11,6 +11,8 @@ import { cn } from '@/lib/utils';
 import { studioPanelClass, StudioExpandableHeader } from '@/components/studio-panel';
 import { Checkbox } from '@/components/ui/checkbox'; // Import Checkbox
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'; // Import Tooltip components
+import type { BoundaryConfig, RenderTarget } from '@/app/(studio)/types';
+import { BoundaryPicker } from '@/components/boundary-picker';
 
 interface MapProjectionSelectionProps {
 	geography: 'usa-states' | 'usa-counties' | 'usa-nation' | 'canada-provinces' | 'canada-nation' | 'world';
@@ -25,6 +27,9 @@ interface MapProjectionSelectionProps {
 	onClipToCountryChange: (clip: boolean) => void; // New prop
 	isExpanded: boolean;
 	setIsExpanded: (expanded: boolean) => void;
+	boundaryConfig?: BoundaryConfig;
+	onBoundaryChange?: (config: BoundaryConfig) => void;
+	renderTarget?: RenderTarget;
 }
 
 const geographies = [
@@ -54,6 +59,9 @@ export function MapProjectionSelection({
 	onClipToCountryChange, // Destructure new prop
 	isExpanded,
 	setIsExpanded,
+	boundaryConfig,
+	onBoundaryChange,
+	renderTarget = 'svg',
 }: MapProjectionSelectionProps) {
 	const [searchQuery, setSearchQuery] = useState('');
 
@@ -75,12 +83,19 @@ export function MapProjectionSelection({
 	return (
 		<Card className={cn(studioPanelClass, 'overflow-hidden')}>
 			<StudioExpandableHeader
-				title="Geography and projection"
+				title="Geography, boundaries, and projection"
 				isExpanded={isExpanded}
 				onToggle={() => setIsExpanded(!isExpanded)}
 			/>
 			<CardContent className={cn('studio-panel-expand-body transition-all duration-200', isExpanded ? 'pb-6 pt-2 max-h-none opacity-100' : 'pb-0 h-0 max-h-0 overflow-hidden opacity-0')}>
 				<div className="flex flex-col gap-4">
+					{boundaryConfig && onBoundaryChange ? (
+						<BoundaryPicker
+							boundaryConfig={boundaryConfig}
+							onBoundaryChange={onBoundaryChange}
+							renderTarget={renderTarget}
+						/>
+					) : null}
 					<div>
 						<Label htmlFor="geography-search" className="mb-2 block">
 							Select geography
